@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/X/Projects/medinor/**)",
+      "Bash(npm run *)",
+      "Bash(npm install *)"
+    ]
+  }
+}

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEDIRON Product Catalog & Slab Pricing | KGSM Group</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #1a1a1a; line-height: 1.6; }
+  .header { background: #fff; border-bottom: 1px solid #e5e5e5; padding: 16px 24px; position: sticky; top: 0; z-index: 100; }
+  .header-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand img { height: 40px; }
+  .brand-text { font-size: 14px; color: #666; }
+  .brand-text strong { display: block; font-size: 16px; color: #1a1a1a; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+  /* Control Panel */
+  .control-panel { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 20px; margin-bottom: 30px; }
+  .control-panel h2 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .control-panel p { font-size: 12px; color: #888; margin-bottom: 16px; }
+  .slab-tiers { display: flex; gap: 12px; flex-wrap: wrap; }
+  .tier-card { background: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px 14px; flex: 1; min-width: 180px; }
+  .tier-card .tier-name { font-size: 12px; font-weight: 700; color: #333; margin-bottom: 8px; }
+  .tier-card .tier-inputs { display: flex; align-items: center; gap: 6px; }
+  .tier-card .tier-inputs input[type="number"] { width: 60px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-align: center; }
+  .tier-card .tier-inputs input:focus { outline: none; border-color: #188038; }
+  .tier-card .tier-inputs span { font-size: 12px; color: #999; }
+  .tier-card .tier-discount { margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .tier-card .tier-discount label { font-size: 11px; color: #666; }
+  .tier-card .tier-discount input { width: 50px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-align: center; }
+  .slab-actions { margin-top: 16px; display: flex; gap: 8px; }
+  .slab-btn { background: #188038; color: #fff; border: none; border-radius: 6px; padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .slab-btn:hover { background: #146b2f; }
+  .slab-btn-reset { background: #f0f0f0; color: #333; border: 1px solid #ccc; }
+  .slab-btn-reset:hover { background: #e0e0e0; }
+
+  /* Slab Preview Table */
+  .slab-preview { margin-top: 16px; overflow-x: auto; }
+  .slab-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .slab-preview th { background: #f0f0f0; color: #333; padding: 8px 12px; text-align: left; font-weight: 600; white-space: nowrap; border-bottom: 2px solid #e5e5e5; }
+  .slab-preview td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .slab-preview tr:nth-child(even) td { background: #fafafa; }
+  .slab-preview tr:hover td { background: #e6f4ea; }
+  .price-cell { font-weight: 700; color: #188038; }
+  .disc-cell { color: #e53e3e; }
+
+  /* Product Grid */
+  .section-title { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  .section-title span { font-size: 14px; font-weight: 400; color: #666; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; transition: box-shadow 0.2s, transform 0.2s; display: flex; flex-direction: column; cursor: pointer; }
+  .card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); transform: translateY(-2px); }
+  .card-img { position: relative; aspect-ratio: 1; background: #fff; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .badge { position: absolute; top: 12px; left: 12px; background: #e53e3e; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; }
+  .express-badge { display: inline-flex; align-items: center; gap: 4px; background: #f0f0f0; font-size: 10px; font-weight: 600; color: #333; padding: 4px 8px; border-radius: 4px; margin: 8px 0 0 12px; }
+  .express-badge img { width: 14px; height: 14px; }
+  .card-body { padding: 12px 16px 16px; flex: 1; display: flex; flex-direction: column; }
+  .card-title { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+
+  /* Pricing Inputs */
+  .price-config { background: #f8f8f8; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .price-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .price-row:last-child { margin-bottom: 0; }
+  .price-row label { font-size: 11px; font-weight: 600; color: #666; width: 60px; flex-shrink: 0; }
+  .price-row input { width: 80px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; text-align: right; }
+  .price-row input:focus { outline: none; border-color: #188038; }
+  .price-row .unit { font-size: 11px; color: #999; }
+  .calc-result { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px dashed #ddd; margin-top: 8px; }
+  .calc-result .label { font-size: 11px; color: #666; font-weight: 600; }
+  .calc-result .value { font-size: 16px; font-weight: 700; color: #188038; }
+  .calc-result .value del { font-size: 12px; color: #999; font-weight: 400; margin-right: 4px; }
+  .calc-result .disc { font-size: 11px; color: #e53e3e; font-weight: 600; }
+
+
+  /* Product Detail Section */
+  .product-detail { display: none; background: #fff; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px; padding: 24px; margin-top: -1px; margin-bottom: 30px; }
+  .product-detail.active { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+  .detail-section { margin-bottom: 20px; }
+  .detail-section h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #333; text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-section ul { list-style: none; padding: 0; }
+  .detail-section li { padding: 4px 0; font-size: 13px; color: #555; }
+  .detail-section li::before { content: "• "; color: #188038; }
+  .detail-section p { font-size: 13px; color: #555; line-height: 1.7; }
+  .spec-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .spec-table td { padding: 6px 0; border-bottom: 1px solid #f0f0f0; color: #555; }
+  .spec-table td:first-child { font-weight: 600; color: #333; width: 45%; }
+  .usage-steps { counter-reset: step; list-style: none; padding: 0; }
+  .usage-steps li { counter-increment: step; padding: 6px 0 6px 28px; position: relative; font-size: 13px; color: #555; }
+  .usage-steps li::before { content: counter(step); position: absolute; left: 0; top: 6px; width: 20px; height: 20px; background: #e6f4ea; color: #188038; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .cautions { background: #fff3f3; border-left: 3px solid #e53e3e; padding: 12px 16px; border-radius: 0 6px 6px 0; }
+  .cautions ul { list-style: none; padding: 0; }
+  .cautions li { padding: 3px 0; font-size: 12px; color: #666; }
+  .cautions li::before { content: "⚠ "; }
+  .product-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e5e5; }
+  .product-header img { width: 80px; height: 80px; object-fit: contain; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px; background: #fff; }
+  .product-header h3 { font-size: 18px; font-weight: 700; }
+  .product-header .price { font-size: 22px; }
+
+
+
+  /* MRP Slab Reference */
+  .slab-ref { margin-top: 16px; padding: 12px; background: #f0f7ff; border-radius: 6px; border: 1px solid #d0e4ff; }
+  .slab-ref summary { font-size: 12px; font-weight: 600; color: #1a1a1a; cursor: pointer; }
+  .slab-ref table { width: 100%; margin-top: 10px; font-size: 11px; border-collapse: collapse; }
+  .slab-ref th, .slab-ref td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #d0e4ff; }
+  .slab-ref th { background: #d0e4ff; font-weight: 600; }
+  .slab-ref td { color: #555; }
+
+  .footer { text-align: center; padding: 32px; color: #999; font-size: 12px; }
+  .kgsm-badge { display: inline-block; background: #1a1a1a; color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; margin-top: 8px; }
+
+  @media (max-width: 768px) {
+    .detail-grid { grid-template-columns: 1fr; gap: 16px; }
+    .slab-controls { flex-direction: column; }
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .container { padding: 16px; }
+    .section-title { font-size: 18px; }
+    .card-title { font-size: 12px; }
+    .product-detail { padding: 16px; }
+    .product-header { flex-direction: column; text-align: center; }
+  }
+
+  /* Print Styles */
+  @media print {
+    .control-panel, .slab-tiers, .slab-actions, .slab-preview, .detail-toggle, .header { display: none !important; }
+    .container { max-width: 100%; padding: 0; }
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 15px; }
+    .card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
+    .card-img { height: 180px; }
+    .card-body { padding: 10px; }
+    .card-title { font-size: 11px; }
+    .product-detail { display: block !important; padding: 10px; border: none; margin-bottom: 10px; page-break-inside: avoid; }
+    .detail-grid { grid-template-columns: 1fr; gap: 10px; }
+    .detail-section { margin-bottom: 8px; }
+    .detail-section h4 { font-size: 10px; margin-bottom: 4px; }
+    .detail-section li, .detail-section p { font-size: 9px; line-height: 1.4; }
+    .spec-table { font-size: 9px; }
+    .product-header { padding-bottom: 8px; margin-bottom: 8px; }
+    .product-header img { width: 50px; height: 50px; }
+    .product-header h3 { font-size: 12px; }
+    .cautions { padding: 6px 8px; }
+    .footer { padding: 10px; }
+  }
+
+  .print-btn { background: #1a1a1a; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-left: 10px; }
+  .print-btn:hover { background: #333; }
+  .print-only { display: none; }
+  @media print {
+    .print-only { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <img src="https://kgsmgroup.com/wp-content/uploads/2021/09/KgsmGroupLogo.png" alt="KGSM Group">
+      <div class="brand-text">
+        <strong>MEDIRON<sup style="font-size:10px;">&reg;</sup></strong>
+        Exclusive Sole Agent &mdash; KGSM Group
+      </div>
+    </div>
+    <div style="font-size:13px;color:#666;">Product Catalog &amp; Slab Pricing</div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Print Header -->
+  <div class="print-only" style="text-align:center;padding:20px;border-bottom:2px solid #1a1a1a;margin-bottom:20px;">
+    <h1 style="font-size:24px;margin-bottom:4px;">MEDIRON<sup style="font-size:12px;">&reg;</sup> Product Catalog</h1>
+    <p style="font-size:12px;color:#666;">Exclusive Sole Agent: KGSM Group | DGDA DAR No.: 72-8880-2024</p>
+    <p style="font-size:10px;color:#999;">ISO Certified | CE Marked | Bangladesh</p>
+  </div>
+
+  <!-- SLAB CONTROL PANEL -->
+  <div class="control-panel">
+    <h2>Slab Pricing Engine</h2>
+    <p>Configure wholesale slab tiers. Prices auto-calculate as MRP × (1 - discount%). Edit tier ranges and percentages to experiment.</p>
+
+    <div class="slab-tiers">
+      <div class="tier-card">
+        <div class="tier-name">Tier 1</div>
+        <div class="tier-inputs">
+          <input type="number" id="tier1min" value="10" min="1" oninput="recalcAll()">
+          <span>—</span>
+          <input type="number" id="tier1max" value="49" min="1" oninput="recalcAll()">
+          <span>units</span>
+        </div>
+        <div class="tier-discount">
+          <label>Discount:</label>
+          <input type="number" id="slab1" value="25" min="0" max="80" oninput="recalcAll()">
+          <span>%</span>
+        </div>
+      </div>
+      <div class="tier-card">
+        <div class="tier-name">Tier 2</div>
+        <div class="tier-inputs">
+          <input type="number" id="tier2min" value="50" min="1" oninput="recalcAll()">
+          <span>—</span>
+          <input type="number" id="tier2max" value="199" min="1" oninput="recalcAll()">
+          <span>units</span>
+        </div>
+        <div class="tier-discount">
+          <label>Discount:</label>
+          <input type="number" id="slab2" value="29" min="0" max="80" oninput="recalcAll()">
+          <span>%</span>
+        </div>
+      </div>
+      <div class="tier-card">
+        <div class="tier-name">Tier 3</div>
+        <div class="tier-inputs">
+          <input type="number" id="tier3min" value="200" min="1" oninput="recalcAll()">
+          <span>—</span>
+          <input type="number" id="tier3max" value="499" min="1" oninput="recalcAll()">
+          <span>units</span>
+        </div>
+        <div class="tier-discount">
+          <label>Discount:</label>
+          <input type="number" id="slab3" value="32" min="0" max="80" oninput="recalcAll()">
+          <span>%</span>
+        </div>
+      </div>
+      <div class="tier-card">
+        <div class="tier-name">Tier 4</div>
+        <div class="tier-inputs">
+          <input type="number" id="tier4min" value="500" min="1" oninput="recalcAll()">
+          <span>+ units</span>
+        </div>
+        <div class="tier-discount">
+          <label>Discount:</label>
+          <input type="number" id="slab4" value="35" min="0" max="80" oninput="recalcAll()">
+          <span>%</span>
+        </div>
+      </div>
+    </div>
+    <div class="slab-actions">
+      <button class="slab-btn" onclick="recalcAll()">Apply</button>
+      <button class="slab-btn slab-btn-reset" onclick="resetSlabs()">Reset</button>
+    </div>
+
+    <div class="slab-preview" id="slabPreview">
+      <table>
+        <thead>
+           <tr><th>Tier</th><th>Volume</th><th>Discount %</th><th>Price (Est. MRP ৳1650)</th><th>Status</th></tr>
+        </thead>
+        <tbody id="slabPreviewBody"></tbody>
+      </table>
+
+    </div>
+  </div>
+
+  <!-- PRODUCT GRID -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <h2 class="section-title" style="margin-bottom:0;">All Items <span>8 products</span></h2>
+    <button class="print-btn" onclick="window.print()">Print Catalog (PDF)</button>
+  </div>
+  <div class="grid" id="productGrid"></div>
+
+</main>
+
+<!-- Print Footer -->
+<div class="print-only" style="text-align:center;padding:15px;border-top:1px solid #ddd;margin-top:20px;font-size:10px;color:#999;">
+  <p>KGSM Group | Exclusive Sole Agent for MEDIRON<sup>&reg;</sup> in Bangladesh</p>
+  <p>Prices subject to change. Contact KGSM Group for current trade pricing.</p>
+</div>
+
+<footer class="footer">
+  <span class="kgsm-badge">KGSM GROUP</span>
+  <p style="margin-top:8px;">Exclusive Sole Agent for MEDIRON<sup>&reg;</sup> in Bangladesh</p>
+  <p style="margin-top:4px;">All products DGDA approved. DAR No.: 72-8880-2024</p>
+  <p style="margin-top:12px;">Use the Slab Pricing Engine above to experiment with wholesale tiers. Contact KGSM Group for official trade pricing.</p>
+</footer>
+
+<script>
+// Product Data with actual MRPs from market
+const products = [
+  {
+    id: 1, name: "Mediron Prime Automatic Blood Pressure Monitor Model No. MEDI 712",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC85MjMzN1wvOTIzMzctTWVkaXJvbi1QcmltZS1BdXRvbWF0aWMtQmxvb2QtUHJlc3N1cmUtTW9uaXRvci1Nb2RlbC1Oby1tNXFyZ2Eud2VicCIsImVkaXRzIjp7InJlc2l6ZSI6eyJ3aWR0aCI6MjE2LCJoZWlnaHQiOjIxNiwiZml0Ijoib3V0c2lkZSJ9fX0%3D&w=1280&q=75",
+    mrp: 3400, discount: 0, ratings: 0, ratedBy: 0,
+    desc: "Mediron Prime Automatic Blood Pressure Monitor MEDI 712 is a digital upper arm blood pressure monitor designed for convenient and reliable home health monitoring.",
+    features: ["One-touch automatic operation", "Intelligent measurement system", "Irregular heartbeat detection", "Memory storage (up to 120 readings)", "Large LCD display", "Dual power options (battery and USB)"],
+    specs: { "Product Type": "Digital BP Monitor", "Model": "MEDI 712", "Power": "4 AA Batteries or USB" }
+  },
+  {
+    id: 2, name: "Mediron Examination Gloves (Large)",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84NDIzMVwvODQyMzEtMDlmNzMwZjEtYjU0Yi00YWUzLTkxNWEtYTllOGY3ZjQ3NjE4LWI4bjBrMy5qcGVnIiwiZWRpdHMiOnsicmVzaXplIjp7IndpZHRoIjoyMTYsImhlaWdodCI6MjE2LCJmaXQiOiJvdXRzaWRlIn19fQ%3D%3D&w=1280&q=75",
+    mrp: 600, discount: 17, ratings: 5, ratedBy: 1,
+    desc: "Ensure safety, hygiene, and comfort with MEDIRON Examination Gloves, designed for professional use in medical, clinical, and laboratory environments. 100 gloves per box. Made in Malaysia.",
+    features: ["Reliable barrier protection", "Comfortable large-size fit", "High tactile sensitivity", "Single-use and hygienic", "Durable for professional use", "Made in Malaysia"],
+    specs: { "Size": "Large", "Quantity": "100 per box", "Material": "Disposable examination", "Manufacturing": "Malaysia" }
+  },
+  {
+    id: 3, name: "Mediron Blood Glucose Test Strip 25 Test Strips (Foil Pack)",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84Mzg2OVwvODM4NjktTWVkaXJvbi1CbG9vZC1HbHVjb3NlLVRlc3QtU3RyaXAtMjUtVGVzdC1TdHJpcHMtRm9pbC1QYWNrLWNvcHktMnQxem5wLndlYnAiLCJlZGl0cyI6eyJyZXNpemUiOnsid2lkdGgiOjIxNiwiaGVpZ2h0IjoyMTYsImZpdCI6Im91dHNpZGUifX19&w=1280&q=75",
+    mrp: 665, discount: 10, ratings: 0, ratedBy: 0,
+    desc: "Mediron Blood Glucose Test Strips deliver fast, accurate, and reliable blood sugar readings. Pack contains 25 individually sealed strips in foil packaging. Compatible with Mediron glucose meters.",
+    features: ["25 test strips per pack", "No coding required", "Individually sealed for hygiene", "Use within 90 days of opening", "Capillary whole blood testing"],
+    specs: { "Count": "25 strips", "Packaging": "Foil pack", "Compatibility": "Mediron meters" }
+  },
+  {
+    id: 4, name: "Mediron Advance Automatic Blood Pressure Monitor Model no: MEDI 447",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84MzMwMFwvODMzMDAtNjUzNzBiMzYtMmFiNC00ZDAwLTk3YWYtNzNjOGU1ZjE5MjU4LW52a2Ruay5qcGVnIiwiZWRpdHMiOnsicmVzaXplIjp7IndpZHRoIjoyMTYsImhlaWdodCI6MjE2LCJmaXQiOiJvdXRzaWRlIn19fQ%3D&w=1280&q=75",
+    mrp: 3150, discount: 19, ratings: 0, ratedBy: 0,
+    desc: "The Mediron Advance Automatic Blood Pressure Monitor (Model MEDI 447) is a user-friendly, digital device for accurate home blood pressure readings. 3-year warranty.",
+    features: ["Fully automatic one-touch operation", "Digital LCD display", "Standard cuff size", "Compact and lightweight", "Battery operated", "Results in 5 seconds"],
+    specs: { "Model": "MEDI 447", "Warranty": "3 years", "Power": "Battery operated" }
+  },
+  {
+    id: 5, name: "Mediron Automatic Blood Pressure Monitor (Smart) Model No. MEDI 589",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84MzI5N1wvODMyOTctYTFhY2Y4NmEtYzE4MC00NDgwLWFkNzMtOTRkZGE2M2M1YzRiLWY2dTVhcS5qcGVnIiwiZWRpdHMiOnsicmVzaXplIjp7IndpZHRoIjoyMTYsImhlaWdodCI6MjE2LCJmaXQiOiJvdXRzaWRlIn19fQ%3D&w=1280&q=75",
+    mrp: 3150, discount: 24, ratings: 0, ratedBy: 0,
+    desc: "The MEDIRON Smart Blood Pressure Monitor provides precise, convenient, and reliable blood pressure and pulse measurements at home with advanced features.",
+    features: ["Cuff wrapping guide", "Hypertension indicator", "Body movement detection", "Last memory recall", "Irregular heartbeat detection", "Dual power (battery + USB)"],
+    specs: { "Model": "MEDI 589", "BP Range": "0-280 mmHg", "Pulse": "40-199 bpm", "Accuracy": "±3 mmHg" }
+  },
+  {
+    id: 6, name: "Mediron Blood Lancets Twist Type 31G 100pcs",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84MzI5NVwvODMyOTUtVGFpc2lyLTgwMDgwMHB4LXhpNGY3YS5qcGVnIiwiZWRpdHMiOnsicmVzaXplIjp7IndpZHRoIjoyMTYsImhlaWdodCI6MjE2LCJmaXQiOiJvdXRzaWRlIn19fQ%3D&w=1280&q=75",
+    mrp: 110, discount: 15, ratings: 5, ratedBy: 3,
+    desc: "Mediron Blood Lancets Twist Type 31G are sterile, single-use lancets designed for safe and virtually painless blood sampling. Universal compatibility with most lancing devices.",
+    features: ["31G fine gauge needle", "Tri-bevel tip for reduced pain", "Twist-off cap", "Universal compatibility", "Individually sealed", "100 pieces per box"],
+    specs: { "Gauge": "31G", "Count": "100 per box", "Type": "Twist-off cap" }
+  },
+  {
+    id: 7, name: "Mediron Excellent Blood Glucose Meter",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84MzI5MlwvODMyOTItNDc1YTRkMGItOWJmNS00YzJmLWJkN2ItZjEwMjZhNjllMDg5LTlybDU0Ny5qcGVnIiwiZWRpdHMiOnsicmVzaXplIjp7IndpZHRoIjoyMTYsImhlaWdodCI6MjE2LCJmaXQiOiJvdXRzaWRlIn19fQ%3D&w=1280&q=75",
+    mrp: 1650, discount: 55, ratings: 0, ratedBy: 0,
+    desc: "The MEDIRON Blood Glucose Meter delivers fast and accurate results in just 5 seconds. Requires only 0.5μL blood sample. ISO Certified and CE Marked. Best value starter kit.",
+    features: ["Tiny blood sample (0.5μL)", "Memory recall (480 results)", "Auto shut-off", "ISO Certified and CE Marked", "Date and time display", "Complete starter kit included"],
+    specs: { "Result Time": "5 seconds", "Blood Sample": "0.5μL", "Memory": "480-512 tests", "Certifications": "ISO, CE Marked" }
+  },
+  {
+    id: 8, name: "Mediron Blood Glucose Test Strip 25x2=50 strips",
+    img: "https://www.arogga.com/_next/image?url=https%3A%2F%2Fcdn2.arogga.com%2FeyJidWNrZXQiOiJhcm9nZ2EiLCJrZXkiOiJQcm9kdWN0LXBfaW1hZ2VzXC84MzI5MFwvODMyOTAtMTJkYTE4MjctM2QxZC00NjE5LWIyMmMtZmI4OGI2ZmI0MTAxLXA0dzZwdC5qcGVnIiwiZWRpdHMiOnsicmVzaXplIjp7IndpZHRoIjoyMTYsImhlaWdodCI6MjE2LCJmaXQiOiJvdXRzaWRlIn19fQ%3D&w=1280&q=75",
+    mrp: 950, discount: 5, ratings: 5, ratedBy: 3,
+    desc: "Mediron Blood Glucose Test Strips deliver fast, accurate, reliable readings. Pack contains two vials of 25 strips each (50 total). Ideal for regular home monitoring.",
+    features: ["50 strips (2 vials x 25)", "Capillary whole blood testing", "5-second results", "Individually sealed vials", "Calibrated for Mediron meters"],
+    specs: { "Count": "50 strips (2x25)", "Result Time": "5 seconds", "Compatibility": "Mediron meters" }
+  }
+];
+
+function calcPrice(mrp, discount) {
+  return Math.round(mrp * (1 - discount / 100));
+}
+
+function getStarDisplay(rating) {
+  let stars = '';
+  for (let i = 0; i < 5; i++) stars += i < rating ? '★' : '☆';
+  return stars;
+}
+
+function recalcAll() {
+  const s1 = parseInt(document.getElementById('slab1').value) || 0;
+  const s2 = parseInt(document.getElementById('slab2').value) || 0;
+  const s3 = parseInt(document.getElementById('slab3').value) || 0;
+  const s4 = parseInt(document.getElementById('slab4').value) || 0;
+  const refMRP = 1650; // Reference MRP for preview
+
+  // Get editable tier ranges
+  const t1min = parseInt(document.getElementById('tier1min').value) || 10;
+  const t1max = parseInt(document.getElementById('tier1max').value) || 49;
+  const t2min = parseInt(document.getElementById('tier2min').value) || 50;
+  const t2max = parseInt(document.getElementById('tier2max').value) || 199;
+  const t3min = parseInt(document.getElementById('tier3min').value) || 200;
+  const t3max = parseInt(document.getElementById('tier3max').value) || 499;
+  const t4min = parseInt(document.getElementById('tier4min').value) || 500;
+
+  // Update slab preview table
+  const tiers = [
+    { name: "Tier 1", range: `${t1min}-${t1max} units`, disc: s1 },
+    { name: "Tier 2", range: `${t2min}-${t2max} units`, disc: s2 },
+    { name: "Tier 3", range: `${t3min}-${t3max} units`, disc: s3 },
+    { name: "Tier 4", range: `${t4min}+ units`, disc: s4 }
+  ];
+
+  const tbody = document.getElementById('slabPreviewBody');
+  tbody.innerHTML = tiers.map(t => {
+    const price = Math.round(refMRP * (1 - t.disc / 100));
+    return `<tr>
+      <td>${t.name}</td>
+      <td>${t.range}</td>
+      <td class="disc-cell">${t.disc}%</td>
+      <td class="price-cell">৳${price.toLocaleString()}</td>
+      <td><span style="color:#188038;">Active</span></td>
+    </tr>`;
+  }).join('');
+
+  // Update all product cards
+  renderProducts();
+
+  // Update tier range labels in all detail sections
+  updateAllTierRanges();
+}
+
+function updateAllTierRanges() {
+  const t1min = parseInt(document.getElementById('tier1min').value) || 10;
+  const t1max = parseInt(document.getElementById('tier1max').value) || 49;
+  const t2min = parseInt(document.getElementById('tier2min').value) || 50;
+  const t2max = parseInt(document.getElementById('tier2max').value) || 199;
+  const t3min = parseInt(document.getElementById('tier3min').value) || 200;
+  const t3max = parseInt(document.getElementById('tier3max').value) || 499;
+  const t4min = parseInt(document.getElementById('tier4min').value) || 500;
+
+  products.forEach(p => {
+    const table = document.querySelector(`#detail${p.id} table`);
+    if (table) {
+      const rows = table.querySelectorAll('tr');
+      if (rows.length >= 4) {
+        rows[0].querySelector('td:first-child').innerHTML = `<strong>Tier 1</strong> (${t1min}-${t1max} units)`;
+        rows[1].querySelector('td:first-child').innerHTML = `<strong>Tier 2</strong> (${t2min}-${t2max} units)`;
+        rows[2].querySelector('td:first-child').innerHTML = `<strong>Tier 3</strong> (${t3min}-${t3max} units)`;
+        rows[3].querySelector('td:first-child').innerHTML = `<strong>Tier 4</strong> (${t4min}+ units)`;
+      }
+    }
+  });
+}
+
+function resetSlabs() {
+  document.getElementById('tier1min').value = 10;
+  document.getElementById('tier1max').value = 49;
+  document.getElementById('tier2min').value = 50;
+  document.getElementById('tier2max').value = 199;
+  document.getElementById('tier3min').value = 200;
+  document.getElementById('tier3max').value = 499;
+  document.getElementById('tier4min').value = 500;
+  document.getElementById('slab1').value = 25;
+  document.getElementById('slab2').value = 29;
+  document.getElementById('slab3').value = 32;
+  document.getElementById('slab4').value = 35;
+  recalcAll();
+}
+
+function updateProductPrice(id) {
+  const mrpInput = document.getElementById('mrp_' + id);
+  const discInput = document.getElementById('disc_' + id);
+  const mrp = parseInt(mrpInput.value) || 0;
+  const disc = parseInt(discInput.value) || 0;
+  const selling = calcPrice(mrp, disc);
+
+  document.getElementById('selling_' + id).textContent = '৳ ' + selling.toLocaleString();
+  const detailPrice = document.getElementById('detail_price_' + id);
+  if (detailPrice) detailPrice.textContent = '৳ ' + selling.toLocaleString();
+
+  // Calculate slab prices for this product
+  const s1 = parseInt(document.getElementById('slab1').value) || 0;
+  const s2 = parseInt(document.getElementById('slab2').value) || 0;
+  const s3 = parseInt(document.getElementById('slab3').value) || 0;
+  const s4 = parseInt(document.getElementById('slab4').value) || 0;
+
+  document.getElementById('slab1_price_' + id).textContent = '৳' + Math.round(mrp * (1 - s1/100)).toLocaleString();
+  document.getElementById('slab2_price_' + id).textContent = '৳' + Math.round(mrp * (1 - s2/100)).toLocaleString();
+  document.getElementById('slab3_price_' + id).textContent = '৳' + Math.round(mrp * (1 - s3/100)).toLocaleString();
+  document.getElementById('slab4_price_' + id).textContent = '৳' + Math.round(mrp * (1 - s4/100)).toLocaleString();
+  document.getElementById('slab4_price_' + id).style.color = '#e53e3e';
+}
+
+function toggleDetail(id) {
+  const detail = document.getElementById('detail' + id);
+  const wasActive = detail.classList.contains('active');
+  document.querySelectorAll('.product-detail').forEach(d => d.classList.remove('active'));
+  if (!wasActive) {
+    detail.classList.add('active');
+    detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+
+
+function renderProducts() {
+  const grid = document.getElementById('productGrid');
+
+  grid.innerHTML = products.map(p => {
+    const selling = calcPrice(p.mrp, p.discount);
+    return `
+    <div class="card" onclick="toggleDetail(${p.id})">
+      <div class="card-img">
+        <img src="${p.img}" alt="${p.name}">
+      </div>
+      <div class="card-body">
+        <div class="card-title">${p.name}</div>
+        <div style="margin-top:auto;font-size:14px;font-weight:700;color:#188038;">৳ ${selling.toLocaleString()}</div>
+        <div style="font-size:11px;color:#999;">Market price</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Render detail sections
+  const detailsContainer = document.createElement('div');
+  detailsContainer.id = 'detailsContainer';
+  detailsContainer.innerHTML = products.map(p => `
+    <div class="product-detail" id="detail${p.id}">
+      <div class="product-header">
+        <img src="${p.img}" alt="">
+        <div style="flex:1;">
+          <h3>${p.name}</h3>
+          <p style="font-size:12px;color:#999;">DAR No.: 72-8880-2024</p>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:#999;text-decoration:line-through;">MRP: ৳${p.mrp.toLocaleString()}</div>
+          <div style="font-size:22px;font-weight:700;color:#188038;" id="detail_price_${p.id}">৳ ${calcPrice(p.mrp, p.discount).toLocaleString()}</div>
+          <div style="font-size:11px;color:#999;">Market Price</div>
+        </div>
+      </div>
+      <div class="detail-grid">
+        <div>
+          <div class="detail-section">
+            <h4>Product Overview</h4>
+            <p>${p.desc}</p>
+          </div>
+          <div class="detail-section">
+            <h4>Key Features</h4>
+            <ul>${p.features.map(f => `<li>${f}</li>`).join('')}</ul>
+          </div>
+          <div class="detail-section">
+            <h4>Specifications</h4>
+            <table class="spec-table">
+              ${Object.entries(p.specs).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="detail-section">
+            <h4>Pricing Configuration</h4>
+            <div class="price-config">
+              <div class="price-row">
+                <label>MRP:</label>
+                <input type="number" id="mrp_${p.id}" value="${p.mrp}" min="1" oninput="updateProductPrice(${p.id})">
+                <span class="unit">৳</span>
+              </div>
+              <div class="price-row">
+                <label>Discount:</label>
+                <input type="number" id="disc_${p.id}" value="${p.discount}" min="0" max="90" oninput="updateProductPrice(${p.id})">
+                <span class="unit">%</span>
+              </div>
+              <div class="calc-result">
+                <span class="label">Market Price:</span>
+                <span class="value" id="selling_${p.id}">৳ ${calcPrice(p.mrp, p.discount).toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <h4>Wholesale Slab Pricing</h4>
+            <table>
+              <tr><td><strong>Tier 1</strong> (10-49 units)</td><td style="font-weight:700;color:#188038;" id="slab1_price_${p.id}">৳ ${Math.round(p.mrp * 0.75).toLocaleString()}</td></tr>
+              <tr><td><strong>Tier 2</strong> (50-199 units)</td><td style="font-weight:700;color:#188038;" id="slab2_price_${p.id}">৳ ${Math.round(p.mrp * 0.71).toLocaleString()}</td></tr>
+              <tr><td><strong>Tier 3</strong> (200-499 units)</td><td style="font-weight:700;color:#188038;" id="slab3_price_${p.id}">৳ ${Math.round(p.mrp * 0.68).toLocaleString()}</td></tr>
+              <tr><td><strong>Tier 4</strong> (500+ units)</td><td style="font-weight:700;color:#e53e3e;" id="slab4_price_${p.id}">৳ ${Math.round(p.mrp * 0.65).toLocaleString()}</td></tr>
+            </table>
+            <p style="font-size:11px;color:#999;margin-top:8px;">Adjust slab tiers above to recalculate.</p>
+          </div>
+          <div class="detail-section cautions">
+            <h4>Cautions</h4>
+            <ul>
+              <li>For single use only where applicable</li>
+              <li>Store in cool, dry place away from sunlight</li>
+              <li>Do not use if seal is broken or expired</li>
+              <li>Keep out of reach of children</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Replace old details container if exists
+  const old = document.getElementById('detailsContainer');
+  if (old) old.remove();
+  grid.parentNode.insertBefore(detailsContainer, grid.nextSibling);
+
+  // Initialize all product prices
+  products.forEach(p => updateProductPrice(p.id));
+}
+
+// Initial render
+recalcAll();
+</script>
+
+</body>
+</html>

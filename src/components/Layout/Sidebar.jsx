@@ -1,0 +1,134 @@
+import { NavLink } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import {
+  MdDashboard, MdInventory2, MdShoppingCart, MdReceipt,
+  MdPeople, MdAssessment, MdLocalShipping, MdAssignmentReturn,
+  MdCampaign, MdSupportAgent, MdSettings, MdClose, MdStore
+} from 'react-icons/md'
+
+const NAV_ITEMS = {
+  super_admin: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/products', icon: MdInventory2, label: 'Products' },
+    { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/invoices', icon: MdReceipt, label: 'Invoices' },
+    { path: '/dealers', icon: MdStore, label: 'Dealers' },
+    { path: '/inventory', icon: MdLocalShipping, label: 'Inventory' },
+    { path: '/returns', icon: MdAssignmentReturn, label: 'Returns' },
+    { path: '/crm', icon: MdPeople, label: 'CRM' },
+    { path: '/reports', icon: MdAssessment, label: 'Reports' },
+    { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
+    { path: '/support', icon: MdSupportAgent, label: 'Support' },
+    { path: '/settings', icon: MdSettings, label: 'Settings' },
+  ],
+  admin: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/products', icon: MdInventory2, label: 'Products' },
+    { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/invoices', icon: MdReceipt, label: 'Invoices' },
+    { path: '/dealers', icon: MdStore, label: 'Dealers' },
+    { path: '/inventory', icon: MdLocalShipping, label: 'Inventory' },
+    { path: '/returns', icon: MdAssignmentReturn, label: 'Returns' },
+    { path: '/crm', icon: MdPeople, label: 'CRM' },
+    { path: '/reports', icon: MdAssessment, label: 'Reports' },
+    { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
+    { path: '/support', icon: MdSupportAgent, label: 'Support' },
+  ],
+  sales_manager: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/dealers', icon: MdStore, label: 'Dealers' },
+    { path: '/reports', icon: MdAssessment, label: 'Reports' },
+    { path: '/crm', icon: MdPeople, label: 'CRM' },
+  ],
+  area_manager: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/dealers', icon: MdStore, label: 'Dealers' },
+    { path: '/reports', icon: MdAssessment, label: 'Reports' },
+  ],
+  sales_executive: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/my-orders', icon: MdShoppingCart, label: 'My Orders' },
+    { path: '/my-dealers', icon: MdStore, label: 'My Dealers' },
+    { path: '/collections', icon: MdReceipt, label: 'Collections' },
+    { path: '/crm', icon: MdPeople, label: 'CRM' },
+  ],
+  dealer: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/place-order', icon: MdShoppingCart, label: 'Place Order' },
+    { path: '/my-orders', icon: MdReceipt, label: 'My Orders' },
+    { path: '/payments', icon: MdAssessment, label: 'Payments' },
+  ],
+  warehouse: [
+    { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
+    { path: '/inventory', icon: MdInventory2, label: 'Inventory' },
+    { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+  ],
+}
+
+export default function Sidebar({ open, onClose }) {
+  const { user, signOut } = useAuth()
+  const items = NAV_ITEMS[user?.role] || NAV_ITEMS.sales_executive
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {open && (
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onClose} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-100 z-50
+        transform transition-transform duration-200 ease-out
+        lg:translate-x-0 lg:static lg:z-auto
+        ${open ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        {/* Header */}
+        <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
+              <span className="text-sm font-bold text-white">M</span>
+            </div>
+            <div>
+              <span className="text-sm font-bold text-gray-900">Mediron</span>
+              <span className="text-[10px] text-gray-400 block -mt-0.5">SDMS</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="lg:hidden p-1 text-gray-400 hover:text-gray-600">
+            <MdClose size={20} />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="p-3 space-y-0.5 overflow-y-auto h-[calc(100%-8rem)]">
+          {items.map(item => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `nav-item ${isActive ? 'nav-item-active' : ''}`
+              }
+            >
+              <item.icon size={19} />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100 bg-white">
+          <button
+            onClick={signOut}
+            className="nav-item w-full text-red-500 hover:bg-red-50 hover:text-red-600"
+          >
+            <MdClose size={19} />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}
