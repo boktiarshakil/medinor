@@ -5,7 +5,13 @@
       "Bash(npm run *)",
       "Bash(npm install *)",
       "Bash(ls /c/Users/X/Projects/medinor/node_modules >/dev/null 2>&1 && echo \"node_modules EXISTS\" || echo \"node_modules MISSING\")",
-      "Read(//c/Users/X/Projects/medinor/node_modules/**)"
+      "Read(//c/Users/X/Projects/medinor/node_modules/**)",
+      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(ls /c/Users/X/Projects/medinor/src/pages/ /c/Users/X/Projects/medinor/src/pages/dashboards/)",
+      "Read(//c/Users/X/Projects/medinor/src/pages//**)",
+      "mcp__filesystem__write_file",
+      "Bash(npx vite:*)"
     ]
   }
 }

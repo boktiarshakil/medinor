@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, getCurrentUser } from '../lib/supabase'
+import { demoApi, isDemo } from '../lib/demo'
 
 const AuthContext = createContext(null)
 
@@ -12,6 +13,14 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const init = async () => {
       try {
+        // Demo mode — skip Supabase entirely
+        if (isDemo()) {
+          const profile = await demoApi.getCurrentUser()
+          setUser(profile)
+          setLoading(false)
+          setInitialized(true)
+          return
+        }
         const profile = await getCurrentUser()
         setUser(profile)
       } catch (err) {
@@ -23,7 +32,9 @@ export function AuthProvider({ children }) {
     }
     init()
 
-    // Listen for auth changes
+    // Listen for auth changes (skip in demo mode)
+    if (isDemo()) return
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
         const profile = await getCurrentUser()
@@ -37,6 +48,12 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signIn = useCallback(async (email, password) => {
+    // Demo mode — accept any credentials
+    if (isDemo()) {
+      const profile = await demoApi.signIn()
+      setUser(profile)
+      return profile
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     const profile = await getCurrentUser()
@@ -45,6 +62,11 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    if (isDemo()) {
+      await demoApi.signOut()
+      setUser(null)
+      return
+    }
     await supabase.auth.signOut()
     setUser(null)
   }, [])

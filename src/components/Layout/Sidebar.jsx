@@ -3,7 +3,8 @@ import { useAuth } from '../../context/AuthContext'
 import {
   MdDashboard, MdInventory2, MdShoppingCart, MdReceipt,
   MdPeople, MdAssessment, MdLocalShipping, MdAssignmentReturn,
-  MdCampaign, MdSupportAgent, MdSettings, MdClose, MdStore
+  MdCampaign, MdSupportAgent, MdSettings, MdClose, MdStore,
+  MdChat, MdMyLocation, MdQrCode, MdAccountTree
 } from 'react-icons/md'
 
 const NAV_ITEMS = {
@@ -11,11 +12,17 @@ const NAV_ITEMS = {
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/products', icon: MdInventory2, label: 'Products' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/invoices', icon: MdReceipt, label: 'Invoices' },
     { path: '/dealers', icon: MdStore, label: 'Dealers' },
     { path: '/inventory', icon: MdLocalShipping, label: 'Inventory' },
     { path: '/returns', icon: MdAssignmentReturn, label: 'Returns' },
     { path: '/crm', icon: MdPeople, label: 'CRM' },
+    { path: '/gps-tracking', icon: MdMyLocation, label: 'GPS Tracking' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/messages', icon: MdChat, label: 'Messages' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
+    { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
     { path: '/support', icon: MdSupportAgent, label: 'Support' },
@@ -25,11 +32,17 @@ const NAV_ITEMS = {
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/products', icon: MdInventory2, label: 'Products' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/invoices', icon: MdReceipt, label: 'Invoices' },
     { path: '/dealers', icon: MdStore, label: 'Dealers' },
     { path: '/inventory', icon: MdLocalShipping, label: 'Inventory' },
     { path: '/returns', icon: MdAssignmentReturn, label: 'Returns' },
     { path: '/crm', icon: MdPeople, label: 'CRM' },
+    { path: '/gps-tracking', icon: MdMyLocation, label: 'GPS Tracking' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/messages', icon: MdChat, label: 'Messages' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
+    { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
     { path: '/support', icon: MdSupportAgent, label: 'Support' },
@@ -37,33 +50,56 @@ const NAV_ITEMS = {
   sales_manager: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/dealers', icon: MdStore, label: 'Dealers' },
+    { path: '/gps-tracking', icon: MdMyLocation, label: 'GPS Tracking' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/messages', icon: MdChat, label: 'Messages' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
+    { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/crm', icon: MdPeople, label: 'CRM' },
   ],
   area_manager: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/dealers', icon: MdStore, label: 'Dealers' },
+    { path: '/gps-tracking', icon: MdMyLocation, label: 'GPS Tracking' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/messages', icon: MdChat, label: 'Messages' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
+    { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
   ],
   sales_executive: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/my-orders', icon: MdShoppingCart, label: 'My Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/my-dealers', icon: MdStore, label: 'My Dealers' },
     { path: '/collections', icon: MdReceipt, label: 'Collections' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/messages', icon: MdChat, label: 'Messages' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
     { path: '/crm', icon: MdPeople, label: 'CRM' },
   ],
   dealer: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/place-order', icon: MdShoppingCart, label: 'Place Order' },
     { path: '/my-orders', icon: MdReceipt, label: 'My Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
     { path: '/payments', icon: MdAssessment, label: 'Payments' },
   ],
   warehouse: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/inventory', icon: MdInventory2, label: 'Inventory' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
+    { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
+    { path: '/announcements', icon: MdCampaign, label: 'Announcements' },
+    { path: '/messages', icon: MdChat, label: 'Messages' },
+    { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
   ],
 }
 
@@ -103,19 +139,22 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Nav */}
         <nav className="p-3 space-y-0.5 overflow-y-auto h-[calc(100%-8rem)]">
-          {items.map(item => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onClose}
-              className={({ isActive }) =>
-                `nav-item ${isActive ? 'nav-item-active' : ''}`
-              }
-            >
-              <item.icon size={19} />
-              {item.label}
-            </NavLink>
-          ))}
+          {items.map(item => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `nav-item ${isActive ? 'nav-item-active' : ''}`
+                }
+              >
+                <Icon size={19} />
+                {item.label}
+              </NavLink>
+            )
+          })}
         </nav>
 
         {/* Footer */}

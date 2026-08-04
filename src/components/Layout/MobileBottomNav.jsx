@@ -58,20 +58,23 @@ export default function MobileBottomNav() {
 
   return (
     <nav className="mobile-bottom-nav flex items-center justify-around lg:hidden">
-      {items.map(item => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          className={({ isActive }) =>
-            `flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors ${
-              isActive ? 'text-brand-600' : 'text-gray-400'
-            }`
-          }
-        >
-          <item.icon size={20} />
-          {item.label}
-        </NavLink>
-      ))}
+      {items.map(item => {
+        const Icon = item.icon
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors ${
+                isActive ? 'text-brand-600' : 'text-gray-400'
+              }`
+            }
+          >
+            <Icon size={20} />
+            {item.label}
+          </NavLink>
+        )
+      })}
     </nav>
   )
 }

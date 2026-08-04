@@ -20,6 +20,14 @@ import Support from './pages/Support'
 import Settings from './pages/Settings'
 import PlaceOrder from './pages/PlaceOrder'
 
+// New feature pages
+import Announcements from './pages/announcements/Announcements'
+import Messages from './pages/messages/Messages'
+import OrderTracker from './pages/orders/OrderTracker'
+import GPSTracking from './pages/gps/GPSTracking'
+import Warranty from './pages/warranty/Warranty'
+import OrgChartPage from './components/OrgChart/OrgHierarchy'
+
 export default function App() {
   const { user, loading } = useAuth()
 
@@ -65,6 +73,14 @@ export default function App() {
         {/* Dealer */}
         <Route path="/place-order" element={<ProtectedRoute roles={['dealer']}><PlaceOrder /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute roles={['dealer']}><Invoices /></ProtectedRoute>} />
+
+        {/* Feature pages — role-based access */}
+        <Route path="/announcements" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse','dealer']}><Announcements /></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse']}><Messages /></ProtectedRoute>} />
+        <Route path="/order-tracker" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse']}><OrderTracker /></ProtectedRoute>} />
+        <Route path="/gps-tracking" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager']}><GPSTracking /></ProtectedRoute>} />
+        <Route path="/warranty" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse','dealer']}><Warranty /></ProtectedRoute>} />
+        <Route path="/org-chart" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager']}><OrgChartPage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

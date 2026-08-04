@@ -34,12 +34,6 @@ export default function SalesChart({ series = MOCK_DATA.series, categories = MOC
     tooltip: {
       y: { formatter: (val) => `৳${val.toLocaleString()}` }
     },
-    xaxis: {
-      categories,
-      axisBorder: { show: false },
-      axisTicks: { show: false },
-      labels: { style: { fontSize: '11px', colors: '#94a3b8' } }
-    },
     yaxis: {
       labels: {
         style: { fontSize: '11px', colors: '#94a3b8' },
