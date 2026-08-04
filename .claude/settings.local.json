@@ -3,7 +3,9 @@
     "allow": [
       "Read(//c/Users/X/Projects/medinor/**)",
       "Bash(npm run *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(ls /c/Users/X/Projects/medinor/node_modules >/dev/null 2>&1 && echo \"node_modules EXISTS\" || echo \"node_modules MISSING\")",
+      "Read(//c/Users/X/Projects/medinor/node_modules/**)"
     ]
   }
 }

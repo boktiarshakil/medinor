@@ -22,7 +22,7 @@ const TOP_PRODUCTS = [
   { name: 'Mediron Blood Glucose Meter', sales: 450, revenue: formatCurrency(315000) },
   { name: 'Mediron Prime BP Monitor (MEDI 712)', sales: 320, revenue: formatCurrency(416000) },
   { name: 'Mediron Test Strips (50 pcs)', sales: 280, revenue: formatCurrency(84000) },
-  { name: 'Mediron Advance BP Monitor (MEDI 447)', sales: 195, formatCurrency(234000) },
+  { name: 'Mediron Advance BP Monitor (MEDI 447)', sales: 195, revenue: formatCurrency(234000) },
   { name: 'Mediron Examination Gloves', sales: 160, revenue: formatCurrency(48000) },
 ]
 
