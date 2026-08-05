@@ -2,6 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase, getCurrentUser } from '../lib/supabase'
 import { demoApi, isDemo } from '../lib/demo'
 
+// Default role for new users without a profile yet
+const DEFAULT_ROLE = 'sales_executive'
+
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
@@ -116,4 +119,45 @@ export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuth must be used within AuthProvider')
   return context
+}
+
+// Helper: create profile for auth user if missing
+export const ensureProfile = async (authUser) => {
+  if (isDemo()) return demoApi.getCurrentUser()
+
+  const { data: existing } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .single()
+
+  if (existing) return existing
+
+  // No profile — create one with default role
+  const { data: profile, error } = await supabase
+    .from('user_profiles')
+    .insert({
+      id: authUser.id,
+      email: authUser.email,
+      full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+      phone: authUser.user_metadata?.phone || null,
+      role: authUser.user_metadata?.role || DEFAULT_ROLE,
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Profile creation failed:', error)
+    // Return minimal profile so app doesn't break
+    return {
+      id: authUser.id,
+      email: authUser.email,
+      full_name: authUser.user_metadata?.full_name || authUser.email,
+      role: authUser.user_metadata?.role || DEFAULT_ROLE,
+      is_active: true
+    }
+  }
+
+  return profile
 }

@@ -1,29 +1,48 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatCurrency, statusColor } from '../lib/utils'
 import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore } from 'react-icons/md'
-
-const DEALERS = [
-  { id: '1', name: 'Medicine Point', owner: 'Dr. Rahim Uddin', mobile: '+880 1712-345678', district: 'Dhaka', area: 'Dhanmondi', creditLimit: 50000, due: 12300, status: 'active', sr: 'Rahim Uddin', lastOrder: '2025-01-10' },
-  { id: '2', name: 'Lazz Pharma', owner: 'Mr. Karim', mobile: '+880 1812-987654', district: 'Dhaka', area: 'New Market', creditLimit: 75000, due: 8750, status: 'active', sr: 'Karim Ahmed', lastOrder: '2025-01-08' },
-  { id: '3', name: 'HealthCare Ltd', owner: 'Ms. Fatima', mobile: '+880 1912-567890', district: 'Dhaka', area: 'Elephant Road', creditLimit: 30000, due: 0, status: 'active', sr: 'Sajid Hasan', lastOrder: '2025-01-05' },
-  { id: '4', name: 'Central Pharmacy', owner: 'Mr. Hasan', mobile: '+880 1612-345123', district: 'Dhaka', area: 'Nilkhet', creditLimit: 40000, due: 8750, status: 'active', sr: 'Nusrat Jahan', lastOrder: '2025-01-03' },
-  { id: '5', name: 'Square Hospital Pharmacy', owner: 'Mr. Alam', mobile: '+880 1512-789456', district: 'Dhaka', area: 'Panthapath', creditLimit: 100000, due: 22000, status: 'active', sr: 'Tanvir Rahman', lastOrder: '2025-01-12' },
-  { id: '6', name: 'Chittagong Medical', owner: 'Dr. Roy', mobile: '+880 1812-222333', district: 'Chattogram', area: 'GEC', creditLimit: 60000, due: 35000, status: 'active', sr: 'Faruk Hossain', lastOrder: '2025-01-09' },
-  { id: '7', name: 'Rajshahi Health Plus', owner: 'Mr. Islam', mobile: '+880 1712-444555', district: 'Rajshahi', area: 'Shaheb Bazar', creditLimit: 25000, due: 15000, status: 'inactive', sr: 'Rahim Uddin', lastOrder: '2024-12-20' },
-]
+import { api } from '../lib/api'
+import toast from 'react-hot-toast'
 
 export default function Dealers() {
+  const [dealers, setDealers] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [districtFilter, setDistrictFilter] = useState('all')
 
-  const districts = ['all', ...new Set(DEALERS.map(d => d.district))]
-  const filtered = DEALERS.filter(d => {
-    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) || d.owner.toLowerCase().includes(search.toLowerCase())
-    const matchDistrict = districtFilter === 'all' || d.district === districtFilter
+  useEffect(() => { fetchDealers() }, [])
+
+  const fetchDealers = async () => {
+    try {
+      setLoading(true)
+      const data = await api.getDealers()
+      // Normalize field names
+      const normalized = data.map(d => ({
+        ...d,
+        owner: d.owner_name,
+        mobile: d.mobile || d.phone,
+        area: d.area || d.district,
+        creditLimit: d.credit_limit,
+        due: d.current_due,
+        status: d.status || 'active',
+      }))
+      setDealers(normalized)
+    } catch (err) {
+      console.error('Dealers fetch failed:', err)
+      toast.error('Failed to load dealers')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const districts = ['all', ...new Set(dealers.map(d => d.district || d.area))]
+  const filtered = dealers.filter(d => {
+    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) || (d.owner || '').toLowerCase().includes(search.toLowerCase())
+    const matchDistrict = districtFilter === 'all' || (d.district || d.area) === districtFilter
     return matchSearch && matchDistrict
   })
 
-  const totalDue = DEALERS.reduce((sum, d) => sum + d.due, 0)
+  const totalDue = dealers.reduce((sum, d) => sum + (d.due || d.current_due || 0), 0)
 
   return (
     <div className="space-y-5">
@@ -31,7 +50,7 @@ export default function Dealers() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Dealers</h1>
-          <p className="text-sm text-gray-500">{DEALERS.length} dealers · Total Due: <span className="font-semibold text-red-600">{formatCurrency(totalDue)}</span></p>
+          <p className="text-sm text-gray-500">{dealers.length} dealers · Total Due: <span className="font-semibold text-red-600">{formatCurrency(totalDue)}</span></p>
         </div>
         <button className="btn-primary">
           <MdAdd size={16} /> Add Dealer
@@ -61,6 +80,14 @@ export default function Dealers() {
         </select>
       </div>
 
+      {/* Loading */}
+      {loading ? (
+        <div className="card p-12 text-center">
+          <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-500 mt-3">Loading dealers...</p>
+        </div>
+      ) : (
+      <>
       {/* Dealers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(dealer => (
@@ -118,6 +145,9 @@ export default function Dealers() {
           <p className="text-sm text-gray-500">No dealers found</p>
         </div>
       )}
+      </>
+      )}
     </div>
   )
 }
+

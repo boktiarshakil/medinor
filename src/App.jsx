@@ -29,6 +29,7 @@ import Warranty from './pages/warranty/Warranty'
 import OrgChartPage from './components/OrgChart/OrgHierarchy'
 import Settlements from './pages/Settlements'
 import PersonalIds from './pages/PersonalIds'
+import UserManagement from './pages/UserManagement'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -87,6 +88,9 @@ export default function App() {
         {/* Price isolation & settlement — admin only */}
         <Route path="/settlements" element={<ProtectedRoute roles={['super_admin','admin','sales_manager']}><Settlements /></ProtectedRoute>} />
         <Route path="/personal-ids" element={<ProtectedRoute roles={['super_admin','admin']}><PersonalIds /></ProtectedRoute>} />
+
+        {/* User management — super_admin only */}
+        <Route path="/users" element={<ProtectedRoute roles={['super_admin','admin']}><UserManagement /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
