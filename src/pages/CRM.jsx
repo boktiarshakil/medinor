@@ -31,7 +31,7 @@ export default function CRM() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newContact, setNewContact] = useState({
-    name: '', type: 'doctor', phone: '', specialty: '', address: '', org: ''
+    name: '', type: 'doctor', phone: '', specialty: '', address: '', organization: ''
   })
 
   const fetchContacts = async () => {
@@ -63,10 +63,10 @@ export default function CRM() {
         phone: newContact.phone || null,
         specialty: newContact.specialty || null,
         address: newContact.address || null,
-        org: newContact.org || null,
+        organization: newContact.organization || null,
       })
       toast.success(`Contact "${newContact.name}" added`)
-      setNewContact({ name: '', type: 'doctor', phone: '', specialty: '', address: '', org: '' })
+      setNewContact({ name: '', type: 'doctor', phone: '', specialty: '', address: '', organization: '' })
       setShowCreate(false)
       fetchContacts()
     } catch (err) {
@@ -138,7 +138,7 @@ export default function CRM() {
                 </div>
               </div>
               <div className="space-y-1.5 text-xs text-gray-600">
-                {contact.org && <p>📍 {contact.org}</p>}
+                {contact.organization && <p>📍 {contact.organization}</p>}
                 {contact.phone && <p>📞 {contact.phone}</p>}
                 {contact.last_visit && <p>🗓 Last visit: {formatDate(contact.last_visit)}</p>}
               </div>
@@ -190,9 +190,14 @@ export default function CRM() {
                   value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
               </div>
               <div>
-                <label className="label">Specialty / Org</label>
+                <label className="label">Specialty</label>
                 <input type="text" className="input" placeholder="e.g. Cardiology"
                   value={newContact.specialty} onChange={(e) => setNewContact({ ...newContact, specialty: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Organization</label>
+                <input type="text" className="input" placeholder="Hospital / Clinic name"
+                  value={newContact.organization} onChange={(e) => setNewContact({ ...newContact, organization: e.target.value })} />
               </div>
               <div>
                 <label className="label">Address</label>
