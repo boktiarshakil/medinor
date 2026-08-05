@@ -1,28 +1,59 @@
+import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../../lib/utils'
+import { api } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 import { MdShoppingCart, MdReceipt, MdAssessment, MdPayment, MdFileDownload } from 'react-icons/md'
 
-const DEALER_INFO = {
-  name: 'Medicine Point',
-  owner: 'Dr. Rahim Uddin',
-  mobile: '+880 1712-345678',
-  creditLimit: 50000,
-  currentDue: 12300,
-  paymentTerms: 30,
-}
-
-const RECENT_ORDERS = [
-  { id: '1', number: 'ORD-A1B2C3', amount: 15400, status: 'delivered', date: '2025-01-15' },
-  { id: '2', number: 'ORD-D4E5F6', amount: 8750, status: 'dispatched', date: '2025-01-14' },
-  { id: '3', number: 'ORD-G7H8I9', amount: 22300, status: 'pending', date: '2025-01-14' },
-]
-
-const RECENT_PAYMENTS = [
-  { id: '1', amount: 5000, method: 'bkash', date: '2025-01-12', ref: 'TXN123456' },
-  { id: '2', amount: 8750, method: 'bank', date: '2025-01-08', ref: 'CHQ789012' },
-  { id: '3', amount: 3000, method: 'cash', date: '2025-01-05', ref: null },
-]
-
 export default function DealerDashboard() {
+  const { user } = useAuth()
+  const [orders, setOrders] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetch = async () => {
+      setLoading(true)
+      try {
+        const [ordersData, invoicesData] = await Promise.all([
+          api.getOrders().catch(() => []),
+          api.getInvoices().catch(() => []),
+        ])
+        setOrders(ordersData)
+        setInvoices(invoicesData)
+      } catch (err) {
+        console.error('Dealer dashboard fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetch()
+  }, [])
+
+  // Filter for this dealer's orders and invoices
+  const myOrders = orders.filter(o => o.dealer_id === user?.id || o.dealer?.id === user?.id)
+  const myInvoices = invoices.filter(inv => inv.dealer_id === user?.id || inv.dealer?.id === user?.id)
+
+  // Compute credit info
+  const creditLimit = user?.credit_limit || user?.dealer?.credit_limit || 50000
+  const totalDue = myInvoices
+    .filter(inv => inv.status === 'pending' || inv.status === 'unpaid' || inv.status === 'partial')
+    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+  const available = Math.max(0, creditLimit - totalDue)
+
+  // Recent payments from paid invoices
+  const recentPayments = myInvoices
+    .filter(inv => inv.status === 'paid')
+    .slice(0, 10)
+
+  if (loading) {
+    return (
+      <div className="card p-12 text-center">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-gray-500 mt-3">Loading dashboard...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Account Summary */}
@@ -30,8 +61,8 @@ export default function DealerDashboard() {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-brand-100">Welcome back,</p>
-            <h2 className="text-xl font-bold mt-0.5">{DEALER_INFO.name}</h2>
-            <p className="text-xs text-brand-200 mt-1">{DEALER_INFO.owner}</p>
+            <h2 className="text-xl font-bold mt-0.5">{user?.full_name || user?.name || 'Dealer'}</h2>
+            <p className="text-xs text-brand-200 mt-1">{user?.email || ''}</p>
           </div>
           <button className="btn bg-white/15 text-white hover:bg-white/25 text-xs backdrop-blur-sm">
             <MdFileDownload size={14} /> Statement
@@ -40,15 +71,15 @@ export default function DealerDashboard() {
         <div className="grid grid-cols-3 gap-4 mt-5 pt-4 border-t border-white/20">
           <div>
             <p className="text-[10px] text-brand-200 uppercase font-medium">Credit Limit</p>
-            <p className="text-lg font-bold mt-0.5">{formatCurrency(DEALER_INFO.creditLimit)}</p>
+            <p className="text-lg font-bold mt-0.5">{formatCurrency(creditLimit)}</p>
           </div>
           <div>
             <p className="text-[10px] text-brand-200 uppercase font-medium">Current Due</p>
-            <p className="text-lg font-bold mt-0.5">{formatCurrency(DEALER_INFO.currentDue)}</p>
+            <p className="text-lg font-bold mt-0.5">{formatCurrency(totalDue)}</p>
           </div>
           <div>
             <p className="text-[10px] text-brand-200 uppercase font-medium">Available</p>
-            <p className="text-lg font-bold mt-0.5">{formatCurrency(DEALER_INFO.creditLimit - DEALER_INFO.currentDue)}</p>
+            <p className="text-lg font-bold mt-0.5">{formatCurrency(available)}</p>
           </div>
         </div>
       </div>
@@ -87,28 +118,35 @@ export default function DealerDashboard() {
           <h3 className="text-sm font-bold text-gray-900">Recent Orders</h3>
           <a href="/my-orders" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</a>
         </div>
-        <div className="table-container border-0 rounded-none">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Order #</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th className="hidden sm:table-cell">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RECENT_ORDERS.map(order => (
-                <tr key={order.id}>
-                  <td className="font-mono text-xs font-medium">{order.number}</td>
-                  <td className="font-semibold">{formatCurrency(order.amount)}</td>
-                  <td><span className={statusColor(order.status)}>{statusLabel(order.status)}</span></td>
-                  <td className="hidden sm:table-cell text-gray-500">{formatDate(order.date)}</td>
+        {myOrders.length === 0 ? (
+          <div className="p-8 text-center">
+            <MdShoppingCart size={32} className="mx-auto text-gray-300 mb-2" />
+            <p className="text-xs text-gray-500">No orders yet</p>
+          </div>
+        ) : (
+          <div className="table-container border-0 rounded-none">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th className="hidden sm:table-cell">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {myOrders.slice(0, 10).map(order => (
+                  <tr key={order.id}>
+                    <td className="font-mono text-xs font-medium">{order.order_number || order.order_no || order.id}</td>
+                    <td className="font-semibold">{formatCurrency(order.total_amount || order.amount || 0)}</td>
+                    <td><span className={statusColor(order.status)}>{statusLabel(order.status)}</span></td>
+                    <td className="hidden sm:table-cell text-gray-500">{formatDate(order.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Recent Payments */}
@@ -117,28 +155,33 @@ export default function DealerDashboard() {
           <h3 className="text-sm font-bold text-gray-900">Recent Payments</h3>
           <a href="/payments" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</a>
         </div>
-        <div className="table-container border-0 rounded-none">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Amount</th>
-                <th>Method</th>
-                <th className="hidden sm:table-cell">Reference</th>
-                <th className="hidden sm:table-cell">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RECENT_PAYMENTS.map(p => (
-                <tr key={p.id}>
-                  <td className="font-semibold text-emerald-600">{formatCurrency(p.amount)}</td>
-                  <td className="capitalize">{p.method}</td>
-                  <td className="hidden sm:table-cell text-gray-500 font-mono text-xs">{p.ref || '-'}</td>
-                  <td className="hidden sm:table-cell text-gray-500">{formatDate(p.date)}</td>
+        {recentPayments.length === 0 ? (
+          <div className="p-8 text-center">
+            <MdPayment size={32} className="mx-auto text-gray-300 mb-2" />
+            <p className="text-xs text-gray-500">No payments yet</p>
+          </div>
+        ) : (
+          <div className="table-container border-0 rounded-none">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th className="hidden sm:table-cell">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentPayments.map(p => (
+                  <tr key={p.id}>
+                    <td className="font-semibold text-emerald-600">{formatCurrency(p.total_amount || p.amount || 0)}</td>
+                    <td><span className={statusColor(p.status)}>{statusLabel(p.status)}</span></td>
+                    <td className="hidden sm:table-cell text-gray-500">{formatDate(p.paid_at || p.updated_at || p.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

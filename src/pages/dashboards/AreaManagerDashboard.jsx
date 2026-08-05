@@ -1,28 +1,94 @@
+import { useState, useEffect } from 'react'
 import StatCard from '../../components/Dashboard/StatCard'
 import SalesChart from '../../components/Dashboard/SalesChart'
 import RecentOrdersTable from '../../components/Dashboard/RecentOrdersTable'
-import { formatCurrency, formatNumber } from '../../lib/utils'
+import { formatCurrency, formatNumber, startOfMonth, endOfMonth } from '../../lib/utils'
+import { api } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 import { MdAttachMoney, MdShoppingCart, MdPeople, MdWarning, MdLocationOn } from 'react-icons/md'
 
-const STATS = [
-  { label: 'Today Orders', value: formatCurrency(156400), icon: MdShoppingCart, trend: 'up', trendValue: '18%', color: 'brand' },
-  { label: 'Target Achieved', value: formatCurrency(1850000), icon: MdAttachMoney, trend: 'up', trendValue: '5%', color: 'green' },
-  { label: 'Overdue Accounts', value: formatCurrency(89000), icon: MdWarning, color: 'red' },
-  { label: 'Active SRs', value: formatNumber(6), icon: MdPeople, color: 'blue' },
-]
-
-const DAILY_TARGET = { achieved: 1850000, target: 2000000, percent: 93 }
-
-const SR_STATUS = [
-  { name: 'Rahim Uddin', checkedIn: true, orders: 3, visits: 5, lastLocation: 'Dhanmondi 27' },
-  { name: 'Karim Ahmed', checkedIn: true, orders: 2, visits: 4, lastLocation: 'New Market' },
-  { name: 'Sajid Hasan', checkedIn: false, orders: 0, visits: 0, lastLocation: null },
-  { name: 'Nusrat Jahan', checkedIn: true, orders: 4, visits: 6, lastLocation: 'Uttara Sector 7' },
-  { name: 'Tanvir Rahman', checkedIn: true, orders: 1, visits: 3, lastLocation: 'Mirpur 10' },
-  { name: 'Faruk Hossain', checkedIn: false, orders: 0, visits: 0, lastLocation: null },
-]
-
 export default function AreaManagerDashboard() {
+  const { user } = useAuth()
+  const [orders, setOrders] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetch = async () => {
+      setLoading(true)
+      try {
+        const [ordersData, invoicesData, usersData] = await Promise.all([
+          api.getOrders().catch(() => []),
+          api.getInvoices().catch(() => []),
+          api.getUsers().catch(() => []),
+        ])
+        setOrders(ordersData)
+        setInvoices(invoicesData)
+        setUsers(usersData)
+      } catch (err) {
+        console.error('AreaManager dashboard fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetch()
+  }, [])
+
+  const monthStart = startOfMonth(new Date()).toISOString()
+  const monthEnd = endOfMonth(new Date()).toISOString()
+
+  // SRs in this area manager's team
+  const mySRs = users.filter(u => u.role === 'sales_executive' && u.area_id === user?.area_id)
+  const srIds = mySRs.map(sr => sr.id)
+
+  // Orders from this area's SRs
+  const areaOrders = orders.filter(o => srIds.includes(o.sr_id) || srIds.includes(o.created_by))
+  const todayOrders = areaOrders.filter(o => o.created_at >= monthStart && o.status !== 'cancelled')
+  const monthOrders = areaOrders.filter(o => o.created_at >= monthStart && o.created_at <= monthEnd && o.status !== 'cancelled')
+
+  const todayOrdersTotal = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
+  const monthAchieved = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
+  const overdueAccounts = invoices
+    .filter(inv => {
+      if (inv.status === 'paid') return false
+      return inv.due_date && new Date(inv.due_date) < new Date()
+    })
+    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+
+  const monthTarget = 2000000
+  const percent = Math.min(Math.round((monthAchieved / monthTarget) * 100), 100)
+
+  const STATS = [
+    { label: 'Today Orders', value: formatCurrency(todayOrdersTotal), icon: MdShoppingCart, color: 'brand' },
+    { label: 'Target Achieved', value: formatCurrency(monthAchieved), icon: MdAttachMoney, color: 'green' },
+    { label: 'Overdue Accounts', value: formatCurrency(overdueAccounts), icon: MdWarning, color: 'red' },
+    { label: 'Active SRs', value: formatNumber(mySRs.length), icon: MdPeople, color: 'blue' },
+  ]
+
+  // SR live status — compute from orders and GPS history
+  const SR_STATUS = mySRs.map(sr => {
+    const srOrders = areaOrders.filter(o => o.sr_id === sr.id || o.created_by === sr.id)
+    const todayOrders_sr = srOrders.filter(o => o.created_at >= new Date().toISOString().split('T')[0])
+    return {
+      id: sr.id,
+      name: sr.full_name || sr.email || 'Unknown',
+      checkedIn: sr.is_active !== false,
+      orders: todayOrders_sr.filter(o => o.status !== 'cancelled').length,
+      visits: todayOrders_sr.length,
+      lastLocation: sr.area?.name || 'Unknown',
+    }
+  })
+
+  if (loading) {
+    return (
+      <div className="card p-12 text-center">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-gray-500 mt-3">Loading dashboard...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Stats */}
@@ -37,19 +103,19 @@ export default function AreaManagerDashboard() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-sm font-bold text-gray-900">Monthly Target Progress</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Dhaka North Territory</p>
+            <p className="text-xs text-gray-400 mt-0.5">{user?.area?.name || user?.area_name || 'Your Territory'}</p>
           </div>
-          <span className="text-xl font-bold text-brand-600">{DAILY_TARGET.percent}%</span>
+          <span className="text-xl font-bold text-brand-600">{percent}%</span>
         </div>
         <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-brand-400 to-emerald-500 rounded-full transition-all duration-700"
-            style={{ width: `${DAILY_TARGET.percent}%` }}
+            style={{ width: `${percent}%` }}
           />
         </div>
         <div className="flex justify-between mt-2 text-xs text-gray-500">
-          <span>Achieved: {formatCurrency(DAILY_TARGET.achieved)}</span>
-          <span>Target: {formatCurrency(DAILY_TARGET.target)}</span>
+          <span>Achieved: {formatCurrency(monthAchieved)}</span>
+          <span>Target: {formatCurrency(monthTarget)}</span>
         </div>
       </div>
 
@@ -58,27 +124,27 @@ export default function AreaManagerDashboard() {
         <SalesChart />
         <div className="card p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4">SR Live Status</h3>
-          <div className="space-y-3">
-            {SR_STATUS.map((sr, i) => (
-              <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sr.checkedIn ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-800">{sr.name}</p>
-                  {sr.lastLocation ? (
+          {SR_STATUS.length === 0 ? (
+            <p className="text-xs text-gray-500">No SRs assigned</p>
+          ) : (
+            <div className="space-y-3">
+              {SR_STATUS.map((sr) => (
+                <div key={sr.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50">
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sr.checkedIn ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-800">{sr.name}</p>
                     <p className="text-[10px] text-gray-400 flex items-center gap-0.5">
                       <MdLocationOn size={10} /> {sr.lastLocation}
                     </p>
-                  ) : (
-                    <p className="text-[10px] text-gray-400">Not checked in</p>
-                  )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs font-bold text-gray-800">{sr.orders} orders</p>
+                    <p className="text-[10px] text-gray-400">{sr.visits} visits</p>
+                  </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-xs font-bold text-gray-800">{sr.orders} orders</p>
-                  <p className="text-[10px] text-gray-400">{sr.visits} visits</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

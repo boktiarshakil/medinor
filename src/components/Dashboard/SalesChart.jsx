@@ -1,14 +1,62 @@
+import { useState, useEffect } from 'react'
 import Chart from 'react-apexcharts'
+import { api } from '../../lib/api'
+import { startOfMonth, format, subMonths } from 'date-fns'
 
-const MOCK_DATA = {
-  series: [{
-    name: 'Sales',
-    data: [42000, 38000, 55000, 49000, 63000, 58000, 72000, 68000, 85000, 79000, 92000, 88000]
-  }],
-  categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-}
+export default function SalesChart() {
+  const [seriesData, setSeriesData] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-export default function SalesChart({ series = MOCK_DATA.series, categories = MOCK_DATA.categories }) {
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const orders = await api.getOrders()
+        // Group by month for last 12 months
+        const monthlyTotals = {}
+        for (let i = 11; i >= 0; i--) {
+          const m = startOfMonth(subMonths(new Date(), i))
+          monthlyTotals[format(m, 'MMM')] = 0
+        }
+        orders.forEach(o => {
+          if (o.created_at && o.status !== 'cancelled') {
+            const m = format(startOfMonth(new Date(o.created_at)), 'MMM')
+            if (m in monthlyTotals) {
+              monthlyTotals[m] += (o.total_amount || o.amount || 0)
+            }
+          }
+        })
+        const categories = Object.keys(monthlyTotals)
+        const data = Object.values(monthlyTotals)
+        setSeriesData([{ name: 'Sales', data }])
+        setCategories(categories)
+      } catch (err) {
+        console.error('SalesChart fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSales()
+  }, [])
+
+  const [categories, setCategories] = useState([])
+
+  if (loading) {
+    return (
+      <div className="card p-5 flex items-center justify-center h-[320px]">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!seriesData) {
+    return (
+      <div className="card p-5">
+        <h3 className="text-sm font-bold text-gray-900">Sales Overview</h3>
+        <p className="text-xs text-gray-500 mt-4">Unable to load chart data</p>
+      </div>
+    )
+  }
+
   const options = {
     chart: {
       type: 'area',
@@ -16,7 +64,7 @@ export default function SalesChart({ series = MOCK_DATA.series, categories = MOC
       sparkline: { enabled: false },
       fontFamily: 'Inter, sans-serif',
     },
-    series,
+    series: seriesData,
     xaxis: { categories },
     colors: ['#188038'],
     fill: {
@@ -49,13 +97,8 @@ export default function SalesChart({ series = MOCK_DATA.series, categories = MOC
           <h3 className="text-sm font-bold text-gray-900">Sales Overview</h3>
           <p className="text-xs text-gray-400 mt-0.5">Monthly revenue trend</p>
         </div>
-        <div className="flex gap-1">
-          <button className="px-3 py-1 text-[10px] font-semibold bg-brand-50 text-brand-600 rounded-md">12M</button>
-          <button className="px-3 py-1 text-[10px] font-semibold text-gray-400 hover:bg-gray-50 rounded-md">6M</button>
-          <button className="px-3 py-1 text-[10px] font-semibold text-gray-400 hover:bg-gray-50 rounded-md">30D</button>
-        </div>
       </div>
-      <Chart options={options} series={series} type="area" height={260} />
+      <Chart options={options} series={seriesData} type="area" height={260} />
     </div>
   )
 }
