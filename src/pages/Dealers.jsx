@@ -42,8 +42,8 @@ export default function Dealers() {
       }))
       setDealers(normalized)
     } catch (err) {
-      console.error('Dealers fetch failed:', err)
-      toast.error('Failed to load dealers')
+      console.error('Dealers fetch failed:', err.message, err.details || '', err.hint || '')
+      toast.error('Dealers: ' + (err.message || 'Failed to load'))
     } finally {
       setLoading(false)
     }

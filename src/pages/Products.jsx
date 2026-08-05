@@ -100,8 +100,8 @@ export default function Products() {
       }))
       setProducts(normalized)
     } catch (err) {
-      console.error('Products fetch failed:', err)
-      toast.error('Failed to load products')
+      console.error('Products fetch failed:', err.message, err.details || '', err.hint || '')
+      toast.error('Products: ' + (err.message || 'Failed to load'))
     } finally {
       setLoading(false)
     }
