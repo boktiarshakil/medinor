@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
-import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh } from 'react-icons/md'
+import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete, MdTrash2 } from 'react-icons/md'
 import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
+import toast from 'react-hot-toast'
 
 export default function Orders() {
   const [orders, setOrders] = useState([])
@@ -9,6 +11,17 @@ export default function Orders() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [dealers, setDealers] = useState([])
+  const [products, setProducts] = useState([])
+  const [orderDraft, setOrderDraft] = useState({
+    dealer_id: '',
+    sr_id: '',
+    area_id: '',
+    items: [{ product_id: '', quantity: 1, unit_price: 0 }],
+    notes: '',
+  })
 
   const statuses = ['all', 'draft', 'submitted', 'approved', 'packed', 'dispatched', 'delivered', 'completed']
 
@@ -57,7 +70,91 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders()
+    fetchDealersAndProducts()
   }, [])
+
+  const fetchDealersAndProducts = async () => {
+    try {
+      const [dealerData, productData] = await Promise.all([
+        api.getDealers(),
+        api.getProducts(),
+      ])
+      setDealers(dealerData)
+      setProducts(productData)
+    } catch (err) {
+      console.error('Failed to load dealers/products:', err)
+    }
+  }
+
+  const addItem = () => {
+    setOrderDraft(prev => ({
+      ...prev,
+      items: [...prev.items, { product_id: '', quantity: 1, unit_price: 0 }],
+    }))
+  }
+
+  const removeItem = (index) => {
+    setOrderDraft(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateItem = (index, field, value) => {
+    setOrderDraft(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => {
+        if (i !== index) return item
+        const updated = { ...item, [field]: value }
+        if (field === 'product_id') {
+          const product = products.find(p => p.id === value)
+          if (product) updated.unit_price = product.trade_price || product.mrp || 0
+        }
+        return updated
+      }),
+    }))
+  }
+
+  const handleCreateOrder = async () => {
+    if (!orderDraft.dealer_id) {
+      toast.error('Select a dealer')
+      return
+    }
+    const validItems = orderDraft.items.filter(i => i.product_id && i.quantity > 0)
+    if (validItems.length === 0) {
+      toast.error('Add at least one product')
+      return
+    }
+    setCreating(true)
+    try {
+      const totalAmount = validItems.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0)
+      await api.createOrder(
+        {
+          dealer_id: orderDraft.dealer_id,
+          sr_id: orderDraft.sr_id || null,
+          area_id: orderDraft.area_id || null,
+          status: 'submitted',
+          total_amount: totalAmount,
+          net_amount: totalAmount,
+          notes: orderDraft.notes || null,
+        },
+        validItems.map(i => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          total: i.quantity * i.unit_price,
+        }))
+      )
+      toast.success('Order created')
+      setShowCreate(false)
+      setOrderDraft({ dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '' })
+      fetchOrders()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const filtered = orders.filter(o => {
     const matchSearch = o.number.toLowerCase().includes(search.toLowerCase()) || o.dealer.toLowerCase().includes(search.toLowerCase())
@@ -77,7 +174,7 @@ export default function Orders() {
           <button className="btn-secondary" onClick={fetchOrders} disabled={loading}>
             <MdRefresh size={16} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button className="btn-primary">
+          <button className="btn-primary" onClick={() => setShowCreate(true)}>
             <MdAdd size={16} /> New Order
           </button>
         </div>
@@ -168,6 +265,83 @@ export default function Orders() {
         <div className="card p-12 text-center">
           <MdShoppingCart size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">No orders found</p>
+        </div>
+      )}
+
+      {/* Create Order Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Create New Order</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Add products and submit</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Dealer *</label>
+                  <select className="input" value={orderDraft.dealer_id} onChange={(e) => setOrderDraft({ ...orderDraft, dealer_id: e.target.value })}>
+                    <option value="">Select dealer...</option>
+                    {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Notes</label>
+                  <input type="text" className="input" placeholder="Optional notes"
+                    value={orderDraft.notes} onChange={(e) => setOrderDraft({ ...orderDraft, notes: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Order Items */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label mb-0">Order Items *</label>
+                  <button type="button" onClick={addItem} className="text-xs text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1">
+                    <MdAdd size={14} /> Add Item
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {orderDraft.items.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                      <select className="input flex-1 text-xs" value={item.product_id} onChange={(e) => updateItem(index, 'product_id', e.target.value)}>
+                        <option value="">Select product...</option>
+                        {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
+                      </select>
+                      <input type="number" className="input w-20 text-xs" placeholder="Qty" min="1" value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} />
+                      <input type="number" className="input w-24 text-xs" placeholder="Price" value={item.unit_price}
+                        onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))} />
+                      <span className="text-xs font-medium text-gray-600 w-24 text-right">
+                        {formatCurrency(item.quantity * item.unit_price)}
+                      </span>
+                      {orderDraft.items.length > 1 && (
+                        <button type="button" onClick={() => removeItem(index)} className="p-1 text-red-400 hover:text-red-600">
+                          <MdDelete size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end mt-2">
+                  <p className="text-sm font-bold text-gray-900">
+                    Total: {formatCurrency(orderDraft.items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0))}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleCreateOrder} disabled={creating} className="btn-primary flex-1 disabled:opacity-50">
+                  {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Submit Order</>}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
