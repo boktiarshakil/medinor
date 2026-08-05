@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canSeePrice } from '../lib/utils'
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock } from 'react-icons/md'
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock, MdClose } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
@@ -11,10 +11,44 @@ export default function Products() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newProduct, setNewProduct] = useState({
+    name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active'
+  })
 
   useEffect(() => {
     fetchProducts()
   }, [])
+
+  const handleCreate = async () => {
+    if (!newProduct.name.trim()) {
+      toast.error('Product name is required')
+      return
+    }
+    setCreating(true)
+    try {
+      await api.createProduct({
+        name: newProduct.name,
+        sku: newProduct.sku || null,
+        category: newProduct.category || null,
+        mrp: Number(newProduct.mrp) || 0,
+        trade_price: Number(newProduct.trade_price) || 0,
+        dealer_price: Number(newProduct.dealer_price) || 0,
+        purchase_price: Number(newProduct.purchase_price) || 0,
+        stock: Number(newProduct.stock) || 0,
+        status: 'active',
+      })
+      toast.success(`Product "${newProduct.name}" created`)
+      setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active' })
+      setShowCreate(false)
+      fetchProducts()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const fetchProducts = async () => {
     try {
@@ -50,7 +84,7 @@ export default function Products() {
           <h1 className="text-xl font-bold text-gray-900">Products</h1>
           <p className="text-sm text-gray-500">Mediron product catalog ({products.length} items)</p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>
           <MdAdd size={16} /> Add Product
         </button>
       </div>
@@ -173,6 +207,73 @@ export default function Products() {
         </div>
       )}
       </>
+      )}
+
+      {/* Create Product Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Add New Product</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Create product in catalog</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="label">Product Name *</label>
+                  <input type="text" className="input" placeholder="e.g. Mediron Prime BP Monitor"
+                    value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">SKU</label>
+                  <input type="text" className="input" placeholder="MED-BP-001"
+                    value={newProduct.sku} onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Category</label>
+                  <input type="text" className="input" placeholder="e.g. BP Monitor"
+                    value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">MRP</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={newProduct.mrp} onChange={(e) => setNewProduct({ ...newProduct, mrp: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Trade Price</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={newProduct.trade_price} onChange={(e) => setNewProduct({ ...newProduct, trade_price: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Dealer Price</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={newProduct.dealer_price} onChange={(e) => setNewProduct({ ...newProduct, dealer_price: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Purchase Price</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={newProduct.purchase_price} onChange={(e) => setNewProduct({ ...newProduct, purchase_price: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Stock Qty</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleCreate} disabled={!newProduct.name || creating} className="btn-primary flex-1 disabled:opacity-50">
+                  {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Create Product</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

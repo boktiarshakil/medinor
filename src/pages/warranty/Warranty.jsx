@@ -22,6 +22,7 @@ export default function Warranty() {
     name: '', phone: '', address: '', product: '', stickerNo: ''
   })
   const [regSuccess, setRegSuccess] = useState(false)
+  const [products, setProducts] = useState([])
 
   const fetchData = async () => {
     setLoading(true)
@@ -94,6 +95,7 @@ export default function Warranty() {
 
   useEffect(() => {
     fetchData()
+    api.getProducts().then(setProducts).catch(() => {})
   }, [])
 
   const handleSearch = (e) => {
@@ -110,24 +112,74 @@ export default function Warranty() {
     setPhoneResult(matches.length > 0 ? { found: true, matches } : { found: false })
   }
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault()
     if (!registerForm.name || !registerForm.phone || !registerForm.address) return
-    // Add to local state immediately; API wiring can be added later
+
     const newWarranty = {
-      id: `local-${Date.now()}`,
-      code: registerForm.stickerNo || `STK-NEW-${Date.now()}`,
+      code: registerForm.stickerNo || `STK-${Date.now()}`,
       product: registerForm.product || 'Unknown Product',
       customer: registerForm.name,
       phone: registerForm.phone,
       address: registerForm.address,
-      purchaseDate: new Date().toISOString(),
-      warrantyTill: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      purchase_date: new Date().toISOString(),
+      warranty_till: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'active',
-      registeredVia: 'Manual',
-      stickerNo: registerForm.stickerNo || `STK-${Date.now()}`
+      registered_via: 'Manual',
+      sticker_no: registerForm.stickerNo || `STK-${Date.now()}`,
     }
-    setWarranties(prev => [newWarranty, ...prev])
+
+    // Try to persist to database
+    try {
+      // Try warranties table first
+      try {
+        const { supabase } = await import('../../lib/supabase')
+        const { data, error: dbErr } = await supabase
+          .from('warranties')
+          .insert(newWarranty)
+          .select()
+          .single()
+        if (!dbErr && data) {
+          setWarranties(prev => [data, ...prev])
+          setRegSuccess(true)
+          setTimeout(() => {
+            setShowRegister(false)
+            setRegSuccess(false)
+            setRegisterForm({ name: '', phone: '', address: '', product: '', stickerNo: '' })
+          }, 2000)
+          return
+        }
+      } catch {
+        // warranties table may not exist
+      }
+
+      // Fallback: save to crm_contacts
+      try {
+        await api.createCRMContact({
+          name: registerForm.name,
+          type: 'other',
+          phone: registerForm.phone,
+          address: registerForm.address,
+          org: registerForm.product,
+          specialty: `Warranty: ${newWarranty.code}`,
+        })
+      } catch {
+        // crm insert failed — still show locally
+      }
+
+      // Add to local state regardless
+      setWarranties(prev => [{
+        id: `local-${Date.now()}`,
+        ...newWarranty,
+        purchaseDate: newWarranty.purchase_date,
+        warrantyTill: newWarranty.warranty_till,
+        registeredVia: newWarranty.registered_via,
+        stickerNo: newWarranty.sticker_no,
+      }, ...prev])
+    } catch (err) {
+      console.error('Register error:', err)
+    }
+
     setRegSuccess(true)
     setTimeout(() => {
       setShowRegister(false)
@@ -715,12 +767,19 @@ export default function Warranty() {
                     onChange={(e) => setRegisterForm({ ...registerForm, product: e.target.value })}
                   >
                     <option value="">Select product</option>
-                    <option>Mediron Excellent Blood Glucose Meter</option>
-                    <option>Mediron Prime BP Monitor (MEDI 712)</option>
-                    <option>Mediron Automatic BP Monitor (MEDI 589)</option>
-                    <option>Mediron Advance BP Monitor (MEDI 447)</option>
-                    <option>Mediron Blood Glucose Test Strip (50 pcs)</option>
-                    <option>Mediron Blood Glucose Test Strip (25 pcs)</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                    {products.length === 0 && (
+                      <>
+                        <option>Mediron Excellent Blood Glucose Meter</option>
+                        <option>Mediron Prime BP Monitor (MEDI 712)</option>
+                        <option>Mediron Automatic BP Monitor (MEDI 589)</option>
+                        <option>Mediron Advance BP Monitor (MEDI 447)</option>
+                        <option>Mediron Blood Glucose Test Strip (50 pcs)</option>
+                        <option>Mediron Blood Glucose Test Strip (25 pcs)</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>

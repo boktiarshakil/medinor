@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatDate } from '../lib/utils'
-import { MdSearch, MdAdd, MdLocalHospital, MdPerson, MdBusiness, MdScience, MdStore } from 'react-icons/md'
+import { MdSearch, MdAdd, MdLocalHospital, MdPerson, MdBusiness, MdScience, MdStore, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
@@ -28,6 +28,11 @@ export default function CRM() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newContact, setNewContact] = useState({
+    name: '', type: 'doctor', phone: '', specialty: '', address: '', org: ''
+  })
 
   const fetchContacts = async () => {
     setLoading(true)
@@ -44,6 +49,32 @@ export default function CRM() {
   }
 
   useEffect(() => { fetchContacts() }, [])
+
+  const handleCreate = async () => {
+    if (!newContact.name.trim()) {
+      toast.error('Name is required')
+      return
+    }
+    setCreating(true)
+    try {
+      await api.createCRMContact({
+        name: newContact.name,
+        type: newContact.type,
+        phone: newContact.phone || null,
+        specialty: newContact.specialty || null,
+        address: newContact.address || null,
+        org: newContact.org || null,
+      })
+      toast.success(`Contact "${newContact.name}" added`)
+      setNewContact({ name: '', type: 'doctor', phone: '', specialty: '', address: '', org: '' })
+      setShowCreate(false)
+      fetchContacts()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const types = ['all', ...new Set(contacts.map(c => c.type || 'other'))]
   const filtered = contacts.filter(c => {
@@ -77,7 +108,7 @@ export default function CRM() {
           <h1 className="text-xl font-bold text-gray-900">CRM</h1>
           <p className="text-sm text-gray-500">{contacts.length} contacts</p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>
           <MdAdd size={16} /> Add Contact
         </button>
       </div>
@@ -120,6 +151,62 @@ export default function CRM() {
         <div className="card p-12 text-center">
           <MdPerson size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">No contacts found</p>
+        </div>
+      )}
+
+      {/* Create Contact Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Add New Contact</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Add to CRM database</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="label">Name *</label>
+                <input type="text" className="input" placeholder="e.g. Dr. Rahim Uddin"
+                  value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Type</label>
+                <select className="input" value={newContact.type} onChange={(e) => setNewContact({ ...newContact, type: e.target.value })}>
+                  <option value="doctor">Doctor</option>
+                  <option value="hospital">Hospital</option>
+                  <option value="pharmacy">Pharmacy</option>
+                  <option value="diagnostic">Diagnostic</option>
+                  <option value="clinic">Clinic</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Phone</label>
+                <input type="tel" className="input" placeholder="+8801XXXXXXXXX"
+                  value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Specialty / Org</label>
+                <input type="text" className="input" placeholder="e.g. Cardiology"
+                  value={newContact.specialty} onChange={(e) => setNewContact({ ...newContact, specialty: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Address</label>
+                <input type="text" className="input" placeholder="Full address"
+                  value={newContact.address} onChange={(e) => setNewContact({ ...newContact, address: e.target.value })} />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleCreate} disabled={!newContact.name || creating} className="btn-primary flex-1 disabled:opacity-50">
+                  {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Add Contact</>}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

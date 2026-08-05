@@ -247,6 +247,16 @@ export const api = {
     return data || []
   },
 
+  async createCRMContact(contact) {
+    const { data, error } = await supabase
+      .from('crm_contacts')
+      .insert(contact)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- Support Tickets ----
 
   async getSupportTickets() {
