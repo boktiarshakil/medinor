@@ -1,9 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, getCurrentUser } from '../lib/supabase'
-import { demoApi, isDemo } from '../lib/demo'
-
-// Default role for new users without a profile yet
-const DEFAULT_ROLE = 'sales_executive'
 
 const AuthContext = createContext(null)
 
@@ -12,18 +8,9 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
 
-  // Initialize auth state
   useEffect(() => {
     const init = async () => {
       try {
-        // Demo mode — skip Supabase entirely
-        if (isDemo()) {
-          const profile = await demoApi.getCurrentUser()
-          setUser(profile)
-          setLoading(false)
-          setInitialized(true)
-          return
-        }
         const profile = await getCurrentUser()
         setUser(profile)
       } catch (err) {
@@ -34,9 +21,6 @@ export function AuthProvider({ children }) {
       }
     }
     init()
-
-    // Listen for auth changes (skip in demo mode)
-    if (isDemo()) return
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
@@ -51,12 +35,6 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signIn = useCallback(async (email, password) => {
-    // Demo mode — accept any credentials
-    if (isDemo()) {
-      const profile = await demoApi.signIn()
-      setUser(profile)
-      return profile
-    }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     const profile = await getCurrentUser()
@@ -65,11 +43,6 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    if (isDemo()) {
-      await demoApi.signOut()
-      setUser(null)
-      return
-    }
     await supabase.auth.signOut()
     setUser(null)
   }, [])
@@ -121,43 +94,3 @@ export const useAuth = () => {
   return context
 }
 
-// Helper: create profile for auth user if missing
-export const ensureProfile = async (authUser) => {
-  if (isDemo()) return demoApi.getCurrentUser()
-
-  const { data: existing } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .single()
-
-  if (existing) return existing
-
-  // No profile — create one with default role
-  const { data: profile, error } = await supabase
-    .from('user_profiles')
-    .insert({
-      id: authUser.id,
-      email: authUser.email,
-      full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
-      phone: authUser.user_metadata?.phone || null,
-      role: authUser.user_metadata?.role || DEFAULT_ROLE,
-      is_active: true
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Profile creation failed:', error)
-    // Return minimal profile so app doesn't break
-    return {
-      id: authUser.id,
-      email: authUser.email,
-      full_name: authUser.user_metadata?.full_name || authUser.email,
-      role: authUser.user_metadata?.role || DEFAULT_ROLE,
-      is_active: true
-    }
-  }
-
-  return profile
-}

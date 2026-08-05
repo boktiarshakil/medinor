@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { demoApi, isDemo } from './demo'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
@@ -19,7 +18,6 @@ export const signIn = (email, password) =>
 export const signOut = () => supabase.auth.signOut()
 
 export const getCurrentUser = async () => {
-  if (isDemo()) return demoApi.getCurrentUser()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 

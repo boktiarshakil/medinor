@@ -3,19 +3,7 @@ import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canS
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { isDemo } from '../lib/demo'
-
-// Demo fallback
-const DEMO_PRODUCTS = [
-  { id: '1', name: 'Mediron Excellent Blood Glucose Meter', sku: 'MED-GLU-001', category: 'Glucose Monitoring', purchase_price: 550, trade_price: 650, dealer_price: 700, mrp: 750, stock: 70, status: 'active', image: '🩸' },
-  { id: '2', name: 'Mediron Blood Glucose Test Strip (25 pcs)', sku: 'MED-TST-025', category: 'Consumable', purchase_price: 220, trade_price: 280, dealer_price: 300, mrp: 350, stock: 150, status: 'active', image: '🧪' },
-  { id: '3', name: 'Mediron Blood Glucose Test Strip (50 pcs)', sku: 'MED-TST-050', category: 'Consumable', purchase_price: 400, trade_price: 500, dealer_price: 550, mrp: 600, stock: 20, status: 'active', image: '🧪' },
-  { id: '4', name: 'Mediron Blood Lancets Twist Type 31G (100 pcs)', sku: 'MED-LAN-100', category: 'Consumable', purchase_price: 120, trade_price: 160, dealer_price: 180, mrp: 200, stock: 80, status: 'active', image: '💉' },
-  { id: '5', name: 'Mediron Examination Gloves (Large)', sku: 'MED-GLV-L', category: 'Disposable', purchase_price: 240, trade_price: 300, dealer_price: 320, mrp: 350, stock: 100, status: 'active', image: '🧤' },
-  { id: '6', name: 'Mediron Automatic BP Monitor (MEDI 589)', sku: 'MED-BP-589', category: 'BP Monitor', purchase_price: 950, trade_price: 1200, dealer_price: 1300, mrp: 1500, stock: 45, status: 'active', image: '🩺' },
-  { id: '7', name: 'Mediron Advance BP Monitor (MEDI 447)', sku: 'MED-BP-447', category: 'BP Monitor', purchase_price: 1100, trade_price: 1400, dealer_price: 1500, mrp: 1800, stock: 35, status: 'active', image: '🩺' },
-  { id: '8', name: 'Mediron Prime BP Monitor (MEDI 712)', sku: 'MED-BP-712', category: 'BP Monitor', purchase_price: 1200, trade_price: 1500, dealer_price: 1650, mrp: 2000, stock: 30, status: 'active', image: '🩺' },
-]
+import toast from 'react-hot-toast'
 
 export default function Products() {
   const { user, role } = useAuth()
@@ -32,7 +20,6 @@ export default function Products() {
     try {
       setLoading(true)
       const data = await api.getProducts()
-      // Normalize field names for demo compatibility
       const normalized = data.map(p => ({
         ...p,
         purchase: p.purchase_price,
@@ -42,8 +29,7 @@ export default function Products() {
       setProducts(normalized)
     } catch (err) {
       console.error('Products fetch failed:', err)
-      // Fallback to demo data
-      setProducts(DEMO_PRODUCTS)
+      toast.error('Failed to load products')
     } finally {
       setLoading(false)
     }

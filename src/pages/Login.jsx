@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { MdLock, MdEmail, MdVisibility, MdVisibilityOff, MdRocketLaunch } from 'react-icons/md'
-import { demoApi } from '../lib/demo'
+import { MdLock, MdEmail, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -16,17 +15,6 @@ export default function Login() {
 
   if (user) {
     return <Navigate to="/dashboard" replace />
-  }
-
-  const handleDemo = async () => {
-    setLoading(true)
-    try {
-      const profile = await demoApi.signIn()
-      toast.success(`Demo mode — Welcome, ${profile.full_name}!`)
-      navigate('/dashboard', { replace: true })
-    } finally {
-      setLoading(false)
-    }
   }
 
   const handleSubmit = async (e) => {
@@ -112,24 +100,6 @@ export default function Login() {
               ) : 'Sign In'}
             </button>
           </form>
-        </div>
-
-        {/* Demo mode */}
-        <div className="mt-5">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-            <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-gray-400">or</span></div>
-          </div>
-          <button
-            type="button"
-            onClick={handleDemo}
-            disabled={loading}
-            className="mt-3 w-full py-3 rounded-lg border-2 border-dashed border-brand-300 text-brand-600 font-semibold text-sm hover:bg-brand-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <MdRocketLaunch size={18} />
-            Preview Demo (no login)
-          </button>
-          <p className="text-[10px] text-gray-400 text-center mt-2">Mock data · super_admin role</p>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

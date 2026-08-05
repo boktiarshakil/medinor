@@ -4,6 +4,7 @@ import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore } from 'rea
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
+
 export default function Dealers() {
   const [dealers, setDealers] = useState([])
   const [loading, setLoading] = useState(true)

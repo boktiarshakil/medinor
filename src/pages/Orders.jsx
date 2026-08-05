@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh } from 'react-icons/md'
 import { supabase } from '../lib/supabase'
-import { demoApi, isDemo } from '../lib/demo'
 
 export default function Orders() {
   const [orders, setOrders] = useState([])
@@ -17,14 +16,6 @@ export default function Orders() {
     setLoading(true)
     setError(null)
     try {
-      // Demo mode — use mock data
-      if (isDemo()) {
-        const data = await demoApi.getOrders()
-        setOrders(data)
-        setLoading(false)
-        return
-      }
-
       const { data, error: fetchError } = await supabase
         .from('orders')
         .select(`

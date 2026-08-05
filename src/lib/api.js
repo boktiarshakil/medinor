@@ -1,23 +1,13 @@
 // ============================================================
-// Live Supabase API Service
-// Replaces demo data with real database calls
+// Live Supabase API Service — no demo mode
 // ============================================================
 
 import { supabase } from './supabase'
-import { demoApi, isDemo } from './demo'
-
-// Check if we should use demo mode
-const useDemo = () => isDemo()
-
-// ============================================================
-// USER MANAGEMENT (Admin only)
-// ============================================================
 
 export const api = {
   // ---- Users / Profiles ----
 
   async getUsers() {
-    if (useDemo()) return demoApi.getUsers()
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
@@ -27,18 +17,14 @@ export const api = {
   },
 
   async createUser({ email, full_name, phone, role, area_id, password }) {
-    if (useDemo()) throw new Error('Cannot create users in demo mode')
-
-    // Create auth user
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
-      password: password || 'TempPass123!',
+      password: password || 'Mediron@2025',
       email_confirm: true,
       user_metadata: { full_name, role }
     })
     if (authError) throw authError
 
-    // Profile is auto-created via trigger or we insert it
     const { error: profileError } = await supabase
       .from('user_profiles')
       .upsert({
@@ -56,7 +42,6 @@ export const api = {
   },
 
   async updateUser(id, updates) {
-    if (useDemo()) return updates
     const { data, error } = await supabase
       .from('user_profiles')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -68,13 +53,11 @@ export const api = {
   },
 
   async deleteUser(id) {
-    if (useDemo()) return
     const { error } = await supabase.auth.admin.deleteUser(id)
     if (error) throw error
   },
 
   async toggleUserActive(id, isActive) {
-    if (useDemo()) return { id, is_active: isActive }
     const { data, error } = await supabase
       .from('user_profiles')
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
@@ -88,7 +71,6 @@ export const api = {
   // ---- Products ----
 
   async getProducts() {
-    if (useDemo()) return demoApi.getProducts()
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -98,7 +80,6 @@ export const api = {
   },
 
   async createProduct(product) {
-    if (useDemo()) throw new Error('Demo mode')
     const { data, error } = await supabase
       .from('products')
       .insert(product)
@@ -109,7 +90,6 @@ export const api = {
   },
 
   async updateProduct(id, updates) {
-    if (useDemo()) throw new Error('Demo mode')
     const { data, error } = await supabase
       .from('products')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -123,7 +103,6 @@ export const api = {
   // ---- Dealers ----
 
   async getDealers() {
-    if (useDemo()) return demoApi.getDealers()
     const { data, error } = await supabase
       .from('dealers')
       .select('*')
@@ -133,7 +112,6 @@ export const api = {
   },
 
   async createDealer(dealer) {
-    if (useDemo()) throw new Error('Demo mode')
     const { data, error } = await supabase
       .from('dealers')
       .insert(dealer)
@@ -144,7 +122,6 @@ export const api = {
   },
 
   async updateDealer(id, updates) {
-    if (useDemo()) throw new Error('Demo mode')
     const { data, error } = await supabase
       .from('dealers')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -158,7 +135,6 @@ export const api = {
   // ---- Orders ----
 
   async getOrders() {
-    if (useDemo()) return demoApi.getOrders()
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -173,7 +149,6 @@ export const api = {
   },
 
   async createOrder(order, items) {
-    if (useDemo()) throw new Error('Demo mode')
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert(order)
@@ -191,7 +166,6 @@ export const api = {
   },
 
   async updateOrderStatus(id, status) {
-    if (useDemo()) throw new Error('Demo mode')
     const { data, error } = await supabase
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
@@ -205,7 +179,6 @@ export const api = {
   // ---- Invoices ----
 
   async getInvoices() {
-    if (useDemo()) return demoApi.getInvoices()
     const { data, error } = await supabase
       .from('invoices')
       .select(`
@@ -221,7 +194,6 @@ export const api = {
   // ---- Inventory ----
 
   async getInventory() {
-    if (useDemo()) return demoApi.getInventory()
     const { data, error } = await supabase
       .from('inventory')
       .select(`
@@ -236,7 +208,6 @@ export const api = {
   // ---- Areas ----
 
   async getAreas() {
-    if (useDemo()) return demoApi.getAreas()
     const { data, error } = await supabase
       .from('areas')
       .select('*')
@@ -248,7 +219,6 @@ export const api = {
   // ---- Notifications ----
 
   async getNotifications(userId) {
-    if (useDemo()) return []
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -260,7 +230,6 @@ export const api = {
   },
 
   async markNotificationRead(id) {
-    if (useDemo()) return
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
@@ -271,7 +240,6 @@ export const api = {
   // ---- CRM ----
 
   async getCRMContacts() {
-    if (useDemo()) return demoApi.getCRM()
     const { data, error } = await supabase
       .from('crm_contacts')
       .select('*')
@@ -283,7 +251,6 @@ export const api = {
   // ---- Support Tickets ----
 
   async getSupportTickets() {
-    if (useDemo()) return []
     const { data, error } = await supabase
       .from('support_tickets')
       .select(`
@@ -299,7 +266,6 @@ export const api = {
   // ---- GPS Tracking ----
 
   async getGPSHistory(userId) {
-    if (useDemo()) return []
     const { data, error } = await supabase
       .from('gps_tracking')
       .select('*')
