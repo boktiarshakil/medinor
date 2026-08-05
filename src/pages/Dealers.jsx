@@ -58,13 +58,12 @@ export default function Dealers() {
     try {
       await api.createDealer({
         name: newDealer.name,
-        owner_name: newDealer.owner_name,
-        phone: newDealer.phone,
-        address: newDealer.address,
-        district: newDealer.district,
+        owner_name: newDealer.owner_name || null,
+        phone: newDealer.phone || null,
+        address: newDealer.address || null,
+        district: newDealer.district || null,
         area_id: newDealer.area_id || null,
         credit_limit: Number(newDealer.credit_limit) || 0,
-        is_active: true,
       })
       toast.success(`Dealer "${newDealer.name}" created`)
       setNewDealer({ name: '', owner_name: '', phone: '', address: '', district: '', area_id: '', credit_limit: 50000 })

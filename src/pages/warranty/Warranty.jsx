@@ -160,7 +160,7 @@ export default function Warranty() {
           type: 'other',
           phone: registerForm.phone,
           address: registerForm.address,
-          org: registerForm.product,
+          organization: registerForm.product,
           specialty: `Warranty: ${newWarranty.code}`,
         })
       } catch {

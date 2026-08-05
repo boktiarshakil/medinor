@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
-import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete, MdTrash2 } from 'react-icons/md'
+import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete } from 'react-icons/md'
 import { supabase } from '../lib/supabase'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
