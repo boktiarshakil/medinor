@@ -148,7 +148,7 @@ export default function Settlements() {
                   <tr key={order.id}>
                     <td className="font-mono text-xs font-medium">{order.order_number}</td>
                     <td className="text-xs">{order.dealer?.name || '—'}</td>
-                    <td className="text-xs text-gray-500">{order.sr?.full_name || '—'}</td>
+                    <td className="text-xs text-gray-500">{order.sr_name || order.sr_id || '—'}</td>
                     <td className="font-semibold text-xs">{formatCurrency(settlement.grand_total)}</td>
                     <td className="text-xs text-emerald-600 font-medium">{formatCurrency(settlement.company_total)}</td>
                     <td className="text-xs text-purple-600 font-medium">{formatCurrency(settlement.dealer_margin_total)}</td>

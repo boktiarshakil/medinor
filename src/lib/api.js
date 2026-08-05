@@ -140,7 +140,6 @@ export const api = {
       .select(`
         *,
         dealer:dealers(name),
-        sr:user_profiles(full_name),
         items:order_items(*, product:products(name, sku))
       `)
       .order('created_at', { ascending: false })

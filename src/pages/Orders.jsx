@@ -36,11 +36,11 @@ export default function Orders() {
 
       const mapped = (data || []).map(order => ({
         id: order.id,
-        number: order.order_number,
-        dealer: order.dealers?.name || 'Unknown',
-        sr: order.sr?.full_name || 'Unassigned',
-        amount: order.net_amount || order.total_amount || 0,
-        items: order.order_items?.length || 0,
+        number: order.order_number || order.order_no || order.id,
+        dealer: order.dealer?.name || order.dealer_name || 'Unknown',
+        sr: order.sr_name || order.sr_id || 'Unassigned',
+        amount: order.net_amount || order.total_amount || order.amount || 0,
+        items: order.items?.length || order.order_items?.length || 0,
         status: order.status,
         date: order.created_at,
         area: order.area?.name || '',

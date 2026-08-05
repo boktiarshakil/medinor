@@ -26,12 +26,12 @@ const STATUS_TO_STEP = {
 
 function mapOrder(order) {
   return {
-    id: order.order_number,
+    id: order.order_number || order.order_no || order.id,
     dbId: order.id,
-    dealer: order.dealers?.name || 'Unknown Dealer',
-    sr: order.sr?.full_name || null,
-    amount: order.net_amount ?? order.total_amount ?? 0,
-    items: order.order_items?.length || 0,
+    dealer: order.dealer?.name || order.dealer_name || 'Unknown Dealer',
+    sr: order.sr_name || null,
+    amount: order.net_amount ?? order.total_amount ?? order.amount ?? 0,
+    items: order.items?.length || order.order_items?.length || 0,
     currentStep: STATUS_TO_STEP[order.status] ?? 0,
     placedAt: order.created_at,
     status: order.status,
