@@ -4,7 +4,7 @@ import {
   MdDashboard, MdInventory2, MdShoppingCart, MdReceipt,
   MdPeople, MdAssessment, MdLocalShipping, MdAssignmentReturn,
   MdCampaign, MdSupportAgent, MdSettings, MdClose, MdStore,
-  MdChat, MdMyLocation, MdQrCode, MdAccountTree
+  MdChat, MdMyLocation, MdQrCode, MdAccountTree, MdBadge, MdAccountBalance
 } from 'react-icons/md'
 
 const NAV_ITEMS = {
@@ -23,6 +23,8 @@ const NAV_ITEMS = {
     { path: '/messages', icon: MdChat, label: 'Messages' },
     { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
     { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
+    { path: '/settlements', icon: MdAccountBalance, label: 'Settlements' },
+    { path: '/personal-ids', icon: MdBadge, label: 'Personal IDs' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
     { path: '/support', icon: MdSupportAgent, label: 'Support' },
@@ -43,6 +45,8 @@ const NAV_ITEMS = {
     { path: '/messages', icon: MdChat, label: 'Messages' },
     { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
     { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
+    { path: '/settlements', icon: MdAccountBalance, label: 'Settlements' },
+    { path: '/personal-ids', icon: MdBadge, label: 'Personal IDs' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
     { path: '/support', icon: MdSupportAgent, label: 'Support' },
@@ -57,6 +61,7 @@ const NAV_ITEMS = {
     { path: '/messages', icon: MdChat, label: 'Messages' },
     { path: '/warranty', icon: MdQrCode, label: 'Warranty' },
     { path: '/org-chart', icon: MdAccountTree, label: 'Org Chart' },
+    { path: '/settlements', icon: MdAccountBalance, label: 'Settlements' },
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/crm', icon: MdPeople, label: 'CRM' },
   ],

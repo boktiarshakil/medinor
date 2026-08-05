@@ -27,6 +27,8 @@ import OrderTracker from './pages/orders/OrderTracker'
 import GPSTracking from './pages/gps/GPSTracking'
 import Warranty from './pages/warranty/Warranty'
 import OrgChartPage from './components/OrgChart/OrgHierarchy'
+import Settlements from './pages/Settlements'
+import PersonalIds from './pages/PersonalIds'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -81,6 +83,10 @@ export default function App() {
         <Route path="/gps-tracking" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager']}><GPSTracking /></ProtectedRoute>} />
         <Route path="/warranty" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse','dealer']}><Warranty /></ProtectedRoute>} />
         <Route path="/org-chart" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager']}><OrgChartPage /></ProtectedRoute>} />
+
+        {/* Price isolation & settlement — admin only */}
+        <Route path="/settlements" element={<ProtectedRoute roles={['super_admin','admin','sales_manager']}><Settlements /></ProtectedRoute>} />
+        <Route path="/personal-ids" element={<ProtectedRoute roles={['super_admin','admin']}><PersonalIds /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

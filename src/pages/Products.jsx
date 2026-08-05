@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { formatCurrency, statusColor } from '../lib/utils'
-import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2 } from 'react-icons/md'
+import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canSeePrice } from '../lib/utils'
+import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock } from 'react-icons/md'
+import { useAuth } from '../context/AuthContext'
 
 const PRODUCTS = [
   { id: '1', name: 'Mediron Excellent Blood Glucose Meter', sku: 'MED-GLU-001', category: 'Glucose Monitoring', purchase: 550, trade: 650, dealer: 700, mrp: 750, stock: 70, status: 'active', image: '🩸' },
@@ -14,6 +15,7 @@ const PRODUCTS = [
 ]
 
 export default function Products() {
+  const { user, role } = useAuth()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
@@ -77,24 +79,55 @@ export default function Products() {
 
               <p className="text-[10px] font-mono text-gray-400 mb-3">{product.sku}</p>
 
+              {/* Price display based on role — PRICE ISOLATION */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-3">
+                {/* MRP always visible */}
                 <div>
                   <span className="text-gray-400">MRP</span>
                   <p className="font-semibold text-gray-800">{formatCurrency(product.mrp)}</p>
                 </div>
-                <div>
-                  <span className="text-gray-400">Dealer</span>
-                  <p className="font-semibold text-brand-600">{formatCurrency(product.dealer)}</p>
-                </div>
-                <div>
-                  <span className="text-gray-400">Trade</span>
-                  <p className="font-medium text-gray-600">{formatCurrency(product.trade)}</p>
-                </div>
+
+                {/* Dealer price — only for dealer role and above */}
+                {canSeePrice(role, 'dealer_price') && (
+                  <div>
+                    <span className="text-gray-400">Dealer Price</span>
+                    <p className="font-semibold text-brand-600">{formatCurrency(product.dealer)}</p>
+                  </div>
+                )}
+
+                {/* Trade price — for managers and SR */}
+                {canSeePrice(role, 'trade_price') && (
+                  <div>
+                    <span className="text-gray-400">Trade Price</span>
+                    <p className="font-medium text-gray-600">{formatCurrency(product.trade)}</p>
+                  </div>
+                )}
+
+                {/* Purchase price — admin only */}
+                {canSeePrice(role, 'purchase_price') && (
+                  <div>
+                    <span className="text-gray-400 flex items-center gap-0.5">Cost <MdLock size={9} /></span>
+                    <p className="font-medium text-red-600">{formatCurrency(product.purchase)}</p>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-gray-400">Stock</span>
                   <p className={`font-semibold ${product.stock < 50 ? 'text-amber-600' : 'text-gray-800'}`}>{product.stock} pcs</p>
                 </div>
               </div>
+
+              {/* Role-based price access indicator */}
+              {role === 'sales_executive' && (
+                <div className="text-[9px] text-gray-400 bg-gray-50 rounded px-2 py-1 mb-2 flex items-center gap-1">
+                  <MdLock size={9} /> You see trade price. Dealer price hidden.
+                </div>
+              )}
+              {role === 'dealer' && (
+                <div className="text-[9px] text-gray-400 bg-gray-50 rounded px-2 py-1 mb-2 flex items-center gap-1">
+                  <MdLock size={9} /> You see your dealer price + MRP only.
+                </div>
+              )}
 
               <div className="flex gap-2 pt-3 border-t border-gray-50">
                 <button className="btn-ghost flex-1 text-xs">
