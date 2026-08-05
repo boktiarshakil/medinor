@@ -64,7 +64,7 @@ export default function Products() {
     }
     setCreating(true)
     try {
-      await api.createProduct({
+      const productPayload = {
         name: newProduct.name,
         sku: newProduct.sku || null,
         category: newProduct.category || null,
@@ -74,8 +74,12 @@ export default function Products() {
         purchase_price: Number(newProduct.purchase_price) || 0,
         stock: Number(newProduct.stock) || 0,
         status: 'active',
-        image_url: newProduct.image_url || null,
-      })
+      }
+      // Only include image_url if column exists (after migration)
+      if (newProduct.image_url) {
+        productPayload.image_url = newProduct.image_url
+      }
+      await api.createProduct(productPayload)
       toast.success(`Product "${newProduct.name}" created`)
       setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' })
       setShowCreate(false)
