@@ -1,12 +1,8 @@
+import { useState, useEffect } from 'react'
 import { formatDate, statusColor } from '../lib/utils'
 import { MdSupportAgent } from 'react-icons/md'
-
-const TICKETS = [
-  { id: '1', number: 'TKT-001', subject: 'Glucose Meter Display Issue', dealer: 'Medicine Point', type: 'warranty', priority: 'high', status: 'open', date: '2025-01-15' },
-  { id: '2', number: 'TKT-002', subject: 'Wrong Strips Delivered', dealer: 'Lazz Pharma', type: 'complaint', priority: 'medium', status: 'in_progress', date: '2025-01-14' },
-  { id: '3', number: 'TKT-003', subject: 'BP Monitor Replacement', dealer: 'Square Hospital', type: 'replacement', priority: 'urgent', status: 'resolved', date: '2025-01-12' },
-  { id: '4', number: 'TKT-004', subject: 'Bulk Order Inquiry', dealer: 'Chittagong Medical', type: 'general', priority: 'low', status: 'closed', date: '2025-01-10' },
-]
+import { api } from '../lib/api'
+import toast from 'react-hot-toast'
 
 const priorityColor = {
   low: 'badge-gray',
@@ -16,11 +12,49 @@ const priorityColor = {
 }
 
 export default function Support() {
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchTickets = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getSupportTickets()
+      setTickets(data)
+    } catch (err) {
+      console.error('Support tickets fetch failed:', err)
+      setError(err.message || 'Failed to load tickets')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchTickets() }, [])
+
+  if (loading) {
+    return (
+      <div className="card p-12 text-center">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-gray-500 mt-3">Loading tickets...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="card p-6 text-center border-l-4 border-l-red-400">
+        <p className="text-sm text-red-600 font-medium">{error}</p>
+        <button className="btn-secondary mt-3 text-xs" onClick={fetchTickets}>Retry</button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Support Tickets</h1>
-        <p className="text-sm text-gray-500">{TICKETS.length} tickets</p>
+        <p className="text-sm text-gray-500">{tickets.length} tickets</p>
       </div>
 
       <div className="table-container">
@@ -37,20 +71,27 @@ export default function Support() {
             </tr>
           </thead>
           <tbody>
-            {TICKETS.map(t => (
+            {tickets.map(t => (
               <tr key={t.id}>
-                <td className="font-mono text-xs font-semibold text-brand-600">{t.number}</td>
+                <td className="font-mono text-xs font-semibold text-brand-600">{t.number || t.id}</td>
                 <td className="font-medium">{t.subject}</td>
-                <td className="text-gray-600">{t.dealer}</td>
-                <td className="capitalize text-gray-600">{t.type.replace(/_/g, ' ')}</td>
-                <td><span className={priorityColor[t.priority]}>{t.priority}</span></td>
-                <td><span className={statusColor(t.status)}>{t.status.replace(/_/g, ' ')}</span></td>
-                <td className="text-gray-500">{formatDate(t.date)}</td>
+                <td className="text-gray-600">{t.dealer?.name || t.dealer_name || '-'}</td>
+                <td className="capitalize text-gray-600">{(t.type || '').replace(/_/g, ' ')}</td>
+                <td><span className={priorityColor[t.priority] || 'badge-gray'}>{t.priority}</span></td>
+                <td><span className={statusColor(t.status)}>{(t.status || '').replace(/_/g, ' ')}</span></td>
+                <td className="text-gray-500">{formatDate(t.created_at || t.date)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {tickets.length === 0 && (
+        <div className="card p-12 text-center">
+          <MdSupportAgent size={48} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-gray-500">No support tickets</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,23 +1,75 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatDate, generatePersonalId } from '../lib/utils'
-import { MdContentCopy, MdAdd, MdSearch, MdBadge, MdCheckCircle, MdPerson, MdStore } from 'react-icons/md'
-
-// Demo data — replace with Supabase fetch
-const INITIAL_IDS = [
-  { id: '1', code: 'SR-A3F9K2M1', entity_type: 'sr', entity_name: 'Rahim Uddin', role: 'sales_executive', area: 'Dhaka North', created_at: '2025-01-05', is_active: true, total_orders: 47, total_collected: 892000 },
-  { id: '2', code: 'SR-B7N4P8Q2', entity_type: 'sr', entity_name: 'Karim Ahmed', role: 'sales_executive', area: 'Dhaka South', created_at: '2025-01-03', is_active: true, total_orders: 32, total_collected: 645000 },
-  { id: '3', code: 'DLR-X2K9M4N8', entity_type: 'dealer', entity_name: 'Medicine Point', role: 'dealer', area: 'Dhanmondi', created_at: '2025-01-02', is_active: true, total_orders: 89, total_collected: 2340000 },
-  { id: '4', code: 'DLR-Y6P3Q7R1', entity_type: 'dealer', entity_name: 'Lazz Pharma', role: 'dealer', area: 'New Market', created_at: '2024-12-28', is_active: true, total_orders: 56, total_collected: 1560000 },
-  { id: '5', code: 'DLR-Z8S5T9U2', entity_type: 'dealer', entity_name: 'HealthCare Ltd', role: 'dealer', area: 'Chattogram', created_at: '2024-12-20', is_active: false, total_orders: 23, total_collected: 480000 },
-]
+import { api } from '../lib/api'
+import { MdContentCopy, MdAdd, MdSearch, MdBadge, MdCheckCircle, MdPerson, MdStore, MdRefresh } from 'react-icons/md'
 
 export default function PersonalIds() {
-  const [ids, setIds] = useState(INITIAL_IDS)
+  const [ids, setIds] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [newId, setNewId] = useState({ entity_name: '', entity_type: 'sr', area: '' })
   const [copied, setCopied] = useState(null)
+
+  const fetchIds = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // Try dedicated personal_ids table first
+      const { data: personalIds, error: personalError } = await api.getPersonalIds()
+      if (!personalError && personalIds && personalIds.length > 0) {
+        setIds(personalIds)
+        return
+      }
+
+      // Fallback: derive from dealers + user_profiles
+      const [dealers, users] = await Promise.all([
+        api.getDealers(),
+        api.getUsers(),
+      ])
+
+      const dealerRows = (dealers || []).map(d => ({
+        id: `dealer-${d.id}`,
+        code: d.personal_id_code || generatePersonalId('dealer'),
+        entity_type: 'dealer',
+        entity_name: d.name,
+        role: 'dealer',
+        area: d.area || d.territory || 'Unassigned',
+        created_at: d.created_at || new Date().toISOString(),
+        is_active: d.is_active !== false,
+        total_orders: d.total_orders || 0,
+        total_collected: d.total_collected || 0,
+      }))
+
+      const srRows = (users || [])
+        .filter(u => u.role === 'sales_executive')
+        .map(u => ({
+          id: `sr-${u.id}`,
+          code: u.personal_id_code || generatePersonalId('sr'),
+          entity_type: 'sr',
+          entity_name: u.full_name,
+          role: 'sales_executive',
+          area: u.area_id || 'Unassigned',
+          created_at: u.created_at || new Date().toISOString(),
+          is_active: u.is_active !== false,
+          total_orders: u.total_orders || 0,
+          total_collected: u.total_collected || 0,
+        }))
+
+      setIds([...dealerRows, ...srRows])
+    } catch (err) {
+      console.error('Failed to fetch personal IDs:', err)
+      setError(err.message || 'Failed to load personal IDs')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchIds()
+  }, [])
 
   const filtered = ids.filter(item => {
     const matchSearch = item.code.toLowerCase().includes(search.toLowerCase()) ||
@@ -64,6 +116,26 @@ export default function PersonalIds() {
   const totalSRs = ids.filter(i => i.entity_type === 'sr').length
   const totalDealers = ids.filter(i => i.entity_type === 'dealer').length
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Personal IDs</h1>
+            <p className="text-sm text-gray-500">Unique codes for order attribution & price isolation</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-24">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-500">Loading personal IDs…</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -76,6 +148,24 @@ export default function PersonalIds() {
           <MdAdd size={16} /> Generate ID
         </button>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="card p-4 bg-red-50 border-red-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-red-800">Failed to load IDs</p>
+              <p className="text-xs text-red-600">{error}</p>
+            </div>
+            <button
+              onClick={fetchIds}
+              className="flex items-center gap-1 text-xs font-medium text-red-700 hover:text-red-900 transition-colors"
+            >
+              <MdRefresh size={14} /> Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Info Banner */}
       <div className="card p-4 bg-amber-50 border-amber-100">
@@ -206,10 +296,23 @@ export default function PersonalIds() {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {/* Empty State — when no IDs at all */}
+      {!loading && !error && ids.length === 0 && (
         <div className="card p-12 text-center">
           <MdBadge size={48} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-gray-500">No IDs found</p>
+          <p className="text-sm font-medium text-gray-600 mb-1">No personal IDs generated yet</p>
+          <p className="text-xs text-gray-400 mb-4">Generate unique codes for SRs and dealers to enable order attribution</p>
+          <button onClick={() => setShowCreate(true)} className="btn-primary">
+            <MdAdd size={15} /> Generate First ID
+          </button>
+        </div>
+      )}
+
+      {/* No search results */}
+      {!loading && !error && ids.length > 0 && filtered.length === 0 && (
+        <div className="card p-12 text-center">
+          <MdBadge size={48} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-gray-500">No IDs found matching your search</p>
         </div>
       )}
 

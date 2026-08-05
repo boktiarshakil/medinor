@@ -1,14 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatDate } from '../lib/utils'
 import { MdSearch, MdAdd, MdLocalHospital, MdPerson, MdBusiness, MdScience, MdStore } from 'react-icons/md'
-
-const CONTACTS = [
-  { id: '1', name: 'Dr. Rahim Uddin', type: 'doctor', specialty: 'Endocrinologist', phone: '+880 1712-345678', org: 'Square Hospital', area: 'Panthapath', lastVisit: '2025-01-10' },
-  { id: '2', name: 'Square Hospital', type: 'hospital', phone: '+880 2-8144400', org: null, area: 'Panthapath', lastVisit: '2025-01-12' },
-  { id: '3', name: 'Lazz Pharma', type: 'pharmacy', phone: '+880 1812-987654', org: null, area: 'New Market', lastVisit: '2025-01-08' },
-  { id: '4', name: 'Dr. Fatima Begum', type: 'doctor', specialty: 'Cardiologist', phone: '+880 1912-567890', org: 'Labaid Hospital', area: 'Dhanmondi', lastVisit: '2025-01-05' },
-  { id: '5', name: 'Popular Diagnostic', type: 'diagnostic', phone: '+880 2-9123456', org: null, area: 'Mirpur', lastVisit: '2025-01-03' },
-]
+import { api } from '../lib/api'
+import toast from 'react-hot-toast'
 
 const TYPE_ICONS = {
   doctor: MdPerson,
@@ -29,22 +23,59 @@ const TYPE_COLORS = {
 }
 
 export default function CRM() {
+  const [contacts, setContacts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
 
-  const types = ['all', ...new Set(CONTACTS.map(c => c.type))]
-  const filtered = CONTACTS.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === 'all' || c.type === typeFilter
+  const fetchContacts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getCRMContacts()
+      setContacts(data)
+    } catch (err) {
+      console.error('CRM fetch failed:', err)
+      setError(err.message || 'Failed to load contacts')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchContacts() }, [])
+
+  const types = ['all', ...new Set(contacts.map(c => c.type || 'other'))]
+  const filtered = contacts.filter(c => {
+    const matchSearch = (c.name || '').toLowerCase().includes(search.toLowerCase())
+    const matchType = typeFilter === 'all' || (c.type || 'other') === typeFilter
     return matchSearch && matchType
   })
+
+  if (loading) {
+    return (
+      <div className="card p-12 text-center">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-gray-500 mt-3">Loading contacts...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="card p-6 text-center border-l-4 border-l-red-400">
+        <p className="text-sm text-red-600 font-medium">{error}</p>
+        <button className="btn-secondary mt-3 text-xs" onClick={fetchContacts}>Retry</button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">CRM</h1>
-          <p className="text-sm text-gray-500">{CONTACTS.length} contacts</p>
+          <p className="text-sm text-gray-500">{contacts.length} contacts</p>
         </div>
         <button className="btn-primary">
           <MdAdd size={16} /> Add Contact
@@ -67,7 +98,7 @@ export default function CRM() {
           return (
             <div key={contact.id} className="card card-hover p-5">
               <div className="flex items-start gap-3 mb-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${TYPE_COLORS[contact.type]}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${TYPE_COLORS[contact.type || 'other']}`}>
                   <Icon size={20} />
                 </div>
                 <div className="flex-1">
@@ -77,13 +108,20 @@ export default function CRM() {
               </div>
               <div className="space-y-1.5 text-xs text-gray-600">
                 {contact.org && <p>📍 {contact.org}</p>}
-                <p>📞 {contact.phone}</p>
-                <p>🗓 Last visit: {formatDate(contact.lastVisit)}</p>
+                {contact.phone && <p>📞 {contact.phone}</p>}
+                {contact.last_visit && <p>🗓 Last visit: {formatDate(contact.last_visit)}</p>}
               </div>
             </div>
           )
         })}
       </div>
+
+      {filtered.length === 0 && (
+        <div className="card p-12 text-center">
+          <MdPerson size={48} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-gray-500">No contacts found</p>
+        </div>
+      )}
     </div>
   )
 }

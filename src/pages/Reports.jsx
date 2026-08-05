@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { formatCurrency, formatNumber } from '../lib/utils'
 import { MdFileDownload, MdAssessment } from 'react-icons/md'
+import { api } from '../lib/api'
 
 const REPORT_CARDS = [
   { title: 'Sales Report', description: 'Detailed sales by period, area, product, and executive', icon: '📊', color: 'bg-blue-50 text-blue-600' },
@@ -13,16 +15,55 @@ const REPORT_CARDS = [
   { title: 'Profit Report', description: 'Revenue, cost, and profit margins', icon: '💹', color: 'bg-teal-50 text-teal-600' },
 ]
 
-const SUMMARY_STATS = [
-  { label: 'Total Revenue (MTD)', value: formatCurrency(4875000) },
-  { label: 'Total Collection (MTD)', value: formatCurrency(3641000) },
-  { label: 'Outstanding', value: formatCurrency(1234500) },
-  { label: 'Active Dealers', value: formatNumber(342) },
-  { label: 'Orders (MTD)', value: formatNumber(487) },
-  { label: 'Avg Order Value', value: formatCurrency(10012) },
-]
-
 export default function Reports() {
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [orders, invoices, dealers] = await Promise.all([
+          api.getOrders(),
+          api.getInvoices(),
+          api.getDealers(),
+        ])
+
+        const now = new Date()
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+        const mtdOrders = orders.filter(o => new Date(o.created_at) >= monthStart)
+        const totalRevenue = mtdOrders.reduce((s, o) => s + (o.net_amount || o.total_amount || 0), 0)
+        const totalPaid = invoices.reduce((s, i) => s + (i.paid || 0), 0)
+        const outstanding = invoices.reduce((s, i) => s + ((i.amount || 0) - (i.paid || 0)), 0)
+        const activeDealers = dealers.filter(d => d.status === 'active').length
+        const avgOrder = mtdOrders.length > 0 ? totalRevenue / mtdOrders.length : 0
+
+        setStats({
+          totalRevenue,
+          totalPaid,
+          outstanding,
+          activeDealers,
+          mtdOrders: mtdOrders.length,
+          avgOrder,
+        })
+      } catch (err) {
+        console.error('Reports stats fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchStats()
+  }, [])
+
+  const summaryStats = stats ? [
+    { label: 'Total Revenue (MTD)', value: formatCurrency(stats.totalRevenue) },
+    { label: 'Total Collection (MTD)', value: formatCurrency(stats.totalPaid) },
+    { label: 'Outstanding', value: formatCurrency(stats.outstanding) },
+    { label: 'Active Dealers', value: formatNumber(stats.activeDealers) },
+    { label: 'Orders (MTD)', value: formatNumber(stats.mtdOrders) },
+    { label: 'Avg Order Value', value: formatCurrency(stats.avgOrder) },
+  ] : []
+
   return (
     <div className="space-y-6">
       <div>
@@ -31,14 +72,21 @@ export default function Reports() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {SUMMARY_STATS.map((stat, i) => (
-          <div key={i} className="card p-4">
-            <p className="stat-value text-lg">{stat.value}</p>
-            <p className="stat-label text-[10px]">{stat.label}</p>
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="card p-8 text-center">
+          <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-500 mt-3">Loading stats...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {summaryStats.map((stat, i) => (
+            <div key={i} className="card p-4">
+              <p className="stat-value text-lg">{stat.value}</p>
+              <p className="stat-label text-[10px]">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Report Cards */}
       <div>

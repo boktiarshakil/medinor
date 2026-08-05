@@ -263,6 +263,31 @@ export const api = {
     return data || []
   },
 
+  // ---- Personal IDs ----
+
+  async getPersonalIds() {
+    // Try dedicated personal_ids table first
+    const { data, error } = await supabase
+      .from('personal_ids')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) {
+      // Table may not exist yet — return empty to trigger fallback
+      return { data: null, error }
+    }
+    return { data: data || [], error: null }
+  },
+
+  async createPersonalId(record) {
+    const { data, error } = await supabase
+      .from('personal_ids')
+      .insert(record)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- GPS Tracking ----
 
   async getGPSHistory(userId) {
@@ -275,6 +300,35 @@ export const api = {
     if (error) throw error
     return data || []
   },
+
+  // ---- Campaigns ----
+
+  async getCampaigns() {
+    const { data, error } = await supabase
+      .from('campaigns')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  // ---- Returns ----
+
+  async getReturns() {
+    const { data, error } = await supabase
+      .from('returns')
+      .select(`
+        *,
+        dealer:dealers(name),
+        items:return_items(*, product:products(name))
+      `)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  // Expose supabase for direct queries
+  supabase,
 }
 
 export default api

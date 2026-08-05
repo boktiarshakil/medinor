@@ -1,23 +1,158 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MdLocationOn, MdMyLocation, MdRefresh, MdPeople, MdCheckCircle, MdCancel } from 'react-icons/md'
 import { HiLocationMarker } from 'react-icons/hi'
+import { api } from '../../lib/api'
 
-const MOCK_STAFF = [
-  { id: 1, name: 'Rahim Uddin', role: 'TSO', status: 'online', location: 'Dhanmondi 27, Dhaka', lat: 23.7465, lng: 90.3762, lastUpdate: '2 min ago', orders: 3, visits: 5, battery: 78 },
-  { id: 2, name: 'Karim Ahmed', role: 'ASM', status: 'online', location: 'New Market, Dhaka', lat: 23.7300, lng: 90.3850, lastUpdate: '5 min ago', orders: 2, visits: 4, battery: 65 },
-  { id: 3, name: 'Sajid Hasan', role: 'TSO', status: 'offline', location: 'Last: Mirpur 10', lat: 23.8062, lng: 90.3650, lastUpdate: '2 hours ago', orders: 0, visits: 0, battery: 12 },
-  { id: 4, name: 'Nusrat Jahan', role: 'TSO', status: 'online', location: 'Uttara Sector 7', lat: 23.8728, lng: 90.3984, lastUpdate: '1 min ago', orders: 4, visits: 6, battery: 92 },
-  { id: 5, name: 'Tanvir Rahman', role: 'TSO', status: 'online', location: 'Mirpur 11', lat: 23.8150, lng: 90.3650, lastUpdate: '8 min ago', orders: 1, visits: 3, battery: 45 },
-  { id: 6, name: 'Faruk Hossain', role: 'TSO', status: 'offline', location: 'Last: Mohammadpur', lat: 23.7530, lng: 90.3620, lastUpdate: '3 hours ago', orders: 0, visits: 0, battery: 0 },
-]
+// Sales roles eligible for GPS tracking
+const SALES_ROLES = ['TSO', 'ASM', 'SR', 'Sales Rep', 'Territory Sales Officer', 'Area Sales Manager']
+
+// Consider online if last GPS record within 30 minutes
+const ONLINE_THRESHOLD_MS = 30 * 60 * 1000
+
+function timeAgo(dateString) {
+  if (!dateString) return 'Never'
+  const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000)
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  return `${days} days ago`
+}
 
 export default function GPSTracking() {
-  const [staff] = useState(MOCK_STAFF)
+  const [staff, setStaff] = useState([])
   const [selectedStaff, setSelectedStaff] = useState(null)
   const [filter, setFilter] = useState('all') // all, online, offline
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchStaffData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const users = await api.getUsers()
+      // Filter for sales roles only
+      const salesUsers = users.filter(u =>
+        SALES_ROLES.includes(u.role) || u.role?.toLowerCase().includes('sales')
+      )
+
+      // Fetch latest GPS record for each user
+      const staffWithLocation = await Promise.all(
+        salesUsers.map(async (user) => {
+          try {
+            const gpsHistory = await api.getGPSHistory(user.id)
+            const latest = gpsHistory?.[0]
+
+            if (latest) {
+              const lastSeen = new Date(latest.recorded_at).getTime()
+              const isOnline = Date.now() - lastSeen < ONLINE_THRESHOLD_MS
+              return {
+                id: user.id,
+                name: user.full_name || user.email || 'Unknown',
+                role: user.role || 'N/A',
+                status: isOnline ? 'online' : 'offline',
+                location: latest.lat && latest.lng
+                  ? `${latest.lat.toFixed(4)}, ${latest.lng.toFixed(4)}`
+                  : 'Unknown',
+                lat: latest.lat,
+                lng: latest.lng,
+                lastUpdate: timeAgo(latest.recorded_at),
+                orders: '—',
+                visits: '—',
+                battery: latest.battery_pct ?? '—',
+              }
+            }
+
+            // User exists but has no GPS data
+            return {
+              id: user.id,
+              name: user.full_name || user.email || 'Unknown',
+              role: user.role || 'N/A',
+              status: 'offline',
+              location: 'No location data',
+              lat: null,
+              lng: null,
+              lastUpdate: 'Never',
+              orders: '—',
+              visits: '—',
+              battery: '—',
+            }
+          } catch {
+            return {
+              id: user.id,
+              name: user.full_name || user.email || 'Unknown',
+              role: user.role || 'N/A',
+              status: 'offline',
+              location: 'Unknown',
+              lat: null,
+              lng: null,
+              lastUpdate: 'Error',
+              orders: '—',
+              visits: '—',
+              battery: '—',
+            }
+          }
+        })
+      )
+
+      setStaff(staffWithLocation)
+    } catch (err) {
+      console.error('Failed to fetch staff data:', err)
+      setError(err.message || 'Failed to load staff data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchStaffData()
+  }, [])
 
   const filteredStaff = filter === 'all' ? staff : staff.filter(s => s.status === filter)
   const onlineCount = staff.filter(s => s.status === 'online').length
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
+        <p className="text-sm text-gray-500">Loading staff location data…</p>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+          <MdCancel className="text-red-500" size={28} />
+        </div>
+        <p className="text-sm font-semibold text-gray-900 mb-1">Failed to load GPS data</p>
+        <p className="text-xs text-gray-500 mb-4 max-w-xs text-center">{error}</p>
+        <button onClick={fetchStaffData} className="btn-primary text-xs flex items-center gap-1.5">
+          <MdRefresh size={14} /> Retry
+        </button>
+      </div>
+    )
+  }
+
+  // Empty state
+  if (staff.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+          <MdLocationOn className="text-gray-400" size={28} />
+        </div>
+        <p className="text-sm font-semibold text-gray-900 mb-1">No GPS data available</p>
+        <p className="text-xs text-gray-500 max-w-sm text-center">
+          Staff location tracking will appear here once team members start sharing location.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -35,7 +170,7 @@ export default function GPSTracking() {
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-xs font-semibold text-emerald-700">{onlineCount} Online</span>
           </div>
-          <button className="btn-secondary text-xs">
+          <button onClick={fetchStaffData} className="btn-secondary text-xs">
             <MdRefresh size={14} /> Refresh
           </button>
         </div>
@@ -189,7 +324,9 @@ export default function GPSTracking() {
                 <p className="text-[10px] text-gray-400">Visits</p>
               </div>
               <div className="text-center">
-                <p className="font-bold text-gray-900">{selectedStaff.battery}%</p>
+                <p className="font-bold text-gray-900">
+                  {typeof selectedStaff.battery === 'number' ? `${selectedStaff.battery}%` : selectedStaff.battery}
+                </p>
                 <p className="text-[10px] text-gray-400">Battery</p>
               </div>
               <span className={`badge ${selectedStaff.status === 'online' ? 'badge-success' : 'badge-gray'}`}>

@@ -1,41 +1,104 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   MdQrCode, MdPhone, MdSms, MdSearch, MdCheckCircle, MdPending, MdVerified,
   MdPerson, MdInventory, MdAdd, MdLocalPhone, MdLocationOn, MdHistory,
   MdCall, MdMessage, MdClose, MdRefresh
 } from 'react-icons/md'
 import { formatDate, formatCurrency } from '../../lib/utils'
-
-const MOCK_WARRANTY = [
-  { id: 1, code: 'MED-GLU-001-2024-0001', product: 'Mediron Excellent Blood Glucose Meter', customer: 'Mr. Aminul Islam', phone: '+8801711000001', address: '78 Elephant Road, Dhaka', purchaseDate: '2025-06-15', warrantyTill: '2026-06-15', status: 'active', registeredVia: 'SMS', stickerNo: 'STK-2024-0001' },
-  { id: 2, code: 'MED-BP-712-2024-0045', product: 'Mediron Prime BP Monitor (MEDI 712)', customer: 'Square Hospital', phone: '+8801711000002', address: '188 Panthapath, Dhaka', purchaseDate: '2025-05-20', warrantyTill: '2027-05-20', status: 'active', registeredVia: 'QR Scan', stickerNo: 'STK-2024-0045' },
-  { id: 3, code: 'MED-BP-589-2024-0023', product: 'Mediron Automatic BP Monitor (MEDI 589)', customer: 'Dr. Fatima Begum', phone: '+8801711000003', address: '1 Dhanmondi, Dhaka', purchaseDate: '2024-12-01', warrantyTill: '2026-12-01', status: 'active', registeredVia: 'Missed Call', stickerNo: 'STK-2024-0023' },
-  { id: 4, code: 'MED-GLU-001-2023-0099', product: 'Mediron Excellent Blood Glucose Meter', customer: 'Labaid Diagnostic', phone: '+8801711000004', address: '300 Shantinagar, Dhaka', purchaseDate: '2024-01-10', warrantyTill: '2025-01-10', status: 'expired', registeredVia: 'Phone Call', stickerNo: 'STK-2023-0099' },
-  { id: 5, code: 'MED-TST-050-2024-0078', product: 'Mediron Blood Glucose Test Strip (50 pcs)', customer: 'Central Pharmacy', phone: '+8801711000005', address: '12 Shaheb Bazar, Rajshahi', purchaseDate: '2025-07-01', warrantyTill: '2026-01-01', status: 'active', registeredVia: 'SMS', stickerNo: 'STK-2024-0078' },
-]
-
-const MOCK_MISSED_CALLS = [
-  { id: 1, phone: '+8801712345678', time: '2025-08-04T10:30:00Z', duration: 0, handled: false },
-  { id: 2, phone: '+8801798765432', time: '2025-08-04T11:15:00Z', duration: 0, handled: false },
-  { id: 3, phone: '+8801755556666', time: '2025-08-04T12:00:00Z', duration: 0, handled: true },
-]
+import { api } from '../../lib/api'
 
 export default function Warranty() {
+  const [warranties, setWarranties] = useState([])
+  const [missedCalls, setMissedCalls] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchCode, setSearchCode] = useState('')
   const [searchResult, setSearchResult] = useState(null)
   const [activeTab, setActiveTab] = useState('search')
   const [phoneSearch, setPhoneSearch] = useState('')
   const [phoneResult, setPhoneResult] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
-  const [missedCalls, setMissedCalls] = useState(MOCK_MISSED_CALLS)
   const [registerForm, setRegisterForm] = useState({
     name: '', phone: '', address: '', product: '', stickerNo: ''
   })
   const [regSuccess, setRegSuccess] = useState(false)
 
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      let warrantyData = []
+      // Try warranties table first, fall back to crm_contacts
+      try {
+        const { supabase } = await import('../../lib/supabase')
+        const { data, error: err } = await supabase
+          .from('warranties')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (!err && data) {
+          warrantyData = data
+        } else {
+          throw err
+        }
+      } catch {
+        // Fallback to crm_contacts
+        try {
+          const contacts = await api.getCRMContacts()
+          warrantyData = contacts.map((c, i) => ({
+            id: c.id ?? i,
+            code: c.code || c.warranty_code || `CUST-${String(i + 1).padStart(4, '0')}`,
+            product: c.product || c.product_name || 'Unknown Product',
+            customer: c.name || c.full_name || 'Unknown',
+            phone: c.phone || '',
+            address: c.address || '',
+            purchaseDate: c.purchase_date || c.created_at || new Date().toISOString(),
+            warrantyTill: c.warranty_till || c.warranty_end || '',
+            status: c.status || (c.warranty_till && new Date(c.warranty_till) > new Date() ? 'active' : 'expired'),
+            registeredVia: c.registered_via || c.source || 'Direct',
+            stickerNo: c.sticker_no || c.sticker || `STK-${String(i + 1).padStart(4, '0')}`
+          }))
+        } catch {
+          warrantyData = []
+        }
+      }
+      setWarranties(warrantyData)
+
+      // Try missed_calls table
+      try {
+        const { supabase } = await import('../../lib/supabase')
+        const { data, error: err } = await supabase
+          .from('missed_calls')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50)
+        if (!err && data) {
+          setMissedCalls(data.map(mc => ({
+            id: mc.id,
+            phone: mc.phone || mc.caller_number || '',
+            time: mc.created_at || mc.call_time || mc.time || new Date().toISOString(),
+            duration: mc.duration || 0,
+            handled: mc.handled || mc.is_handled || false
+          })))
+        } else {
+          setMissedCalls([])
+        }
+      } catch {
+        setMissedCalls([])
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
   const handleSearch = (e) => {
     e.preventDefault()
-    const found = MOCK_WARRANTY.find(w => w.code.toLowerCase() === searchCode.toLowerCase().trim())
+    const found = warranties.find(w => w.code?.toLowerCase() === searchCode.toLowerCase().trim())
     setSearchResult(found || { notFound: true })
   }
 
@@ -43,13 +106,28 @@ export default function Warranty() {
     e.preventDefault()
     const cleanPhone = phoneSearch.trim()
     if (!cleanPhone) return
-    const matches = MOCK_WARRANTY.filter(w => w.phone.includes(cleanPhone) || cleanPhone.includes(w.phone.slice(-8)))
+    const matches = warranties.filter(w => w.phone?.includes(cleanPhone) || cleanPhone.includes(w.phone?.slice(-8) || ''))
     setPhoneResult(matches.length > 0 ? { found: true, matches } : { found: false })
   }
 
   const handleRegister = (e) => {
     e.preventDefault()
     if (!registerForm.name || !registerForm.phone || !registerForm.address) return
+    // Add to local state immediately; API wiring can be added later
+    const newWarranty = {
+      id: `local-${Date.now()}`,
+      code: registerForm.stickerNo || `STK-NEW-${Date.now()}`,
+      product: registerForm.product || 'Unknown Product',
+      customer: registerForm.name,
+      phone: registerForm.phone,
+      address: registerForm.address,
+      purchaseDate: new Date().toISOString(),
+      warrantyTill: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'active',
+      registeredVia: 'Manual',
+      stickerNo: registerForm.stickerNo || `STK-${Date.now()}`
+    }
+    setWarranties(prev => [newWarranty, ...prev])
     setRegSuccess(true)
     setTimeout(() => {
       setShowRegister(false)
@@ -62,6 +140,176 @@ export default function Warranty() {
     setMissedCalls(prev => prev.map(c => c.id === call.id ? { ...c, handled: true } : c))
     setShowRegister(true)
     setRegisterForm(prev => ({ ...prev, phone: call.phone }))
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-5 max-w-4xl mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <MdQrCode className="text-brand-600" size={22} />
+              Warranty & Customer System
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">Missed call leads · Product verification · Customer database</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
+          <p className="text-sm text-gray-500">Loading warranty data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="space-y-5 max-w-4xl mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <MdQrCode className="text-brand-600" size={22} />
+              Warranty & Customer System
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">Missed call leads · Product verification · Customer database</p>
+          </div>
+        </div>
+        <div className="card p-8 text-center">
+          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <MdPending size={28} className="text-red-500" />
+          </div>
+          <p className="text-sm font-bold text-gray-900 mb-1">Failed to load data</p>
+          <p className="text-xs text-gray-500 mb-4">{error}</p>
+          <button onClick={fetchData} className="btn-primary text-xs">
+            <MdRefresh size={15} /> Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state — no warranties registered yet
+  if (warranties.length === 0) {
+    return (
+      <div className="space-y-5 max-w-4xl mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <MdQrCode className="text-brand-600" size={22} />
+              Warranty & Customer System
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">Missed call leads · Product verification · Customer database</p>
+          </div>
+          <button onClick={() => setShowRegister(true)} className="btn-primary text-xs">
+            <MdAdd size={15} /> Register Customer
+          </button>
+        </div>
+        <div className="card p-8 text-center">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <MdPerson size={28} className="text-gray-400" />
+          </div>
+          <p className="text-sm font-bold text-gray-900 mb-1">No customers registered yet</p>
+          <p className="text-xs text-gray-500 mb-4">Register your first customer to get started.</p>
+          <button onClick={() => setShowRegister(true)} className="btn-primary text-xs">
+            <MdAdd size={15} /> Register First Customer
+          </button>
+        </div>
+
+        {/* Registration Modal */}
+        {showRegister && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
+                <h3 className="text-sm font-bold text-gray-900">
+                  {registerForm.phone ? 'Register Missed Call Lead' : 'Register New Customer'}
+                </h3>
+                <button onClick={() => setShowRegister(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <MdClose size={18} />
+                </button>
+              </div>
+
+              {regSuccess ? (
+                <div className="p-8 text-center">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MdCheckCircle size={28} className="text-emerald-500" />
+                  </div>
+                  <p className="text-sm font-bold text-gray-900">Customer Registered!</p>
+                  <p className="text-xs text-gray-500 mt-1">Warranty sticker will be assigned</p>
+                </div>
+              ) : (
+                <form onSubmit={handleRegister} className="p-5 space-y-4">
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1 block">Customer Name *</label>
+                    <input
+                      className="input"
+                      placeholder="Full name"
+                      value={registerForm.name}
+                      onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1 block">Phone Number *</label>
+                    <input
+                      className="input"
+                      placeholder="+8801XXXXXXXXX"
+                      value={registerForm.phone}
+                      onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1 block">Address *</label>
+                    <input
+                      className="input"
+                      placeholder="Full address"
+                      value={registerForm.address}
+                      onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1 block">Product Purchased</label>
+                    <select
+                      className="input"
+                      value={registerForm.product}
+                      onChange={(e) => setRegisterForm({ ...registerForm, product: e.target.value })}
+                    >
+                      <option value="">Select product</option>
+                      <option>Mediron Excellent Blood Glucose Meter</option>
+                      <option>Mediron Prime BP Monitor (MEDI 712)</option>
+                      <option>Mediron Automatic BP Monitor (MEDI 589)</option>
+                      <option>Mediron Advance BP Monitor (MEDI 447)</option>
+                      <option>Mediron Blood Glucose Test Strip (50 pcs)</option>
+                      <option>Mediron Blood Glucose Test Strip (25 pcs)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1 block">Sticker Number</label>
+                    <input
+                      className="input font-mono"
+                      placeholder="STK-2024-XXXX"
+                      value={registerForm.stickerNo}
+                      onChange={(e) => setRegisterForm({ ...registerForm, stickerNo: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button type="button" onClick={() => setShowRegister(false)} className="btn-secondary flex-1">
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary flex-1">
+                      <MdAdd size={15} /> Register
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -304,7 +552,7 @@ export default function Warranty() {
                       <a href={`tel:${w.phone}`} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-50 text-emerald-600 rounded-md text-[10px] font-semibold hover:bg-emerald-100">
                         <MdCall size={12} /> Call
                       </a>
-                      <a href={`https://wa.me/${w.phone.replace('+','')}`} target="_blank" className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-green-50 text-green-600 rounded-md text-[10px] font-semibold hover:bg-green-100">
+                      <a href={`https://wa.me/${w.phone?.replace('+','')}`} target="_blank" className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-green-50 text-green-600 rounded-md text-[10px] font-semibold hover:bg-green-100">
                         <MdMessage size={12} /> WhatsApp
                       </a>
                       <a href={`sms:${w.phone}`} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-blue-50 text-blue-600 rounded-md text-[10px] font-semibold hover:bg-blue-100">
@@ -332,10 +580,10 @@ export default function Warranty() {
           {!phoneResult && (
             <div className="card overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                <p className="text-xs text-gray-500">{MOCK_WARRANTY.length} registered customers</p>
+                <p className="text-xs text-gray-500">{warranties.length} registered customers</p>
               </div>
               <div className="divide-y divide-gray-50">
-                {MOCK_WARRANTY.map(w => (
+                {warranties.map(w => (
                   <div key={w.id} className="p-4 flex items-center gap-3 hover:bg-gray-50">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
                       w.status === 'active' ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-100 text-gray-400'
@@ -367,7 +615,7 @@ export default function Warranty() {
           <h3 className="text-sm font-bold text-gray-900 mb-4">Customer Purchase History</h3>
           <p className="text-xs text-gray-500 mb-4">Search phone to see full purchase + warranty history</p>
           <div className="space-y-4">
-            {MOCK_WARRANTY.map(w => (
+            {warranties.map(w => (
               <div key={w.id} className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">

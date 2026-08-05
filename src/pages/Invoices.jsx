@@ -1,41 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { api } from '../lib/api'
 import {
   formatCurrency, formatDate, statusColor, statusLabel, generateInvoiceNo
 } from '../lib/utils'
 import {
   MdSearch, MdFileDownload, MdReceipt, MdAdd, MdSend, MdVisibility,
-  MdPerson, MdLocationOn, MdPhone, MdClose, MdCheckCircle, MdDelete
+  MdPerson, MdLocationOn, MdPhone, MdClose, MdCheckCircle, MdDelete,
+  MdRefresh, MdErrorOutline
 } from 'react-icons/md'
 
-const INITIAL_INVOICES = [
-  { id: '1', number: 'MED-A1B2C3', dealer: 'Medicine Point', amount: 15400, paid: 15400, due: 0, status: 'paid', date: '2025-01-15', dueDate: '2025-02-14', createdBy: 'Rahim Uddin', area: 'Dhaka North' },
-  { id: '2', number: 'MED-D4E5F6', dealer: 'Lazz Pharma', amount: 8750, paid: 5000, due: 3750, status: 'partial', date: '2025-01-14', dueDate: '2025-02-13', createdBy: 'Rahim Uddin', area: 'Dhaka South' },
-  { id: '3', number: 'MED-G7H8I9', dealer: 'HealthCare Ltd', amount: 22300, paid: 0, due: 22300, status: 'unpaid', date: '2025-01-14', dueDate: '2025-02-13', createdBy: 'Karim Ahmed', area: 'Chattogram' },
-  { id: '4', number: 'MED-J1K2L3', dealer: 'Central Pharmacy', amount: 5600, paid: 0, due: 5600, status: 'overdue', date: '2025-01-01', dueDate: '2025-01-31', createdBy: 'Rahim Uddin', area: 'Rajshahi' },
-  { id: '5', number: 'MED-M4N5O6', dealer: 'Square Hospital', amount: 31200, paid: 31200, due: 0, status: 'paid', date: '2025-01-12', dueDate: '2025-02-11', createdBy: 'Karim Ahmed', area: 'Dhaka North' },
-]
-
-const PRODUCTS = [
-  { id: 1, name: 'Mediron Excellent Blood Glucose Meter', sku: 'MED-GLU-001', price: 750, stock: 70 },
-  { id: 2, name: 'Mediron Blood Glucose Test Strip (25 pcs)', sku: 'MED-TST-025', price: 350, stock: 150 },
-  { id: 3, name: 'Mediron Blood Glucose Test Strip (50 pcs)', sku: 'MED-TST-050', price: 600, stock: 20 },
-  { id: 4, name: 'Mediron Blood Lancets Twist Type 31G (100 pcs)', sku: 'MED-LAN-100', price: 200, stock: 80 },
-  { id: 5, name: 'Mediron Examination Gloves (Large)', sku: 'MED-GLV-L', price: 350, stock: 100 },
-  { id: 6, name: 'Mediron Automatic BP Monitor (MEDI 589)', sku: 'MED-BP-589', price: 1500, stock: 45 },
-  { id: 7, name: 'Mediron Advance BP Monitor (MEDI 447)', sku: 'MED-BP-447', price: 1800, stock: 35 },
-  { id: 8, name: 'Mediron Prime BP Monitor (MEDI 712)', sku: 'MED-BP-712', price: 2000, stock: 30 },
-]
-
-const DEALERS = [
-  { id: 1, name: 'Medicine Point', phone: '+8801711110001', address: '78 Elephant Road, Dhaka', area: 'Dhaka North', creditLimit: 50000, outstanding: 15400 },
-  { id: 2, name: 'Lazz Pharma', phone: '+8801711110002', address: '23 Nawabpur Road, Dhaka', area: 'Dhaka South', creditLimit: 80000, outstanding: 8750 },
-  { id: 3, name: 'HealthCare Ltd', phone: '+8801711110003', address: '45 Agrabad C/A, Chattogram', area: 'Chattogram', creditLimit: 100000, outstanding: 22300 },
-  { id: 4, name: 'Central Pharmacy', phone: '+8801711110004', address: '12 Shaheb Bazar, Rajshahi', area: 'Rajshahi', creditLimit: 40000, outstanding: 5600 },
-  { id: 5, name: 'Square Hospital', phone: '+8801711110005', address: '188 Panthapath, Dhaka', area: 'Dhaka North', creditLimit: 200000, outstanding: 31200 },
-]
-
 export default function Invoices() {
-  const [invoices, setInvoices] = useState(INITIAL_INVOICES)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [invoices, setInvoices] = useState([])
+  const [products, setProducts] = useState([])
+  const [dealers, setDealers] = useState([])
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
@@ -48,39 +27,91 @@ export default function Invoices() {
   })
   const [createSuccess, setCreateSuccess] = useState(false)
 
-  const filtered = inv => {
-    const matchSearch = inv.number.toLowerCase().includes(search.toLowerCase()) ||
-      inv.dealer.toLowerCase().includes(search.toLowerCase()) ||
-      inv.createdBy.toLowerCase().includes(search.toLowerCase())
+  const fetchAll = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [invData, prodData, dealerData] = await Promise.all([
+        api.getInvoices(),
+        api.getProducts(),
+        api.getDealers()
+      ])
+      setInvoices(invData)
+      setProducts(prodData)
+      setDealers(dealerData)
+    } catch (err) {
+      console.error('Failed to fetch invoices data:', err)
+      setError(err.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAll()
+  }, [])
+
+  const normalizedInvoice = (inv) => ({
+    id: inv.id,
+    number: inv.invoice_number || inv.number || inv.id,
+    dealer: typeof inv.dealer === 'object' ? inv.dealer?.name : (inv.dealer_name || inv.dealer || '-'),
+    amount: inv.total_amount || inv.amount || 0,
+    paid: inv.paid_amount || inv.paid || 0,
+    due: inv.due_amount || inv.due || (inv.total_amount - (inv.paid_amount || 0)),
+    status: inv.status || 'unpaid',
+    date: inv.invoice_date || inv.date || inv.created_at,
+    dueDate: inv.due_date || inv.dueDate,
+    createdBy: typeof inv.created_by === 'object' ? inv.created_by?.full_name : (inv.created_by_name || inv.createdBy || '-'),
+    area: inv.area_name || inv.area || '-',
+  })
+
+  const filtered = (inv) => {
+    const n = normalizedInvoice(inv)
+    const matchSearch =
+      n.number?.toLowerCase().includes(search.toLowerCase()) ||
+      n.dealer?.toLowerCase().includes(search.toLowerCase()) ||
+      n.createdBy?.toLowerCase().includes(search.toLowerCase())
     return matchSearch
   }
 
+  const getProductPrice = (product) =>
+    product.dealer_price || product.trade_price || product.mrp || product.price || 0
+
   const addItem = (productId) => {
-    const product = PRODUCTS.find(p => p.id === Number(productId))
+    const product = products.find(p => String(p.id) === String(productId))
     if (!product) return
-    const existing = newInvoice.items.find(i => i.id === product.id)
+    const existing = newInvoice.items.find(i => String(i.id) === String(product.id))
+    const price = getProductPrice(product)
+    const stock = product.stock_quantity ?? product.stock ?? product.current_stock ?? 0
     if (existing) {
       setNewInvoice({
         ...newInvoice,
-        items: newInvoice.items.map(i => i.id === product.id ? { ...i, qty: i.qty + 1 } : i)
+        items: newInvoice.items.map(i => String(i.id) === String(product.id) ? { ...i, qty: i.qty + 1 } : i)
       })
     } else {
       setNewInvoice({
         ...newInvoice,
-        items: [...newInvoice.items, { id: product.id, name: product.name, sku: product.sku, price: product.price, stock: product.stock, qty: 1 }]
+        items: [...newInvoice.items, {
+          id: product.id,
+          name: product.name,
+          sku: product.sku || '',
+          price,
+          stock,
+          qty: 1
+        }]
       })
     }
   }
 
   const removeItem = (productId) => {
-    setNewInvoice({ ...newInvoice, items: newInvoice.items.filter(i => i.id !== productId) })
+    setNewInvoice({ ...newInvoice, items: newInvoice.items.filter(i => String(i.id) !== String(productId)) })
   }
 
   const updateQty = (productId, qty) => {
     if (qty < 1) return
     setNewInvoice({
       ...newInvoice,
-      items: newInvoice.items.map(i => i.id === productId ? { ...i, qty } : i)
+      items: newInvoice.items.map(i => String(i.id) === String(productId) ? { ...i, qty } : i)
     })
   }
 
@@ -88,27 +119,39 @@ export default function Invoices() {
   const discountAmount = Math.round(subtotal * (newInvoice.discount / 100))
   const total = subtotal - discountAmount
 
-  const selectedDealer = DEALERS.find(d => d.id === Number(newInvoice.dealerId))
+  const selectedDealer = dealers.find(d => String(d.id) === String(newInvoice.dealerId))
 
   const handleCreate = (e) => {
     e.preventDefault()
     if (!selectedDealer || newInvoice.items.length === 0) return
 
     const invoice = {
-      id: String(invoices.length + 1),
+      id: String(Date.now()),
+      invoice_number: generateInvoiceNo(),
+      invoice_number_fallback: generateInvoiceNo(),
       number: generateInvoiceNo(),
       dealer: selectedDealer.name,
+      dealer_id: selectedDealer.id,
+      total_amount: total,
       amount: total,
+      paid_amount: 0,
       paid: 0,
+      due_amount: total,
       due: total,
       status: 'unpaid',
+      invoice_date: new Date().toISOString().split('T')[0],
       date: new Date().toISOString().split('T')[0],
+      due_date: newInvoice.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       dueDate: newInvoice.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      created_by_name: 'You (SR)',
       createdBy: 'You (SR)',
-      area: selectedDealer.area,
+      area_name: selectedDealer.area || selectedDealer.area_name || '-',
+      area: selectedDealer.area || selectedDealer.area_name || '-',
+      notes: newInvoice.notes,
+      items: newInvoice.items,
     }
 
-    setInvoices([invoice, ...invoices])
+    setInvoices(prev => [invoice, ...prev])
     setCreateSuccess(true)
     setTimeout(() => {
       setShowCreate(false)
@@ -117,6 +160,35 @@ export default function Invoices() {
     }, 1500)
   }
 
+  // ── Loading State ──
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+        <p className="text-sm text-gray-500">Loading invoices…</p>
+      </div>
+    )
+  }
+
+  // ── Error State ──
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center">
+          <MdErrorOutline size={28} className="text-red-500" />
+        </div>
+        <p className="text-sm font-semibold text-gray-900">Failed to load data</p>
+        <p className="text-xs text-gray-500 max-w-xs text-center">{error}</p>
+        <button onClick={fetchAll} className="btn-primary mt-2">
+          <MdRefresh size={16} /> Retry
+        </button>
+      </div>
+    )
+  }
+
+  const filteredInvoices = invoices.filter(filtered)
+  const totalDue = invoices.reduce((s, i) => s + (normalizedInvoice(i).due || 0), 0)
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -124,7 +196,7 @@ export default function Invoices() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Invoices</h1>
           <p className="text-sm text-gray-500">
-            {invoices.length} invoices · {formatCurrency(invoices.reduce((s, i) => s + i.due, 0))} outstanding
+            {invoices.length} invoices · {formatCurrency(totalDue)} outstanding
           </p>
         </div>
         <div className="flex gap-2">
@@ -157,122 +229,143 @@ export default function Invoices() {
         </p>
       </div>
 
-      {/* Invoices Table */}
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Invoice #</th>
-              <th>Dealer</th>
-              <th>Amount</th>
-              <th>Paid</th>
-              <th>Due</th>
-              <th>Status</th>
-              <th>Date</th>
-              <th>Created By</th>
-              <th>Area</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.filter(filtered).map(inv => (
-              <tr key={inv.id}>
-                <td className="font-mono text-xs font-semibold text-brand-600">{inv.number}</td>
-                <td className="font-medium">{inv.dealer}</td>
-                <td className="font-semibold">{formatCurrency(inv.amount)}</td>
-                <td className="text-emerald-600">{formatCurrency(inv.paid)}</td>
-                <td className={inv.due > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>{formatCurrency(inv.due)}</td>
-                <td><span className={statusColor(inv.status)}>{statusLabel(inv.status)}</span></td>
-                <td className="text-gray-500">{formatDate(inv.date)}</td>
-                <td className="text-gray-500 text-xs">{inv.createdBy}</td>
-                <td className="text-gray-500 text-xs">{inv.area}</td>
-                <td>
-                  <button
-                    onClick={() => setSelectedInvoice(inv)}
-                    className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg"
-                  >
-                    <MdVisibility size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {invoices.filter(filtered).length === 0 && (
+      {/* Empty State */}
+      {filteredInvoices.length === 0 && (
         <div className="card p-12 text-center">
           <MdReceipt size={48} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-gray-500">No invoices found</p>
+          <p className="text-sm font-semibold text-gray-600">
+            {invoices.length === 0 ? 'No invoices yet' : 'No invoices found'}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            {invoices.length === 0
+              ? 'Create your first invoice to get started'
+              : 'Try adjusting your search'}
+          </p>
+          {invoices.length === 0 && (
+            <button onClick={() => setShowCreate(true)} className="btn-primary mt-4">
+              <MdAdd size={16} /> Create Invoice
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Invoices Table */}
+      {filteredInvoices.length > 0 && (
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Dealer</th>
+                <th>Amount</th>
+                <th>Paid</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Created By</th>
+                <th>Area</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredInvoices.map(inv => {
+                const n = normalizedInvoice(inv)
+                return (
+                  <tr key={n.id}>
+                    <td className="font-mono text-xs font-semibold text-brand-600">{n.number}</td>
+                    <td className="font-medium">{n.dealer}</td>
+                    <td className="font-semibold">{formatCurrency(n.amount)}</td>
+                    <td className="text-emerald-600">{formatCurrency(n.paid)}</td>
+                    <td className={n.due > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>{formatCurrency(n.due)}</td>
+                    <td><span className={statusColor(n.status)}>{statusLabel(n.status)}</span></td>
+                    <td className="text-gray-500">{formatDate(n.date)}</td>
+                    <td className="text-gray-500 text-xs">{n.createdBy}</td>
+                    <td className="text-gray-500 text-xs">{n.area}</td>
+                    <td>
+                      <button
+                        onClick={() => setSelectedInvoice(inv)}
+                        className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg"
+                      >
+                        <MdVisibility size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Invoice Detail Modal */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">{selectedInvoice.number}</h3>
-                <p className="text-xs text-gray-500">Invoice Detail</p>
+      {selectedInvoice && (() => {
+        const n = normalizedInvoice(selectedInvoice)
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">{n.number}</h3>
+                  <p className="text-xs text-gray-500">Invoice Detail</p>
+                </div>
+                <button onClick={() => setSelectedInvoice(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <MdClose size={18} />
+                </button>
               </div>
-              <button onClick={() => setSelectedInvoice(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                <MdClose size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Dealer</p>
-                  <p className="text-sm font-bold text-gray-900">{selectedInvoice.dealer}</p>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Dealer</p>
+                    <p className="text-sm font-bold text-gray-900">{n.dealer}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Status</p>
+                    <span className={statusColor(n.status)}>{statusLabel(n.status)}</span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Amount</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(n.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Due</p>
+                    <p className="text-sm font-bold text-red-600">{formatCurrency(n.due)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Created By</p>
+                    <p className="text-sm font-semibold text-gray-800">{n.createdBy}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Area</p>
+                    <p className="text-sm font-semibold text-gray-800">{n.area}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Date</p>
+                    <p className="text-sm font-semibold text-gray-800">{formatDate(n.date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Due Date</p>
+                    <p className="text-sm font-semibold text-gray-800">{formatDate(n.dueDate)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Status</p>
-                  <span className={statusColor(selectedInvoice.status)}>{statusLabel(selectedInvoice.status)}</span>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Amount</p>
-                  <p className="text-sm font-bold text-gray-900">{formatCurrency(selectedInvoice.amount)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Due</p>
-                  <p className="text-sm font-bold text-red-600">{formatCurrency(selectedInvoice.due)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Created By</p>
-                  <p className="text-sm font-semibold text-gray-800">{selectedInvoice.createdBy}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Area</p>
-                  <p className="text-sm font-semibold text-gray-800">{selectedInvoice.area}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Date</p>
-                  <p className="text-sm font-semibold text-gray-800">{formatDate(selectedInvoice.date)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase">Due Date</p>
-                  <p className="text-sm font-semibold text-gray-800">{formatDate(selectedInvoice.dueDate)}</p>
-                </div>
-              </div>
-              {/* Hierarchy chain */}
-              <div className="pt-3 border-t border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Visible to (Hierarchy Chain)</p>
-                <div className="flex items-center gap-1 flex-wrap">
-                  {['SR (You)', 'ASM', 'RSM', 'NSM', 'Directors'].map((level, i) => (
-                    <div key={level} className="flex items-center gap-1">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                        i === 0 ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600'
-                      }`}>{level}</span>
-                      {i < 4 && <span className="text-gray-300 text-[10px]">→</span>}
-                    </div>
-                  ))}
+                {/* Hierarchy chain */}
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Visible to (Hierarchy Chain)</p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {['SR (You)', 'ASM', 'RSM', 'NSM', 'Directors'].map((level, i) => (
+                      <div key={level} className="flex items-center gap-1">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          i === 0 ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600'
+                        }`}>{level}</span>
+                        {i < 4 && <span className="text-gray-300 text-[10px]">→</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Create Invoice Modal */}
       {showCreate && (
@@ -308,8 +401,8 @@ export default function Invoices() {
                     required
                   >
                     <option value="">Choose dealer...</option>
-                    {DEALERS.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} — {d.area}</option>
+                    {dealers.map(d => (
+                      <option key={d.id} value={d.id}>{d.name} — {d.area || d.area_name || ''}</option>
                     ))}
                   </select>
                 </div>
@@ -319,19 +412,19 @@ export default function Invoices() {
                   <div className="p-3 bg-gray-50 rounded-lg grid grid-cols-2 gap-3">
                     <div className="flex items-center gap-1.5">
                       <MdPhone size={13} className="text-gray-400" />
-                      <span className="text-xs text-gray-700">{selectedDealer.phone}</span>
+                      <span className="text-xs text-gray-700">{selectedDealer.phone || selectedDealer.contact_number || '-'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MdLocationOn size={13} className="text-gray-400" />
-                      <span className="text-xs text-gray-700 truncate">{selectedDealer.address}</span>
+                      <span className="text-xs text-gray-700 truncate">{selectedDealer.address || '-'}</span>
                     </div>
                     <div>
                       <p className="text-[10px] text-gray-400">Credit Limit</p>
-                      <p className="text-xs font-semibold text-gray-800">{formatCurrency(selectedDealer.creditLimit)}</p>
+                      <p className="text-xs font-semibold text-gray-800">{formatCurrency(selectedDealer.credit_limit || selectedDealer.creditLimit || 0)}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-gray-400">Outstanding</p>
-                      <p className="text-xs font-semibold text-red-600">{formatCurrency(selectedDealer.outstanding)}</p>
+                      <p className="text-xs font-semibold text-red-600">{formatCurrency(selectedDealer.outstanding || selectedDealer.outstanding_amount || 0)}</p>
                     </div>
                   </div>
                 )}
@@ -339,28 +432,36 @@ export default function Invoices() {
                 {/* Product Selection */}
                 <div>
                   <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5 block">Add Products</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
-                    {PRODUCTS.map(p => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => addItem(p.id)}
-                        className={`text-left p-2 rounded-md border text-xs transition-colors ${
-                          newInvoice.items.find(i => i.id === p.id)
-                            ? 'border-brand-300 bg-brand-50'
-                            : 'border-gray-100 hover:border-brand-200 hover:bg-brand-50/50'
-                        }`}
-                      >
-                        <p className="font-semibold text-gray-800 truncate">{p.name}</p>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span className="text-gray-500">৳{p.price}</span>
-                          <span className={`text-[10px] font-semibold ${p.stock < 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            Stock: {p.stock}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                  {products.length === 0 ? (
+                    <p className="text-xs text-gray-400 p-3 bg-gray-50 rounded-lg">No products available</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
+                      {products.map(p => {
+                        const price = getProductPrice(p)
+                        const stock = p.stock_quantity ?? p.stock ?? p.current_stock ?? 0
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => addItem(p.id)}
+                            className={`text-left p-2 rounded-md border text-xs transition-colors ${
+                              newInvoice.items.find(i => String(i.id) === String(p.id))
+                                ? 'border-brand-300 bg-brand-50'
+                                : 'border-gray-100 hover:border-brand-200 hover:bg-brand-50/50'
+                            }`}
+                          >
+                            <p className="font-semibold text-gray-800 truncate">{p.name}</p>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-gray-500">৳{price}</span>
+                              <span className={`text-[10px] font-semibold ${stock < 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                Stock: {stock}
+                              </span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Selected Items */}

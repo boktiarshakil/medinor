@@ -1,20 +1,12 @@
-import { useState } from 'react'
-import { formatCurrency } from '../lib/utils'
+import { useState, useEffect } from 'react'
+import { formatCurrency, getPriceForRole, canSeePrice } from '../lib/utils'
 import {
   MdAdd, MdRemove, MdShoppingCart, MdCheckCircle, MdWarning,
   MdErrorOutline, MdInfo, MdSend, MdLocalShipping, MdAccessTime
 } from 'react-icons/md'
-
-const PRODUCTS = [
-  { id: '1', name: 'Mediron Excellent Blood Glucose Meter', sku: 'MED-GLU-001', dealerPrice: 700, stock: 70, image: '🩸', category: 'Glucose' },
-  { id: '2', name: 'Mediron Blood Glucose Test Strip (25 pcs)', sku: 'MED-TST-025', dealerPrice: 300, stock: 150, image: '🧪', category: 'Glucose' },
-  { id: '3', name: 'Mediron Blood Glucose Test Strip (50 pcs)', sku: 'MED-TST-050', dealerPrice: 550, stock: 20, image: '🧪', category: 'Glucose' },
-  { id: '4', name: 'Mediron Blood Lancets Twist Type 31G (100 pcs)', sku: 'MED-LAN-100', dealerPrice: 180, stock: 80, image: '💉', category: 'Glucose' },
-  { id: '5', name: 'Mediron Examination Gloves (Large)', sku: 'MED-GLV-L', dealerPrice: 320, stock: 100, image: '🧤', category: 'Disposable' },
-  { id: '6', name: 'Mediron Automatic BP Monitor (MEDI 589)', sku: 'MED-BP-589', dealerPrice: 1300, stock: 45, image: '🩺', category: 'BP Monitor' },
-  { id: '7', name: 'Mediron Advance BP Monitor (MEDI 447)', sku: 'MED-BP-447', dealerPrice: 1500, stock: 8, image: '🩺', category: 'BP Monitor' },
-  { id: '8', name: 'Mediron Prime BP Monitor (MEDI 712)', sku: 'MED-BP-712', dealerPrice: 1650, stock: 0, image: '🩺', category: 'BP Monitor' },
-]
+import { useAuth } from '../context/AuthContext'
+import { api } from '../lib/api'
+import toast from 'react-hot-toast'
 
 // Stock status helper
 const getStockStatus = (stock) => {
@@ -25,16 +17,42 @@ const getStockStatus = (stock) => {
 }
 
 export default function PlaceOrder() {
+  const { user, role } = useAuth()
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [cart, setCart] = useState({})
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
 
+  const fetchProducts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getProducts()
+      setProducts(data)
+    } catch (err) {
+      console.error('Products fetch failed:', err)
+      setError(err.message || 'Failed to load products')
+      toast.error('Failed to load products')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchProducts() }, [])
+
+  const getPrice = (product) => {
+    if (!role) return product.mrp
+    return getPriceForRole(role, product) || product.mrp
+  }
+
   const addToCart = (id) => {
-    const product = PRODUCTS.find(p => p.id === id)
-    if (!product || product.stock === 0) return
+    const product = products.find(p => p.id === id)
+    if (!product || (product.stock || 0) === 0) return
     const currentQty = cart[id] || 0
-    if (currentQty >= product.stock) return // Can't exceed stock
+    if (currentQty >= product.stock) return
     setCart(prev => ({ ...prev, [id]: currentQty + 1 }))
   }
 
@@ -48,33 +66,69 @@ export default function PlaceOrder() {
   }
 
   const cartItems = Object.entries(cart).map(([id, qty]) => {
-    const product = PRODUCTS.find(p => p.id === id)
-    return { ...product, qty, total: product.dealerPrice * qty, stockStatus: getStockStatus(product.stock) }
-  })
+    const product = products.find(p => p.id === id)
+    if (!product) return null
+    return { ...product, qty, total: getPrice(product) * qty, stockStatus: getStockStatus(product.stock) }
+  }).filter(Boolean)
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.total, 0)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
 
-  // Check for stock issues
   const stockIssues = cartItems.filter(item => {
     const status = getStockStatus(item.stock)
     return status.label !== 'In Stock — ship in 1-2 days'
   })
 
-  const hasStockOut = cartItems.some(item => item.stock === 0)
+  const hasStockOut = cartItems.some(item => (item.stock || 0) === 0)
 
-  const filtered = PRODUCTS.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
+  const filtered = products.filter(p =>
+    (p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.category || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const handlePlaceOrder = () => {
-    setOrderPlaced(true)
-    setTimeout(() => {
-      setOrderPlaced(false)
-      setShowConfirm(false)
-      setCart({})
-    }, 3000)
+  const handlePlaceOrder = async () => {
+    try {
+      const orderData = {
+        sr_id: user.id,
+        status: 'draft',
+        total_amount: cartTotal,
+        net_amount: cartTotal,
+      }
+      const items = cartItems.map(item => ({
+        product_id: item.id,
+        quantity: item.qty,
+        price: getPrice(item),
+        total: getPrice(item) * item.qty,
+      }))
+      await api.createOrder(orderData, items)
+      setOrderPlaced(true)
+      setTimeout(() => {
+        setOrderPlaced(false)
+        setShowConfirm(false)
+        setCart({})
+      }, 3000)
+    } catch (err) {
+      console.error('Order placement failed:', err)
+      toast.error('Failed to place order')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="card p-12 text-center">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+        <p className="text-sm text-gray-500 mt-3">Loading products...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="card p-6 text-center border-l-4 border-l-red-400">
+        <p className="text-sm text-red-600 font-medium">{error}</p>
+        <button className="btn-secondary mt-3 text-xs" onClick={fetchProducts}>Retry</button>
+      </div>
+    )
   }
 
   return (
@@ -123,64 +177,59 @@ export default function PlaceOrder() {
           const atMaxStock = inCart >= product.stock
 
           return (
-            <div key={product.id} className={`card p-4 flex flex-col ${product.stock === 0 ? 'opacity-70' : ''}`}>
+            <div key={product.id} className={`card p-4 flex flex-col ${(product.stock || 0) === 0 ? 'opacity-70' : ''}`}>
               <div className="aspect-square bg-gray-50 rounded-lg flex items-center justify-center text-4xl mb-3 relative">
-                {product.image}
-                {/* Stock badge overlay */}
+                {product.image || '📦'}
                 <span className={`absolute top-2 right-2 ${status.badge} text-[9px] px-1.5 py-0.5 rounded-full`}>
-                  {product.stock === 0 ? 'Out' : `${product.stock} units`}
+                  {(product.stock || 0) === 0 ? 'Out' : `${product.stock} units`}
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">{product.name}</h3>
               <p className="text-xs text-gray-400 mb-1.5">{product.sku}</p>
 
-              {/* Stock status indicator */}
               <div className={`flex items-center gap-1.5 p-1.5 rounded-md mb-2 ${status.color}`}>
                 <StatusIcon size={13} />
                 <span className="text-[10px] font-semibold">{status.label}</span>
               </div>
 
-              <p className="text-lg font-bold text-brand-600 mb-3">{formatCurrency(product.dealerPrice)}</p>
+              <p className="text-lg font-bold text-brand-600 mb-3">{formatCurrency(getPrice(product))}</p>
 
               {inCart > 0 ? (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => removeFromCart(product.id)}
-                    className="btn-secondary p-2"
-                    disabled={product.stock === 0}
-                  >
+                  <button onClick={() => removeFromCart(product.id)} className="btn-secondary p-2" disabled={(product.stock || 0) === 0}>
                     <MdRemove size={16} />
                   </button>
                   <span className="flex-1 text-center font-bold text-lg">{inCart}</span>
-                  <button
-                    onClick={() => addToCart(product.id)}
-                    className="btn-secondary p-2"
-                    disabled={atMaxStock || product.stock === 0}
-                  >
+                  <button onClick={() => addToCart(product.id)} className="btn-secondary p-2" disabled={atMaxStock || (product.stock || 0) === 0}>
                     <MdAdd size={16} />
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => addToCart(product.id)}
-                  disabled={product.stock === 0}
+                  disabled={(product.stock || 0) === 0}
                   className="btn-primary w-full mt-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {product.stock === 0 ? 'Out of Stock' : <><MdAdd size={16} /> Add to Cart</>}
+                  {(product.stock || 0) === 0 ? 'Out of Stock' : <><MdAdd size={16} /> Add to Cart</>}
                 </button>
               )}
 
-              {atMaxStock && product.stock > 0 && (
-                <p className="text-[10px] text-amber-600 font-semibold mt-1 text-center">
-                  Max stock reached
-                </p>
+              {atMaxStock && (product.stock || 0) > 0 && (
+                <p className="text-[10px] text-amber-600 font-semibold mt-1 text-center">Max stock reached</p>
               )}
             </div>
           )
         })}
       </div>
 
-      {/* Cart Summary - Fixed */}
+      {filtered.length === 0 && (
+        <div className="card p-12 text-center">
+          <MdShoppingCart size={48} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-gray-500">No products found</p>
+        </div>
+      )}
+
+      {/* Cart Summary */}
       {cartCount > 0 && (
         <div className="fixed bottom-20 lg:bottom-4 left-4 right-4 lg:left-auto lg:right-6 lg:w-96 card p-5 shadow-xl z-40">
           <div className="flex items-center justify-between mb-3">
@@ -188,7 +237,6 @@ export default function PlaceOrder() {
             <span className="text-lg font-bold text-brand-600">{formatCurrency(cartTotal)}</span>
           </div>
 
-          {/* Stock warnings in cart */}
           {stockIssues.length > 0 && (
             <div className="mb-3 p-2 bg-amber-50 rounded-md border border-amber-100">
               <p className="text-[10px] font-bold text-amber-700 flex items-center gap-1 mb-1">
@@ -246,7 +294,6 @@ export default function PlaceOrder() {
                   <p className="text-xs text-gray-500">Review stock status before confirming</p>
                 </div>
                 <div className="p-5 space-y-4">
-                  {/* Stock summary */}
                   <div className="p-3 bg-gray-50 rounded-lg space-y-2">
                     <p className="text-[10px] font-semibold text-gray-500 uppercase">Stock Status</p>
                     {cartItems.map(item => {
@@ -264,14 +311,11 @@ export default function PlaceOrder() {
                     })}
                   </div>
 
-                  {/* Delivery estimate */}
                   <div className="p-3 bg-brand-50 rounded-lg flex items-center gap-2">
                     <MdLocalShipping size={16} className="text-brand-600 flex-shrink-0" />
                     <div>
                       <p className="text-xs font-semibold text-brand-800">
-                        Estimated Delivery: {
-                          stockIssues.length > 0 ? '5-7 business days' : '1-2 business days'
-                        }
+                        Estimated Delivery: {stockIssues.length > 0 ? '5-7 business days' : '1-2 business days'}
                       </p>
                       <p className="text-[10px] text-brand-600">
                         {stockIssues.length > 0
@@ -281,26 +325,22 @@ export default function PlaceOrder() {
                     </div>
                   </div>
 
-                  {/* Total */}
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span className="text-sm font-bold text-gray-900">Total Amount</span>
                     <span className="text-lg font-bold text-brand-700">{formatCurrency(cartTotal)}</span>
                   </div>
 
-                  {/* Warning if low stock */}
                   {stockIssues.length > 0 && (
                     <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                       <MdInfo size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
                       <p className="text-[10px] text-amber-700">
-                        Some items have low stock. Order will be fulfilled as items become available. You'll be notified of any delays.
+                        Some items have low stock. Order will be fulfilled as items become available.
                       </p>
                     </div>
                   )}
 
                   <div className="flex gap-2 pt-2">
-                    <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">
-                      Back
-                    </button>
+                    <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">Back</button>
                     <button onClick={handlePlaceOrder} className="btn-primary flex-1">
                       <MdSend size={15} /> Confirm Order
                     </button>
