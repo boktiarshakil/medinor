@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { formatCurrency, formatDate, startOfDay, endOfDay, startOfMonth, endOfMonth } from '../../lib/utils'
+import { formatCurrency, formatDate, todayRange, thisMonthRange } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { MdLocationOn, MdShoppingCart, MdReceipt, MdCheckCircle, MdMyLocation, MdRefresh } from 'react-icons/md'
@@ -32,14 +32,16 @@ export default function SalesExecDashboard() {
     fetch()
   }, [])
 
-  const todayStart = startOfDay(new Date()).toISOString()
-  const todayEnd = endOfDay(new Date()).toISOString()
-  const monthStart = startOfMonth(new Date()).toISOString()
+  const { start: todayStart, end: todayEnd } = todayRange()
+  const { start: monthStart, end: monthEnd } = thisMonthRange()
+  const todayStartISO = todayStart.toISOString()
+  const todayEndISO = todayEnd.toISOString()
+  const monthStartISO = monthStart.toISOString()
 
   // Filter orders for current SR
   const myOrders = orders.filter(o => o.sr_id === user?.id || o.created_by === user?.id)
-  const todayOrders = myOrders.filter(o => o.created_at >= todayStart && o.created_at <= todayEnd && o.status !== 'cancelled')
-  const monthOrders = myOrders.filter(o => o.created_at >= monthStart && o.status !== 'cancelled')
+  const todayOrders = myOrders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled')
+  const monthOrders = myOrders.filter(o => o.created_at >= monthStartISO && o.status !== 'cancelled')
 
   const visitsDone = todayOrders.length
   const ordersTaken = todayOrders.length

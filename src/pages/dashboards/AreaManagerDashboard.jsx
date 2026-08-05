@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import StatCard from '../../components/Dashboard/StatCard'
 import SalesChart from '../../components/Dashboard/SalesChart'
 import RecentOrdersTable from '../../components/Dashboard/RecentOrdersTable'
-import { formatCurrency, formatNumber, startOfMonth, endOfMonth } from '../../lib/utils'
+import { formatCurrency, formatNumber, thisMonthRange } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { MdAttachMoney, MdShoppingCart, MdPeople, MdWarning, MdLocationOn } from 'react-icons/md'
@@ -35,8 +35,9 @@ export default function AreaManagerDashboard() {
     fetch()
   }, [])
 
-  const monthStart = startOfMonth(new Date()).toISOString()
-  const monthEnd = endOfMonth(new Date()).toISOString()
+  const { start: monthStart, end: monthEnd } = thisMonthRange()
+  const monthStartISO = monthStart.toISOString()
+  const monthEndISO = monthEnd.toISOString()
 
   // SRs in this area manager's team
   const mySRs = users.filter(u => u.role === 'sales_executive' && u.area_id === user?.area_id)
@@ -44,8 +45,8 @@ export default function AreaManagerDashboard() {
 
   // Orders from this area's SRs
   const areaOrders = orders.filter(o => srIds.includes(o.sr_id) || srIds.includes(o.created_by))
-  const todayOrders = areaOrders.filter(o => o.created_at >= monthStart && o.status !== 'cancelled')
-  const monthOrders = areaOrders.filter(o => o.created_at >= monthStart && o.created_at <= monthEnd && o.status !== 'cancelled')
+  const todayOrders = areaOrders.filter(o => o.created_at >= monthStartISO && o.status !== 'cancelled')
+  const monthOrders = areaOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled')
 
   const todayOrdersTotal = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const monthAchieved = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)

@@ -3,7 +3,7 @@ import StatCard from '../../components/Dashboard/StatCard'
 import SalesChart from '../../components/Dashboard/SalesChart'
 import RecentOrdersTable from '../../components/Dashboard/RecentOrdersTable'
 import OrgHierarchy from '../../components/OrgChart/OrgHierarchy'
-import { formatCurrency, formatNumber, calcPercent, startOfDay, endOfDay, startOfMonth, endOfMonth, parseISO } from '../../lib/utils'
+import { formatCurrency, formatNumber, calcPercent, todayRange, thisMonthRange } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -48,13 +48,15 @@ export default function SuperAdminDashboard() {
   }, [])
 
   // Compute stats from real data
-  const todayStart = startOfDay(new Date()).toISOString()
-  const todayEnd = endOfDay(new Date()).toISOString()
-  const monthStart = startOfMonth(new Date()).toISOString()
-  const monthEnd = endOfMonth(new Date()).toISOString()
+  const { start: todayStart, end: todayEnd } = todayRange()
+  const { start: monthStart, end: monthEnd } = thisMonthRange()
+  const todayStartISO = todayStart.toISOString()
+  const todayEndISO = todayEnd.toISOString()
+  const monthStartISO = monthStart.toISOString()
+  const monthEndISO = monthEnd.toISOString()
 
-  const todayOrders = orders.filter(o => o.created_at >= todayStart && o.created_at <= todayEnd && o.status !== 'cancelled')
-  const monthOrders = orders.filter(o => o.created_at >= monthStart && o.created_at <= monthEnd && o.status !== 'cancelled')
+  const todayOrders = orders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled')
+  const monthOrders = orders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled')
 
   const todaySales = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const monthlySales = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
@@ -67,7 +69,7 @@ export default function SuperAdminDashboard() {
     .filter(inv => inv.status === 'pending' || inv.status === 'unpaid' || inv.status === 'partial')
     .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
   const collectionsToday = invoices
-    .filter(inv => inv.paid_at >= todayStart && inv.paid_at <= todayEnd)
+    .filter(inv => inv.paid_at >= todayStartISO && inv.paid_at <= todayEndISO)
     .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
   const activeDealers = dealers.filter(d => d.is_active !== false).length
   const salesTeam = users.filter(u => u.role === 'sales_executive' || u.role === 'area_manager' || u.role === 'sales_manager').length
