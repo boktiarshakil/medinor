@@ -1,28 +1,41 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, statusColor } from '../lib/utils'
-import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore } from 'react-icons/md'
+import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
-
 
 export default function Dealers() {
   const [dealers, setDealers] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [districtFilter, setDistrictFilter] = useState('all')
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [areas, setAreas] = useState([])
+  const [newDealer, setNewDealer] = useState({
+    name: '',
+    owner_name: '',
+    phone: '',
+    address: '',
+    district: '',
+    area_id: '',
+    credit_limit: 50000,
+  })
 
-  useEffect(() => { fetchDealers() }, [])
+  useEffect(() => {
+    fetchDealers()
+    api.getAreas().then(setAreas).catch(() => {})
+  }, [])
 
   const fetchDealers = async () => {
     try {
       setLoading(true)
       const data = await api.getDealers()
-      // Normalize field names
       const normalized = data.map(d => ({
         ...d,
         owner: d.owner_name,
         mobile: d.mobile || d.phone,
-        area: d.area || d.district,
+        area: d.area?.name || d.area_name || d.area,
         creditLimit: d.credit_limit,
         due: d.current_due,
         status: d.status || 'active',
@@ -36,9 +49,38 @@ export default function Dealers() {
     }
   }
 
-  const districts = ['all', ...new Set(dealers.map(d => d.district || d.area))]
+  const handleCreate = async () => {
+    if (!newDealer.name.trim()) {
+      toast.error('Dealer name is required')
+      return
+    }
+    setCreating(true)
+    try {
+      await api.createDealer({
+        name: newDealer.name,
+        owner_name: newDealer.owner_name,
+        phone: newDealer.phone,
+        address: newDealer.address,
+        district: newDealer.district,
+        area_id: newDealer.area_id || null,
+        credit_limit: Number(newDealer.credit_limit) || 0,
+        is_active: true,
+      })
+      toast.success(`Dealer "${newDealer.name}" created`)
+      setNewDealer({ name: '', owner_name: '', phone: '', address: '', district: '', area_id: '', credit_limit: 50000 })
+      setShowCreate(false)
+      fetchDealers()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const districts = ['all', ...new Set(dealers.map(d => d.district || d.area).filter(Boolean))]
   const filtered = dealers.filter(d => {
-    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) || (d.owner || '').toLowerCase().includes(search.toLowerCase())
+    const matchSearch = (d.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (d.owner || '').toLowerCase().includes(search.toLowerCase())
     const matchDistrict = districtFilter === 'all' || (d.district || d.area) === districtFilter
     return matchSearch && matchDistrict
   })
@@ -53,7 +95,7 @@ export default function Dealers() {
           <h1 className="text-xl font-bold text-gray-900">Dealers</h1>
           <p className="text-sm text-gray-500">{dealers.length} dealers · Total Due: <span className="font-semibold text-red-600">{formatCurrency(totalDue)}</span></p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>
           <MdAdd size={16} /> Add Dealer
         </button>
       </div>
@@ -108,30 +150,26 @@ export default function Dealers() {
 
             <div className="space-y-2 text-xs mb-4">
               <div className="flex items-center gap-2 text-gray-600">
-                <MdPhone size={13} className="text-gray-400" /> {dealer.mobile}
+                <MdPhone size={13} className="text-gray-400" /> {dealer.mobile || '-'}
               </div>
               <div className="flex items-center gap-2 text-gray-600">
-                <MdLocationOn size={13} className="text-gray-400" /> {dealer.area}, {dealer.district}
+                <MdLocationOn size={13} className="text-gray-400" /> {dealer.area}{dealer.district ? `, ${dealer.district}` : ''}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 rounded-lg mb-4">
+            <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg mb-4">
               <div>
                 <p className="text-[10px] text-gray-400">Credit</p>
                 <p className="text-xs font-semibold text-gray-800">{formatCurrency(dealer.creditLimit)}</p>
               </div>
               <div>
                 <p className="text-[10px] text-gray-400">Due</p>
-                <p className={`text-xs font-semibold ${dealer.due > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(dealer.due)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400">SR</p>
-                <p className="text-xs font-semibold text-gray-800">{dealer.sr}</p>
+                <p className={`text-xs font-semibold ${(dealer.due || 0) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(dealer.due)}</p>
               </div>
             </div>
 
             <div className="flex gap-2">
-              <button className="btn-primary flex-1 text-xs">Place Order</button>
+              <a href="/place-order" className="btn-primary flex-1 text-xs text-center">Place Order</a>
               <button className="btn-secondary text-xs">
                 <MdMoreVert size={14} />
               </button>
@@ -148,7 +186,120 @@ export default function Dealers() {
       )}
       </>
       )}
+
+      {/* Create Dealer Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Add New Dealer</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Create dealer account in database</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Dealer Name *</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. Medicine Point"
+                    value={newDealer.name}
+                    onChange={(e) => setNewDealer({ ...newDealer, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Owner Name</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. Dr. Rahim Uddin"
+                    value={newDealer.owner_name}
+                    onChange={(e) => setNewDealer({ ...newDealer, owner_name: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Phone</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="+8801XXXXXXXXX"
+                    value={newDealer.phone}
+                    onChange={(e) => setNewDealer({ ...newDealer, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label">District</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. Dhaka"
+                    value={newDealer.district}
+                    onChange={(e) => setNewDealer({ ...newDealer, district: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Address</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Full address"
+                  value={newDealer.address}
+                  onChange={(e) => setNewDealer({ ...newDealer, address: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Area / Territory</label>
+                  <select
+                    className="input"
+                    value={newDealer.area_id}
+                    onChange={(e) => setNewDealer({ ...newDealer, area_id: e.target.value })}
+                  >
+                    <option value="">Select area...</option>
+                    {areas.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Credit Limit</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={newDealer.credit_limit}
+                    onChange={(e) => setNewDealer({ ...newDealer, credit_limit: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={!newDealer.name || creating}
+                  className="btn-primary flex-1 disabled:opacity-50"
+                >
+                  {creating ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                  ) : (
+                    <><MdAdd size={15} /> Create Dealer</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
