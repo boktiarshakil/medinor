@@ -66,19 +66,16 @@ export default function Products() {
     try {
       const productPayload = {
         name: newProduct.name,
-        sku: newProduct.sku || null,
-        category: newProduct.category || null,
-        mrp: Number(newProduct.mrp) || 0,
-        trade_price: Number(newProduct.trade_price) || 0,
-        dealer_price: Number(newProduct.dealer_price) || 0,
-        purchase_price: Number(newProduct.purchase_price) || 0,
-        stock: Number(newProduct.stock) || 0,
-        status: 'active',
       }
-      // Only include image_url if column exists (after migration)
-      if (newProduct.image_url) {
-        productPayload.image_url = newProduct.image_url
-      }
+      // Only add optional fields if they have values
+      if (newProduct.sku) productPayload.sku = newProduct.sku
+      if (newProduct.category) productPayload.category = newProduct.category
+      if (newProduct.mrp) productPayload.mrp = Number(newProduct.mrp)
+      if (newProduct.trade_price) productPayload.trade_price = Number(newProduct.trade_price)
+      if (newProduct.dealer_price) productPayload.dealer_price = Number(newProduct.dealer_price)
+      if (newProduct.purchase_price) productPayload.purchase_price = Number(newProduct.purchase_price)
+      if (newProduct.stock) productPayload.stock = Number(newProduct.stock)
+      if (newProduct.image_url) productPayload.image_url = newProduct.image_url
       await api.createProduct(productPayload)
       toast.success(`Product "${newProduct.name}" created`)
       setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' })
