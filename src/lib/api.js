@@ -249,7 +249,48 @@ export const api = {
       .select()
       .single()
     if (invError) throw invError
+
+    await this.deductStockForOrder(order)
     return invData
+  },
+
+  async deductStockForOrder(order) {
+    const items = order.items || []
+    if (items.length === 0) return
+
+    for (const item of items) {
+      const { data: invRecords, error: invErr } = await supabase
+        .from('inventory')
+        .select('id, quantity')
+        .eq('product_id', item.product_id)
+        .order('created_at', { ascending: true })
+      if (invErr) throw invErr
+
+      let remaining = item.quantity
+      const updates = []
+      for (const rec of invRecords || []) {
+        if (remaining <= 0) break
+        const deduct = Math.min(rec.quantity, remaining)
+        updates.push({ id: rec.id, newQty: rec.quantity - deduct })
+        remaining -= deduct
+      }
+
+      for (const u of updates) {
+        await supabase
+          .from('inventory')
+          .update({ quantity: u.newQty })
+          .eq('id', u.id)
+      }
+
+      await supabase.from('stock_movements').insert({
+        product_id: item.product_id,
+        type: 'out',
+        quantity: item.quantity,
+        reference_type: 'order',
+        reference_id: order.id,
+        notes: `Order ${order.order_number || order.order_no || order.id}`,
+      })
+    }
   },
 
   // ---- Invoices ----
