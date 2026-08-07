@@ -1,8 +1,60 @@
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { MdSettings, MdPeople, MdSecurity, MdNotifications, MdPalette } from 'react-icons/md'
+import { api } from '../lib/api'
+import { MdSettings, MdPeople, MdSecurity, MdNotifications, MdPalette, MdCheck, MdChevronRight } from 'react-icons/md'
+import toast from 'react-hot-toast'
+
+const DEFAULT_PREFS = {
+  newOrderAlerts: true,
+  paymentReceived: true,
+  lowStockWarnings: true,
+  targetAchievement: false,
+}
 
 export default function Settings() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
+  const [saving, setSaving] = useState(false)
+  const [prefs, setPrefs] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`settings_${user?.id}`)
+      return stored ? JSON.parse(stored) : DEFAULT_PREFS
+    } catch {
+      return DEFAULT_PREFS
+    }
+  })
+  const [saved, setSaved] = useState(false)
+
+  const togglePref = (key) => {
+    setPrefs(prev => ({ ...prev, [key]: !prev[key] }))
+    setSaved(false)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      localStorage.setItem(`settings_${user?.id}`, JSON.stringify(prefs))
+      if (user?.id) {
+        await api.updateUser(user.id, { updated_at: new Date().toISOString() }).catch(() => {})
+      }
+      setSaved(true)
+      toast.success('Preferences saved')
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      toast.error('Failed to save: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const navItems = [
+    { label: 'Manage Users & Roles', path: '/users', icon: MdPeople, roles: ['super_admin', 'admin'] },
+    { label: 'Area Assignments', path: '/areas', icon: MdPeople, roles: ['super_admin', 'admin'] },
+    { label: 'Dealer-SR Mapping', path: '/dealers', icon: MdPeople, roles: ['super_admin', 'admin', 'sales_manager', 'area_manager'] },
+    { label: 'Change Password', path: '#password', icon: MdSecurity, roles: ['super_admin', 'admin', 'sales_manager', 'area_manager', 'sales_executive', 'warehouse', 'dealer'] },
+    { label: 'Audit Logs', path: '#audit', icon: MdSecurity, roles: ['super_admin', 'admin'] },
+  ]
+
+  const visibleNav = navItems.filter(item => item.roles.includes(user?.role))
 
   return (
     <div className="space-y-6">
@@ -12,52 +64,71 @@ export default function Settings() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Quick Actions */}
         <div className="card p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <MdPeople size={16} className="text-brand-500" /> User Management
+            <MdSettings size={16} className="text-brand-500" /> Quick Actions
           </h3>
-          <div className="space-y-2">
-            <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Manage Users & Roles</button>
-            <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Area Assignments</button>
-            <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Dealer-SR Mapping</button>
+          <div className="space-y-1">
+            {visibleNav.map((item, i) => {
+              const Icon = item.icon
+              return (
+                <a
+                  key={i}
+                  href={item.path}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon size={15} className="text-gray-400" />
+                    {item.label}
+                  </span>
+                  <MdChevronRight size={16} className="text-gray-300" />
+                </a>
+              )
+            })}
           </div>
         </div>
 
-        <div className="card p-5">
-          <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <MdSecurity size={16} className="text-brand-500" /> Security
-          </h3>
-          <div className="space-y-2">
-            <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Change Password</button>
-            <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Two-Factor Auth</button>
-            <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Audit Logs</button>
-          </div>
-        </div>
-
+        {/* Notifications */}
         <div className="card p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
             <MdNotifications size={16} className="text-brand-500" /> Notifications
           </h3>
           <div className="space-y-3">
-            <label className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">New Order Alerts</span>
-              <input type="checkbox" defaultChecked className="w-4 h-4 text-brand-500 rounded" />
-            </label>
-            <label className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">Payment Received</span>
-              <input type="checkbox" defaultChecked className="w-4 h-4 text-brand-500 rounded" />
-            </label>
-            <label className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">Low Stock Warnings</span>
-              <input type="checkbox" defaultChecked className="w-4 h-4 text-brand-500 rounded" />
-            </label>
-            <label className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">Target Achievement</span>
-              <input type="checkbox" className="w-4 h-4 text-brand-500 rounded" />
-            </label>
+            {[
+              { key: 'newOrderAlerts', label: 'New Order Alerts' },
+              { key: 'paymentReceived', label: 'Payment Received' },
+              { key: 'lowStockWarnings', label: 'Low Stock Warnings' },
+              { key: 'targetAchievement', label: 'Target Achievement' },
+            ].map(item => (
+              <label key={item.key} className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-gray-700">{item.label}</span>
+                <button
+                  type="button"
+                  onClick={() => togglePref(item.key)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${prefs[item.key] ? 'bg-brand-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${prefs[item.key] ? 'translate-x-5' : ''}`} />
+                </button>
+              </label>
+            ))}
           </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary w-full mt-4 text-xs disabled:opacity-50"
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+            ) : saved ? (
+              <span className="flex items-center justify-center gap-1"><MdCheck size={14} /> Saved</span>
+            ) : (
+              'Save Preferences'
+            )}
+          </button>
         </div>
 
+        {/* Preferences */}
         <div className="card p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
             <MdPalette size={16} className="text-brand-500" /> Preferences
@@ -74,6 +145,33 @@ export default function Settings() {
             <div>
               <label className="label">Language</label>
               <select className="input"><option>English</option><option>বাংলা</option></select>
+            </div>
+          </div>
+        </div>
+
+        {/* Account Info */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <MdPeople size={16} className="text-brand-500" /> Account
+          </h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500">Name</span>
+              <span className="font-medium text-gray-800">{user?.full_name || '—'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500">Email</span>
+              <span className="font-medium text-gray-800">{user?.email || '—'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-50">
+              <span className="text-gray-500">Role</span>
+              <span className="badge-info text-[9px]">{user?.role || '—'}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-gray-500">Status</span>
+              <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold ${user?.is_active !== false ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                {user?.is_active !== false ? 'Active' : 'Inactive'}
+              </span>
             </div>
           </div>
         </div>
