@@ -35,7 +35,7 @@ function mapOrder(order, invoices, payments) {
   const si = STATUS_INDEX[order.status] ?? 0
   const stepComplete = {
     placed: true,
-    approved: si >= 1,        // submitted or beyond
+    approved: si >= 2,        // approved by management or beyond
     accounts: hasInvoice,     // invoice generated for this order
     warehouse: si >= 3,       // packed or beyond
     dispatched: si >= 4,      // dispatched or beyond
