@@ -179,7 +179,7 @@ export default function Invoices() {
     setSavingPayment(true)
     try {
       const newPaid = (inv.paid || 0) + amount
-      const newDue = inv.amount - newPaid
+      const newDue = (inv.total_amount || inv.amount) - newPaid
       await api.createPayment({
         invoice_id: selectedInvoice.id,
         dealer_id: selectedInvoice.dealer_id,

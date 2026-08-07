@@ -39,7 +39,7 @@ export default function WarehouseDashboard() {
     const min = item.low_stock_threshold ?? item.min_quantity ?? item.reorder_level ?? 0
     return min > 0 && stock < min
   })
-  const pendingDispatch = orders.filter(o => o.status === 'approved' || o.status === 'packed').length
+  const pendingDispatch = orders.filter(o => o.status === 'packed').length
 
   const STATS = [
     { label: 'Total SKUs', value: formatNumber(totalSKUs), icon: MdInventory2, color: 'brand' },

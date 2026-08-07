@@ -16,8 +16,19 @@ const NEXT_ACTIONS = {
 const CANCEL_ACTION = { status: 'cancelled', label: 'Cancel', icon: MdDelete, roles: ['super_admin', 'admin'] }
 const CANCELABLE_STATUSES = ['submitted', 'approved', 'packed', 'dispatched']
 
+const ALLOWED_ROLES = ['super_admin', 'admin', 'sales_manager', 'area_manager', 'warehouse']
+
 export default function Orders() {
   const { user } = useAuth()
+
+  if (!user || !ALLOWED_ROLES.includes(user.role)) {
+    return (
+      <div className="card p-12 text-center">
+        <MdShoppingCart size={48} className="mx-auto text-gray-300 mb-3" />
+        <p className="text-sm text-gray-500">You don't have permission to view this page.</p>
+      </div>
+    )
+  }
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
