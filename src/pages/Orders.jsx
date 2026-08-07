@@ -13,6 +13,9 @@ const NEXT_ACTIONS = {
   delivered: { status: 'completed', label: 'Complete', icon: MdCheck, roles: ['super_admin', 'admin'] },
 }
 
+const CANCEL_ACTION = { status: 'cancelled', label: 'Cancel', icon: MdDelete, roles: ['super_admin', 'admin'] }
+const CANCELABLE_STATUSES = ['submitted', 'approved', 'packed', 'dispatched']
+
 export default function Orders() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
@@ -349,6 +352,15 @@ export default function Orders() {
                     </button>
                   )
                 })()}
+                {CANCELABLE_STATUSES.includes(selectedOrder.status) && CANCEL_ACTION.roles.includes(user?.role) && (
+                  <button
+                    onClick={() => handleAdvance(selectedOrder, CANCEL_ACTION)}
+                    className="btn-secondary inline-flex items-center gap-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <CANCEL_ACTION.icon size={15} />
+                    Cancel Order
+                  </button>
+                )}
                 <button onClick={() => setSelectedOrder(null)} className="btn-secondary text-xs">Close</button>
               </div>
             </div>

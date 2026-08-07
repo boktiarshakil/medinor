@@ -60,7 +60,7 @@ export default function AreaManagerDashboard() {
       if (inv.status === 'paid') return false
       return inv.due_date && new Date(inv.due_date) < new Date()
     })
-    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+    .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
 
   const monthTarget = 2000000
   const percent = Math.min(Math.round((monthAchieved / monthTarget) * 100), 100)
