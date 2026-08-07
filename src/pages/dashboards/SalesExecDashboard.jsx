@@ -62,7 +62,8 @@ export default function SalesExecDashboard() {
         .then(() => { setCheckedIn(true) })
         .catch(err => {
           console.error('Check-in failed:', err)
-          setCheckedIn(true)
+          toast.error('Check-in failed — please try again')
+          setCheckedIn(false)
         })
         .finally(() => setCheckingIn(false))
     }

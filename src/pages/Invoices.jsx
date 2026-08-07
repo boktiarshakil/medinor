@@ -18,6 +18,7 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState([])
   const [products, setProducts] = useState([])
   const [dealers, setDealers] = useState([])
+  const [allOrders, setAllOrders] = useState([])
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
@@ -28,6 +29,7 @@ export default function Invoices() {
   const [creating, setCreating] = useState(false)
   const [newInvoice, setNewInvoice] = useState({
     dealerId: '',
+    orderId: '',
     items: [],
     discount: 0,
     notes: '',
@@ -39,14 +41,16 @@ export default function Invoices() {
     setLoading(true)
     setError(null)
     try {
-      const [invData, prodData, dealerData] = await Promise.all([
+      const [invData, prodData, dealerData, ordersData] = await Promise.all([
         api.getInvoices(),
         api.getProductsWithStock(),
-        api.getDealers()
+        api.getDealers(),
+        api.getOrders().catch(() => []),
       ])
       setInvoices(invData)
       setProducts(prodData)
       setDealers(dealerData)
+      setAllOrders(ordersData)
     } catch (err) {
       console.error('Failed to fetch invoices data:', err)
       setError(err.message || 'Failed to load data')
@@ -137,6 +141,7 @@ export default function Invoices() {
       const invoice = {
         invoice_number: generateInvoiceNo(),
         dealer_id: selectedDealer.id,
+        order_id: newInvoice.orderId || null,
         amount: total,
         total_amount: total,
         vat_amount: 0,
@@ -149,10 +154,8 @@ export default function Invoices() {
       }
       await api.createInvoice(invoice)
       toast.success('Invoice created')
-      setCreateSuccess(true)
       setShowCreate(false)
-      setCreateSuccess(false)
-      setNewInvoice({ dealerId: '', items: [], discount: 0, notes: '', dueDate: '' })
+      setNewInvoice({ dealerId: '', orderId: '', items: [], discount: 0, notes: '', dueDate: '' })
       fetchAll()
     } catch (err) {
       console.error('Invoice create failed:', err)
@@ -483,20 +486,11 @@ export default function Invoices() {
                 <h3 className="text-sm font-bold text-gray-900">Create New Invoice</h3>
                 <p className="text-xs text-gray-500">Invoice will be visible upward in hierarchy</p>
               </div>
-              <button onClick={() => { setShowCreate(false); setCreateSuccess(false) }} className="p-1 text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
                 <MdClose size={18} />
               </button>
             </div>
 
-            {createSuccess ? (
-              <div className="p-8 text-center">
-                <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <MdCheckCircle size={28} className="text-emerald-500" />
-                </div>
-                <p className="text-sm font-bold text-gray-900">Invoice Created!</p>
-                <p className="text-xs text-gray-500 mt-1">Visible to all above in hierarchy</p>
-              </div>
-            ) : (
               <form onSubmit={handleCreate} className="p-5 space-y-5">
                 {/* Dealer Selection */}
                 <div>
@@ -511,6 +505,25 @@ export default function Invoices() {
                     {dealers.map(d => (
                       <option key={d.id} value={d.id}>{d.name} — {d.area || d.area_name || ''}</option>
                     ))}
+                  </select>
+                </div>
+
+                {/* Link to Order (optional) */}
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5 block">Link to Order (optional)</label>
+                  <select
+                    className="input"
+                    value={newInvoice.orderId}
+                    onChange={(e) => setNewInvoice({ ...newInvoice, orderId: e.target.value })}
+                  >
+                    <option value="">No order link</option>
+                    {allOrders
+                      .filter(o => !newInvoice.dealerId || String(o.dealer_id) === String(newInvoice.dealerId))
+                      .map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.order_number || o.order_no || o.id} — {o.dealer?.name || o.dealer_name || ''} ({o.status})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -670,10 +683,9 @@ export default function Invoices() {
                   </button>
                 </div>
               </form>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   )
 }

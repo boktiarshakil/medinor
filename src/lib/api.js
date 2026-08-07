@@ -719,6 +719,41 @@ export const api = {
     return data
   },
 
+  async checkOut(userId, { lat = null, lng = null } = {}) {
+    const today = new Date().toISOString().split('T')[0]
+    const existing = await this.getTodayAttendance(userId)
+    if (!existing) {
+      const { data, error } = await supabase
+        .from('attendance')
+        .insert({
+          user_id: userId,
+          date: today,
+          check_in: new Date().toISOString(),
+          check_out: new Date().toISOString(),
+          check_out_lat: lat,
+          check_out_lng: lng,
+          status: 'present',
+          work_type: 'field',
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
+    const { data, error } = await supabase
+      .from('attendance')
+      .update({
+        check_out: new Date().toISOString(),
+        check_out_lat: lat,
+        check_out_lng: lng,
+      })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- Stock movements ----
 
   async getStockMovements(productId) {
