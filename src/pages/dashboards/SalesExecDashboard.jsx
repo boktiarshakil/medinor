@@ -50,7 +50,7 @@ export default function SalesExecDashboard() {
 
   const visitsDone = todayOrders.length
   const ordersTaken = todayOrders.length
-  const collections = todayOrders.filter(o => o.status === 'paid' || o.payment_collected).length
+  const collections = todayOrders.filter(o => o.status === 'paid' || o.payment_collected).reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const monthTarget = 300000 // Default target
   const monthAchieved = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const targetPercent = Math.min(Math.round((monthAchieved / monthTarget) * 100), 100)

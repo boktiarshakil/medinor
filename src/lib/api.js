@@ -322,6 +322,17 @@ export const api = {
     return data || []
   },
 
+  async updateInventory(id, updates) {
+    const { data, error } = await supabase
+      .from('inventory')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- Areas ----
 
   async getAreas() {

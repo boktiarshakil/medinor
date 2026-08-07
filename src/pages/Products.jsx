@@ -70,16 +70,24 @@ export default function Products() {
       const productPayload = {
         name: newProduct.name,
       }
-      // Only add optional fields if they have values
       if (newProduct.sku) productPayload.sku = newProduct.sku
       if (newProduct.category) productPayload.category = newProduct.category
       if (newProduct.mrp) productPayload.mrp = Number(newProduct.mrp)
       if (newProduct.trade_price) productPayload.trade_price = Number(newProduct.trade_price)
       if (newProduct.dealer_price) productPayload.dealer_price = Number(newProduct.dealer_price)
       if (newProduct.purchase_price) productPayload.purchase_price = Number(newProduct.purchase_price)
-      if (newProduct.stock) productPayload.stock = Number(newProduct.stock)
       if (newProduct.image_url) productPayload.image_url = newProduct.image_url
       await api.createProduct(productPayload)
+      if (newProduct.stock) {
+        const created = await api.getProducts().then(ps => ps.find(p => p.name === newProduct.name))
+        if (created) {
+          await api.addStockMovement({ product_id: created.id, type: 'in', quantity: Number(newProduct.stock), reference_type: 'opening_stock', notes: 'Initial stock' })
+          const invCheck = await api.getInventory().then(inv => inv.find(i => i.product_id === created.id))
+          if (invCheck) {
+            await api.updateInventory(invCheck.id, { quantity: (invCheck.quantity || 0) + Number(newProduct.stock) })
+          }
+        }
+      }
       toast.success(`Product "${newProduct.name}" created`)
       setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' })
       setShowCreate(false)
