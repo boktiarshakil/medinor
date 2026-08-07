@@ -43,7 +43,7 @@ function mapOrder(order, invoices, payments) {
     payment: hasPayment,      // payment recorded against invoice
   }
   let currentStep = STEP_KEYS.findIndex(k => !stepComplete[k])
-  if (currentStep === -1) currentStep = STEP_KEYS.length - 1
+  if (currentStep === -1) currentStep = STEP_KEYS.length
 
   return {
     id: order.order_number || order.order_no || order.id,
@@ -112,7 +112,7 @@ export default function OrderTracker() {
   const handleAddComment = (e) => {
     e.preventDefault()
     if (!newComment.trim() || !selectedOrder) return
-    const stepKey = ORDER_STEPS[selectedOrder.currentStep]?.key || 'placed'
+    const stepKey = ORDER_STEPS[Math.min(selectedOrder.currentStep, ORDER_STEPS.length - 1)]?.key || 'placed'
     setSelectedOrder({
       ...selectedOrder,
       comments: [...selectedOrder.comments, {
@@ -222,7 +222,7 @@ export default function OrderTracker() {
                 <span className={`badge text-[9px] ${
                   order.currentStep >= 6 ? 'badge-success' : order.currentStep >= 4 ? 'badge-info' : 'badge-warning'
                 }`}>
-                  {ORDER_STEPS[order.currentStep]?.label || 'Processing'}
+                  {ORDER_STEPS[Math.min(order.currentStep, ORDER_STEPS.length - 1)]?.label || 'Processing'}
                 </span>
               </div>
             </button>
