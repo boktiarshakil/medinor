@@ -439,6 +439,25 @@ export const api = {
     return data || []
   },
 
+  // ---- Targets ----
+
+  async getTargets({ userId = null, areaId = null, period = 'monthly', year = null, month = null } = {}) {
+    const now = new Date()
+    const targetYear = year || now.getFullYear()
+    const targetMonth = month || now.getMonth() + 1
+    let query = supabase
+      .from('targets')
+      .select('*')
+      .eq('period', period)
+      .eq('year', targetYear)
+      .eq('month', targetMonth)
+    if (userId) query = query.eq('user_id', userId)
+    if (areaId) query = query.eq('area_id', areaId)
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  },
+
   // ---- Personal IDs ----
 
   async getPersonalIds() {

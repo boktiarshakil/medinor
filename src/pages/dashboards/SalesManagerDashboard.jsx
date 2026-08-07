@@ -13,20 +13,23 @@ export default function SalesManagerDashboard() {
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
   const [users, setUsers] = useState([])
+  const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, usersData] = await Promise.all([
+        const [ordersData, invoicesData, usersData, targetsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getUsers().catch(() => []),
+          api.getTargets({ areaId: user?.area_id }).catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
         setUsers(usersData)
+        setTargets(targetsData)
       } catch (err) {
         console.error('SalesManager dashboard fetch failed:', err)
       } finally {
@@ -61,6 +64,11 @@ export default function SalesManagerDashboard() {
 
   // Compute team performance from real users + orders
   const salesUsers = users.filter(u => u.role === 'sales_executive' || u.role === 'area_manager')
+  const targetMap = {}
+  targets.filter(t => t.target_type === 'sales').forEach(t => {
+    if (t.user_id) targetMap[t.user_id] = (targetMap[t.user_id] || 0) + t.target_value
+  })
+
   const TEAM_PERFORMANCE = salesUsers.map(sr => {
     const srOrders = orders.filter(o => o.sr_id === sr.id || o.created_by === sr.id)
     const achieved = srOrders
@@ -70,7 +78,8 @@ export default function SalesManagerDashboard() {
       id: sr.id,
       name: sr.full_name || sr.email || 'Unknown',
       area: sr.area?.name || sr.area_name || 'Unassigned',
-      target: 300000,
+      target: targetMap[sr.id] || 300000,
+      achieved,
       achieved,
       orders: srOrders.filter(o => o.status !== 'cancelled').length,
       visits: srOrders.length,

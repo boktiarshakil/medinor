@@ -9,6 +9,7 @@ export default function SalesExecDashboard() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [dealers, setDealers] = useState([])
+  const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
   const [checkedIn, setCheckedIn] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
@@ -17,12 +18,14 @@ export default function SalesExecDashboard() {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, dealersData] = await Promise.all([
+        const [ordersData, dealersData, targetsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getDealers().catch(() => []),
+          api.getTargets({ userId: user?.id }).catch(() => []),
         ])
         setOrders(ordersData)
         setDealers(dealersData)
+        setTargets(targetsData)
         if (user?.id) {
           api.getTodayAttendance(user.id)
             .then(att => { if (att?.check_in) setCheckedIn(true) })
@@ -51,7 +54,10 @@ export default function SalesExecDashboard() {
   const visitsDone = todayOrders.length
   const ordersTaken = todayOrders.length
   const collections = todayOrders.filter(o => o.status === 'paid' || o.payment_collected).reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
-  const monthTarget = 300000 // Default target
+  const dbMonthTarget = targets
+    .filter(t => t.target_type === 'sales')
+    .reduce((sum, t) => sum + (t.target_value || 0), 0)
+  const monthTarget = dbMonthTarget > 0 ? dbMonthTarget : 300000
   const monthAchieved = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const targetPercent = Math.min(Math.round((monthAchieved / monthTarget) * 100), 100)
 

@@ -13,22 +13,24 @@ export default function AreaManagerDashboard() {
   const [invoices, setInvoices] = useState([])
   const [users, setUsers] = useState([])
   const [attendance, setAttendance] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [targets, setTargets] = useState([])
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, usersData, attendanceData] = await Promise.all([
+        const [ordersData, invoicesData, usersData, attendanceData, targetsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getUsers().catch(() => []),
           api.getTodayAttendanceList().catch(() => []),
+          api.getTargets({ areaId: user?.area_id }).catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
         setUsers(usersData)
         setAttendance(attendanceData)
+        setTargets(targetsData)
       } catch (err) {
         console.error('AreaManager dashboard fetch failed:', err)
       } finally {
@@ -62,7 +64,10 @@ export default function AreaManagerDashboard() {
     })
     .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
 
-  const monthTarget = 2000000
+  const dbMonthTarget = targets
+    .filter(t => t.target_type === 'sales')
+    .reduce((sum, t) => sum + (t.target_value || 0), 0)
+  const monthTarget = dbMonthTarget > 0 ? dbMonthTarget : 2000000
   const percent = Math.min(Math.round((monthAchieved / monthTarget) * 100), 100)
 
   const STATS = [
