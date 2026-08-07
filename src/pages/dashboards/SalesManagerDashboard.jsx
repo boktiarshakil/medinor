@@ -4,6 +4,7 @@ import SalesChart from '../../components/Dashboard/SalesChart'
 import RecentOrdersTable from '../../components/Dashboard/RecentOrdersTable'
 import { formatCurrency, formatNumber, calcPercent } from '../../lib/utils'
 import { api } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 import {
   MdAttachMoney, MdShoppingCart, MdPeople, MdTrendingUp,
   MdWarning, MdStore, MdAssessment
