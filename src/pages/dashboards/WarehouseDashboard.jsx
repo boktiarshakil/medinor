@@ -48,6 +48,34 @@ export default function WarehouseDashboard() {
     { label: 'Pending Dispatch', value: formatNumber(pendingDispatch), icon: MdLocalShipping, color: 'purple' },
   ]
 
+  const handleExport = () => {
+    const header = ['Product', 'SKU', 'In', 'Out', 'Stock', 'Min', 'Status']
+    const rows = inventory.map(item => {
+      const stock = item.quantity || item.stock || 0
+      const min = item.low_stock_threshold ?? item.min_quantity ?? item.reorder_level ?? 0
+      const isLow = min > 0 && stock < min
+      return [
+        item.product?.name || item.name || 'Unknown',
+        item.product?.sku || item.sku || '-',
+        item.in_quantity || item.inQty || 0,
+        item.out_quantity || item.outQty || 0,
+        stock,
+        min || '-',
+        isLow ? 'Low Stock' : 'In Stock'
+      ]
+    })
+    const csv = [header, ...rows]
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `warehouse-stock-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="card p-12 text-center">
@@ -83,7 +111,7 @@ export default function WarehouseDashboard() {
       <div className="card">
         <div className="p-5 pb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-900">Current Stock</h3>
-          <button className="btn-secondary text-xs">Export CSV</button>
+          <button className="btn-secondary text-xs" onClick={handleExport}>Export CSV</button>
         </div>
         {inventory.length === 0 ? (
           <div className="p-8 text-center">

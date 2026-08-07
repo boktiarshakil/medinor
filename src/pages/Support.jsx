@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatDate, statusColor } from '../lib/utils'
-import { MdSupportAgent } from 'react-icons/md'
+import { MdSupportAgent, MdAdd, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
@@ -15,6 +15,14 @@ export default function Support() {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newTicket, setNewTicket] = useState({
+    subject: '',
+    type: 'general',
+    priority: 'medium',
+    description: '',
+  })
 
   const fetchTickets = async () => {
     setLoading(true)
@@ -31,6 +39,31 @@ export default function Support() {
   }
 
   useEffect(() => { fetchTickets() }, [])
+
+  const handleCreate = async () => {
+    if (!newTicket.subject.trim()) {
+      toast.error('Subject is required')
+      return
+    }
+    setCreating(true)
+    try {
+      await api.createSupportTicket({
+        subject: newTicket.subject,
+        type: newTicket.type,
+        priority: newTicket.priority,
+        description: newTicket.description || null,
+        status: 'open',
+      })
+      toast.success('Support ticket created')
+      setShowCreate(false)
+      setNewTicket({ subject: '', type: 'general', priority: 'medium', description: '' })
+      fetchTickets()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -52,9 +85,14 @@ export default function Support() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Support Tickets</h1>
-        <p className="text-sm text-gray-500">{tickets.length} tickets</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Support Tickets</h1>
+          <p className="text-sm text-gray-500">{tickets.length} tickets</p>
+        </div>
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>
+          <MdAdd size={16} /> New Ticket
+        </button>
       </div>
 
       <div className="table-container">
@@ -90,6 +128,63 @@ export default function Support() {
         <div className="card p-12 text-center">
           <MdSupportAgent size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">No support tickets</p>
+        </div>
+      )}
+
+      {/* Create Ticket Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">New Support Ticket</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Create a new support request</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="label">Subject *</label>
+                <input type="text" className="input" placeholder="Brief description of the issue"
+                  value={newTicket.subject} onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Type</label>
+                  <select className="input" value={newTicket.type} onChange={(e) => setNewTicket({ ...newTicket, type: e.target.value })}>
+                    <option value="general">General</option>
+                    <option value="technical">Technical</option>
+                    <option value="billing">Billing</option>
+                    <option value="delivery">Delivery</option>
+                    <option value="product">Product</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Priority</label>
+                  <select className="input" value={newTicket.priority} onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value })}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">Description</label>
+                <textarea className="input" rows={3} placeholder="Detailed description of the issue..."
+                  value={newTicket.description} onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })} />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleCreate} disabled={creating || !newTicket.subject.trim()} className="btn-primary flex-1 disabled:opacity-50">
+                  {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Create Ticket</>}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

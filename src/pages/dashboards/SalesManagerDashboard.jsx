@@ -10,6 +10,7 @@ import {
 } from 'react-icons/md'
 
 export default function SalesManagerDashboard() {
+  const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
   const [users, setUsers] = useState([])
@@ -79,7 +80,6 @@ export default function SalesManagerDashboard() {
       name: sr.full_name || sr.email || 'Unknown',
       area: sr.area?.name || sr.area_name || 'Unassigned',
       target: targetMap[sr.id] || 300000,
-      achieved,
       achieved,
       orders: srOrders.filter(o => o.status !== 'cancelled').length,
       visits: srOrders.length,

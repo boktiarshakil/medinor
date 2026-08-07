@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { formatCurrency, formatDate, calculateSettlement } from '../lib/utils'
+import { formatCurrency, formatDate, calculateSettlement, generateSettlementRecord } from '../lib/utils'
 import { MdAccountBalance, MdCheckCircle, MdInfo, MdReceipt, MdTrendingUp, MdShield } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
@@ -9,7 +9,9 @@ export default function Settlements() {
   const [products, setProducts] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [settlements, setSettlements] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -18,19 +20,36 @@ export default function Settlements() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [ordersData, productsData, usersData] = await Promise.all([
+      const [ordersData, productsData, usersData, settlementsData] = await Promise.all([
         api.getOrders(),
         api.getProducts(),
         api.getUsers().catch(() => []),
+        api.getSettlements().catch(() => []),
       ])
       setOrders(ordersData.filter(o => o.status === 'delivered' || o.status === 'completed'))
       setProducts(productsData)
       setUsers(usersData)
+      setSettlements(settlementsData)
     } catch (err) {
       console.error('Settlements fetch failed:', err)
       toast.error('Failed to load settlement data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSettleOrder = async (order) => {
+    if (!window.confirm(`Settle order ${order.order_number}? This will record the settlement split.`)) return
+    setSaving(true)
+    try {
+      const record = generateSettlementRecord(order, products)
+      await api.createSettlement(record)
+      toast.success('Settlement recorded')
+      fetchData()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -152,7 +171,7 @@ export default function Settlements() {
                 </tr>
               </thead>
               <tbody>
-                {allSettlements.map(({ order, settlement }) => (
+                 {allSettlements.map(({ order, settlement }) => (
                   <tr key={order.id}>
                     <td className="font-mono text-xs font-medium">{order.order_number}</td>
                     <td className="text-xs">{order.dealer?.name || '—'}</td>
@@ -160,6 +179,15 @@ export default function Settlements() {
                     <td className="font-semibold text-xs">{formatCurrency(settlement.grand_total)}</td>
                     <td className="text-xs text-emerald-600 font-medium">{formatCurrency(settlement.company_total)}</td>
                     <td className="text-xs text-purple-600 font-medium">{formatCurrency(settlement.dealer_margin_total)}</td>
+                    <td className="text-xs">
+                      <button
+                        onClick={() => handleSettleOrder(order)}
+                        disabled={saving}
+                        className="text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        Record
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

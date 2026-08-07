@@ -773,6 +773,27 @@ export const api = {
     return data
   },
 
+  // ---- Settlements ----
+
+  async createSettlement(settlement) {
+    const { data, error } = await supabase
+      .from('settlements')
+      .insert(settlement)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async getSettlements() {
+    const { data, error } = await supabase
+      .from('settlements')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
   // ---- Stock movements ----
 
   async getStockMovements(productId) {

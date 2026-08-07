@@ -215,12 +215,12 @@ export default function SalesExecDashboard() {
           </div>
           <span className="text-xs font-semibold text-gray-700">New Order</span>
         </a>
-        <button className="card p-4 flex flex-col items-center gap-2 card-hover">
+        <a href="/collections" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
             <MdReceipt size={20} className="text-emerald-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">Collection</span>
-        </button>
+        </a>
       </div>
     </div>
   )

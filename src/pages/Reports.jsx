@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatNumber } from '../lib/utils'
-import { MdFileDownload, MdAssessment } from 'react-icons/md'
+import { MdFileDownload, MdAssessment, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
 
 const REPORT_CARDS = [
@@ -19,6 +19,7 @@ export default function Reports() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dataCache, setDataCache] = useState({ orders: [], invoices: [], dealers: [], inventory: [] })
+  const [viewReport, setViewReport] = useState(null)
 
   const downloadCSV = (filename, header, rows) => {
     const csv = [header, ...rows]
@@ -113,6 +114,40 @@ export default function Reports() {
     { label: 'Avg Order Value', value: formatCurrency(stats.avgOrder) },
   ] : []
 
+  const getReportRows = (report) => {
+    const { orders, invoices, dealers, inventory } = dataCache
+    let rows = []
+    let headers = []
+    switch (report.title) {
+      case 'Sales Report':
+        headers = ['Order #', 'Dealer', 'Amount', 'Status', 'Date']
+        rows = orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at])
+        break
+      case 'Dealer Report':
+        headers = ['Name', 'Mobile', 'District', 'Area', 'Credit Limit', 'Current Due', 'Status']
+        rows = dealers.map(d => [d.name, d.mobile, d.district, d.area, d.credit_limit, d.current_due, d.status])
+        break
+      case 'Collection Report':
+        headers = ['Invoice #', 'Dealer', 'Paid', 'Status']
+        rows = invoices.map(i => [i.invoice_number, i.dealer?.name || '', i.paid_amount || 0, i.status])
+        break
+      case 'Outstanding Report':
+        headers = ['Invoice #', 'Dealer', 'Amount', 'Paid', 'Due', 'Status']
+        rows = invoices
+          .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+          .map(i => [i.invoice_number, i.dealer?.name || '', i.total_amount || 0, i.paid_amount || 0, (i.due_amount ?? i.total_amount) || 0, i.status])
+        break
+      case 'Stock Report':
+        headers = ['Product', 'Quantity', 'Low Stock Threshold', 'Expiry']
+        rows = inventory.map(i => [i.product?.name || '', i.quantity || 0, i.low_stock_threshold || 0, i.expiry_date])
+        break
+      default:
+        headers = ['Order #', 'Dealer', 'Amount', 'Status', 'Date']
+        rows = orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at])
+    }
+    return { headers, rows }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -152,8 +187,8 @@ export default function Reports() {
                   <p className="text-xs text-gray-500 mt-1 leading-relaxed">{report.description}</p>
                 </div>
               </div>
-              <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50">
-                <button onClick={() => handleExport(report)} className="btn-ghost text-xs flex-1">
+               <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50">
+                <button onClick={() => setViewReport(report)} className="btn-ghost text-xs flex-1">
                   <MdAssessment size={14} /> View
                 </button>
                 <button onClick={() => handleExport(report)} className="btn-ghost text-xs flex-1">
@@ -164,6 +199,54 @@ export default function Reports() {
           ))}
         </div>
       </div>
+
+      {/* Report Viewer Modal */}
+      {viewReport && (() => {
+        const { headers, rows } = getReportRows(viewReport)
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">{viewReport.title}</h3>
+                  <p className="text-xs text-gray-500">{viewReport.description}</p>
+                </div>
+                <button onClick={() => setViewReport(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <MdClose size={20} />
+                </button>
+              </div>
+              <div className="p-5">
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        {headers.map((h, i) => <th key={i}>{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, i) => (
+                        <tr key={i}>
+                          {row.map((cell, j) => <td key={j} className="text-xs">{cell}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {rows.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-gray-500">No data available for this report</p>
+                  </div>
+                )}
+              </div>
+              <div className="p-5 border-t border-gray-100 flex justify-end">
+                <button onClick={() => handleExport(viewReport)} className="btn-primary text-xs">
+                  <MdFileDownload size={14} /> Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
