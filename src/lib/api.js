@@ -196,7 +196,60 @@ export const api = {
       .select()
       .single()
     if (error) throw error
-    return data
+
+    let invoice = null
+    if (status === 'delivered' || status === 'completed') {
+      invoice = await this.createInvoiceForOrder(id)
+    }
+    return { order: data, invoice }
+  },
+
+  async createInvoiceForOrder(orderId) {
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        items:order_items(product_id, quantity, unit_price, total_price, discount_percent)
+      `)
+      .eq('id', orderId)
+      .single()
+    if (error) throw error
+    if (!order) return null
+
+    const { data: existing, error: existingError } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('order_id', orderId)
+      .maybeSingle()
+    if (existingError) throw existingError
+    if (existing) return existing
+
+    const totalAmount = (order.items || []).reduce(
+      (sum, item) => sum + (item.total_price ?? item.quantity * item.unit_price),
+      0
+    )
+
+    const invoicePayload = {
+      invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
+      order_id: order.id,
+      dealer_id: order.dealer_id,
+      amount: totalAmount,
+      vat_amount: 0,
+      total_amount: totalAmount,
+      paid_amount: 0,
+      due_amount: totalAmount,
+      status: 'unpaid',
+      invoice_date: new Date().toISOString().split('T')[0],
+      notes: `Auto-generated from order ${order.order_number || order.order_no || order.id}`,
+    }
+
+    const { data: invData, error: invError } = await supabase
+      .from('invoices')
+      .insert(invoicePayload)
+      .select()
+      .single()
+    if (invError) throw invError
+    return invData
   },
 
   // ---- Invoices ----

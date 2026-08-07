@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
-import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete } from 'react-icons/md'
+import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete, MdCheck, MdLocalShipping, MdInventory, MdHandshake, MdReceipt } from 'react-icons/md'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
+
+const NEXT_ACTIONS = {
+  submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'] },
+  approved: { status: 'packed', label: 'Pack', icon: MdInventory, roles: ['super_admin', 'admin', 'warehouse'] },
+  packed: { status: 'dispatched', label: 'Dispatch', icon: MdLocalShipping, roles: ['super_admin', 'admin', 'warehouse'] },
+  dispatched: { status: 'delivered', label: 'Deliver', icon: MdHandshake, roles: ['super_admin', 'admin', 'warehouse'] },
+  delivered: { status: 'completed', label: 'Complete', icon: MdCheck, roles: ['super_admin', 'admin'] },
+}
 
 export default function Orders() {
   const { user } = useAuth()
@@ -104,8 +112,7 @@ export default function Orders() {
     }))
   }
 
-  const handleCreateOrder = async () => {
-    if (!orderDraft.dealer_id) {
+  const handleCreateOrder = async () => {    if (!orderDraft.dealer_id) {
       toast.error('Select a dealer')
       return
     }
@@ -143,6 +150,23 @@ export default function Orders() {
       toast.error('Failed: ' + err.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleAdvance = async (order, action) => {
+    if (!window.confirm(`Move order ${order.number} to "${action.label}"?`)) return
+    try {
+      const { order: updated, invoice } = await api.updateOrderStatus(order._raw.id, action.status)
+      const newStatus = updated?.status || action.status
+      toast.success(
+        newStatus === 'delivered'
+          ? `Order delivered. Invoice ${invoice?.invoice_number ? invoice.invoice_number + ' ' : ''}auto-generated.`
+          : `Order moved to "${statusLabel(newStatus)}"`
+      )
+      setSelectedOrder(null)
+      fetchOrders()
+    } catch (err) {
+      toast.error('Failed to update: ' + err.message)
     }
   }
 
@@ -307,6 +331,25 @@ export default function Orders() {
                     ))}
                   </div>
                 )}
+              </div>
+              <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+                {(() => {
+                  const action = NEXT_ACTIONS[selectedOrder.status]
+                  if (!action || !action.roles.includes(user?.role)) return null
+                  const ActionIcon = action.icon
+                  const showInvoiceNotice = selectedOrder.status === 'dispatched'
+                  return (
+                    <button
+                      onClick={() => handleAdvance(selectedOrder, action)}
+                      className="btn-primary inline-flex items-center gap-2 text-xs"
+                    >
+                      <ActionIcon size={15} />
+                      {action.label} Order
+                      {showInvoiceNotice && <span className="opacity-80 text-[9px]">· invoice auto-generated</span>}
+                    </button>
+                  )
+                })()}
+                <button onClick={() => setSelectedOrder(null)} className="btn-secondary text-xs">Close</button>
               </div>
             </div>
           </div>
