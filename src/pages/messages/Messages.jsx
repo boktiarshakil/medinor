@@ -10,6 +10,7 @@ export default function Messages() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('common')
   const [users, setUsers] = useState([])
+  const [areas, setAreas] = useState([])
   const [directMessages, setDirectMessages] = useState([])
   const [groupMessages, setGroupMessages] = useState([])
   const [commonComments, setCommonComments] = useState([])
@@ -21,18 +22,27 @@ export default function Messages() {
     fetchData()
   }, [])
 
+  useEffect(() => {
+    if (activeTab === 'direct' && selectedUser?.id && user?.id) {
+      fetchDirect(selectedUser.id)
+    }
+  }, [selectedUser?.id, activeTab])
+
   const fetchData = async () => {
     try {
       setLoading(true)
       const usersData = await api.getUsers()
       setUsers(usersData.filter(u => u.id !== user?.id))
-      setSelectedUser(usersData[0] || null)
+      setSelectedUser(prev => prev || usersData.find(u => u.id !== user?.id) || null)
 
-      // TODO: Fetch messages from a messages table when created
-      // For now, show empty state directing admin to set up messaging
-      setDirectMessages([])
-      setGroupMessages([])
-      setCommonComments([])
+      api.getAreas().then(setAreas).catch(() => {})
+
+      const [common, group] = await Promise.all([
+        api.getMessages({ channel: 'common' }),
+        api.getMessages({ channel: 'group', areaId: user?.area_id || null }),
+      ])
+      setCommonComments(common.reverse())
+      setGroupMessages(group.reverse())
     } catch (err) {
       console.error('Messages fetch failed:', err)
     } finally {
@@ -40,26 +50,70 @@ export default function Messages() {
     }
   }
 
-  const handleSendDirect = (e) => {
+  const fetchDirect = async (otherId) => {
+    try {
+      const direct = await api.getMessages({ channel: 'direct', userId: user?.id, otherUserId: otherId })
+      setDirectMessages(direct.reverse())
+    } catch (err) {
+      console.error('Direct messages fetch failed:', err)
+    }
+  }
+
+  const handleSendDirect = async (e) => {
     e.preventDefault()
     if (!newMessage.trim() || !selectedUser) return
-    // TODO: Persist to messages table
-    toast.success('Message sent (local only — wire to DB)')
-    setNewMessage('')
+    try {
+      const msg = await api.sendMessage({
+        channel: 'direct',
+        sender_id: user?.id,
+        recipient_id: selectedUser.id,
+        message: newMessage.trim(),
+      })
+      setDirectMessages(prev => [...prev, msg])
+      setNewMessage('')
+    } catch (err) {
+      console.error('Send direct failed:', err)
+      toast.error('Failed: ' + err.message)
+    }
   }
 
-  const handleSendGroup = (e) => {
+  const handleSendGroup = async (e) => {
     e.preventDefault()
     if (!newMessage.trim()) return
-    toast.success('Group message sent (local only)')
-    setNewMessage('')
+    if (!user?.area_id) {
+      toast.error('You are not assigned to a territory yet. Ask an admin to assign your area.')
+      return
+    }
+    try {
+      const msg = await api.sendMessage({
+        channel: 'group',
+        sender_id: user?.id,
+        area_id: user.area_id,
+        message: newMessage.trim(),
+      })
+      setGroupMessages(prev => [...prev, msg])
+      setNewMessage('')
+    } catch (err) {
+      console.error('Send group failed:', err)
+      toast.error('Failed: ' + err.message)
+    }
   }
 
-  const handleSendCommon = (e) => {
+  const handleSendCommon = async (e) => {
     e.preventDefault()
     if (!newMessage.trim()) return
-    toast.success('Comment posted (local only)')
-    setNewMessage('')
+    try {
+      const msg = await api.sendMessage({
+        channel: 'common',
+        sender_id: user?.id,
+        message: newMessage.trim(),
+      })
+      setCommonComments(prev => [...prev, msg])
+      setNewMessage('')
+    } catch (err) {
+      console.error('Send common failed:', err)
+      toast.error('Failed: ' + err.message)
+    }
   }
 
   const tabs = [
@@ -67,6 +121,15 @@ export default function Messages() {
     { key: 'group', label: 'Territory Group', icon: MdGroup },
     { key: 'direct', label: 'Direct', icon: MdChat },
   ]
+
+  const nameOf = (id) => {
+    if (id === user?.id) return 'You'
+    const u = users.find(x => x.id === id)
+    return u ? u.full_name : (id || 'Unknown').slice(0, 8)
+  }
+
+  const myArea = areas.find(a => a.id === user?.area_id)
+  const myAreaName = myArea ? myArea.name : ''
 
   if (loading) {
     return (
@@ -119,12 +182,12 @@ export default function Messages() {
               commonComments.map(c => (
                 <div key={c.id} className="flex gap-3">
                   <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold">
-                    {(c.from || '?').charAt(0)}
+                    {(nameOf(c.sender_id) || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-900">{c.from}</span>
-                      <span className="text-[10px] text-gray-400">{formatDateTime(c.timestamp)}</span>
+                      <span className="text-xs font-bold text-gray-900">{nameOf(c.sender_id)}</span>
+                      <span className="text-[10px] text-gray-400">{formatDateTime(c.created_at)}</span>
                     </div>
                     <p className="text-sm text-gray-700 mt-0.5">{c.message}</p>
                   </div>
@@ -153,34 +216,34 @@ export default function Messages() {
             <h3 className="text-sm font-bold text-gray-900">Territory Group</h3>
             <p className="text-[10px] text-gray-400 mt-0.5">
               <MdGroup size={10} className="inline" /> Ideas, issues, announcements
+              {myAreaName && <span className="ml-1 badge badge-info">{myAreaName}</span>}
             </p>
           </div>
+          {!user?.area_id ? (
+            <div className="p-8 text-center">
+              <MdGroup size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-gray-600">You are not assigned to a territory yet.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Ask a Super Admin to assign your Area in User Management, then this group will show your territory's thread.
+              </p>
+            </div>
+          ) : (
+          <>
           <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
             {groupMessages.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">No group messages yet.</p>
+              <p className="text-sm text-gray-400 text-center py-8">No messages in your territory yet. Start the conversation.</p>
             ) : (
               groupMessages.map(g => (
-                <div key={g.id} className={`flex gap-3 ${g.type === 'announcement' ? 'p-2 bg-amber-50 rounded-lg' : ''}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                    g.type === 'announcement' ? 'bg-amber-100 text-amber-600' :
-                    g.type === 'idea' ? 'bg-emerald-100 text-emerald-600' :
-                    g.type === 'issue' ? 'bg-red-100 text-red-600' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
-                    {(g.from || '?').charAt(0)}
+                <div key={g.id} className="flex gap-3">
+                  <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold">
+                    {(nameOf(g.sender_id) || '?').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-gray-900">{g.from}</span>
-                      {g.type !== 'comment' && (
-                        <span className={`badge text-[9px] ${
-                          g.type === 'announcement' ? 'badge-warning' :
-                          g.type === 'idea' ? 'badge-success' : 'badge-danger'
-                        }`}>{g.type}</span>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-900">{nameOf(g.sender_id)}</span>
                     </div>
                     <p className="text-sm text-gray-700 mt-0.5">{g.message}</p>
-                    <span className="text-[10px] text-gray-400">{formatDateTime(g.timestamp)}</span>
+                    <span className="text-[10px] text-gray-400">{formatDateTime(g.created_at)}</span>
                   </div>
                 </div>
               ))
@@ -197,6 +260,8 @@ export default function Messages() {
               <MdSend size={16} />
             </button>
           </form>
+          </>
+          )}
         </div>
       )}
 
@@ -230,7 +295,7 @@ export default function Messages() {
               </p>
             ) : (
               directMessages.map(m => {
-                const isMe = m.from === user?.id
+                const isMe = m.sender_id === user?.id
                 return (
                   <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                     <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${
@@ -238,7 +303,7 @@ export default function Messages() {
                     }`}>
                       <p>{m.message}</p>
                       <p className={`text-[9px] mt-1 ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
-                        {formatDateTime(m.timestamp)}
+                        {formatDateTime(m.created_at)}
                       </p>
                     </div>
                   </div>

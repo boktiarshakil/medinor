@@ -9,6 +9,7 @@ import Unauthorized from './pages/Unauthorized'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Dealers from './pages/Dealers'
+import Areas from './pages/Areas'
 import Orders from './pages/Orders'
 import Invoices from './pages/Invoices'
 import Inventory from './pages/Inventory'
@@ -57,6 +58,7 @@ export default function App() {
 
         {/* Admin / Super Admin */}
         <Route path="/products" element={<ProtectedRoute roles={['super_admin','admin']}><Products /></ProtectedRoute>} />
+        <Route path="/areas" element={<ProtectedRoute roles={['super_admin','admin']}><Areas /></ProtectedRoute>} />
         <Route path="/dealers" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive']}><Dealers /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','warehouse']}><Orders /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute roles={['super_admin','admin','sales_manager']}><Invoices /></ProtectedRoute>} />

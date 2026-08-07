@@ -30,6 +30,9 @@ export default function Products() {
   const [creating, setCreating] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef(null)
+  const [editingProduct, setEditingProduct] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
   const [newProduct, setNewProduct] = useState({
     name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: ''
   })
@@ -85,6 +88,63 @@ export default function Products() {
       toast.error('Failed: ' + err.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleEdit = (product) => {
+    setEditingProduct({
+      id: product.id,
+      name: product.name || '',
+      sku: product.sku || '',
+      category: product.category || '',
+      mrp: product.mrp || '',
+      trade_price: product.trade_price || '',
+      dealer_price: product.dealer_price || '',
+      purchase_price: product.purchase_price || '',
+      stock: product.stock || '',
+      status: product.status || 'active',
+      image_url: product.image_url || '',
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingProduct.name.trim()) {
+      toast.error('Product name is required')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = { name: editingProduct.name }
+      if (editingProduct.sku) payload.sku = editingProduct.sku
+      if (editingProduct.category) payload.category = editingProduct.category
+      if (editingProduct.mrp) payload.mrp = Number(editingProduct.mrp)
+      if (editingProduct.trade_price) payload.trade_price = Number(editingProduct.trade_price)
+      if (editingProduct.dealer_price) payload.dealer_price = Number(editingProduct.dealer_price)
+      if (editingProduct.purchase_price) payload.purchase_price = Number(editingProduct.purchase_price)
+      if (editingProduct.image_url) payload.image_url = editingProduct.image_url
+      payload.status = editingProduct.status || 'active'
+      await api.updateProduct(editingProduct.id, payload)
+      toast.success(`Product "${editingProduct.name}" updated`)
+      setEditingProduct(null)
+      fetchProducts()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (product) => {
+    if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return
+    setDeletingId(product.id)
+    try {
+      await api.deleteProduct(product.id)
+      toast.success(`Product "${product.name}" deleted`)
+      fetchProducts()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -232,11 +292,18 @@ export default function Products() {
               )}
 
               <div className="flex gap-2 pt-3 border-t border-gray-50">
-                <button className="btn-ghost flex-1 text-xs">
+                <button className="btn-ghost flex-1 text-xs" onClick={() => handleEdit(product)}>
                   <MdEdit size={14} /> Edit
                 </button>
-                <button className="btn-ghost text-xs text-red-500 hover:bg-red-50">
-                  <MdDelete size={14} />
+                <button
+                  className="btn-ghost text-xs text-red-500 hover:bg-red-50"
+                  onClick={() => handleDelete(product)}
+                  disabled={deletingId === product.id}
+                >
+                  {deletingId === product.id
+                    ? <div className="w-3.5 h-3.5 border-2 border-red-200 border-t-red-500 rounded-full animate-spin mx-auto" />
+                    : <MdDelete size={14} />
+                  }
                 </button>
               </div>
             </div>
@@ -357,6 +424,77 @@ export default function Products() {
                 <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' }); }} className="btn-secondary flex-1">Cancel</button>
                 <button onClick={handleCreate} disabled={!newProduct.name || creating} className="btn-primary flex-1 disabled:opacity-50">
                   {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Create Product</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Edit Product</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Update product details</p>
+              </div>
+              <button onClick={() => setEditingProduct(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="label">Product Name *</label>
+                  <input type="text" className="input" placeholder="e.g. Mediron Prime BP Monitor"
+                    value={editingProduct.name} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">SKU</label>
+                  <input type="text" className="input" placeholder="MED-BP-001"
+                    value={editingProduct.sku} onChange={(e) => setEditingProduct({ ...editingProduct, sku: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Category</label>
+                  <input type="text" className="input" placeholder="e.g. BP Monitor"
+                    value={editingProduct.category} onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">MRP</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={editingProduct.mrp} onChange={(e) => setEditingProduct({ ...editingProduct, mrp: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Trade Price</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={editingProduct.trade_price} onChange={(e) => setEditingProduct({ ...editingProduct, trade_price: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Dealer Price</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={editingProduct.dealer_price} onChange={(e) => setEditingProduct({ ...editingProduct, dealer_price: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Purchase Price</label>
+                  <input type="number" className="input" placeholder="0"
+                    value={editingProduct.purchase_price} onChange={(e) => setEditingProduct({ ...editingProduct, purchase_price: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Status</label>
+                  <select className="input" value={editingProduct.status}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, status: e.target.value })}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="discontinued">Discontinued</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setEditingProduct(null)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={!editingProduct.name || saving} className="btn-primary flex-1 disabled:opacity-50">
+                  {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <>Save Changes</>}
                 </button>
               </div>
             </div>

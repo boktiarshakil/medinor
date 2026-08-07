@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    host: true
+    host: true,
+    allowedHosts: ['.monkeycode-ai.live']
   },
   resolve: {
     alias: {

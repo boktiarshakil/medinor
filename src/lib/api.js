@@ -17,28 +17,22 @@ export const api = {
   },
 
   async createUser({ email, full_name, phone, role, area_id, password }) {
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password: password || 'Mediron@2025',
-      email_confirm: true,
-      user_metadata: { full_name, role }
-    })
-    if (authError) throw authError
-
-    const { error: profileError } = await supabase
-      .from('user_profiles')
-      .upsert({
-        id: authData.user.id,
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
         email,
+        password: password || 'Mediron@2025',
         full_name,
         phone,
         role,
         area_id,
-        is_active: true
-      })
-    if (profileError) throw profileError
-
-    return authData.user
+      }
+    })
+    if (error) {
+      const message = error.context?.error || error.message || 'Failed to create user'
+      throw new Error(message)
+    }
+    if (data?.error) throw new Error(data.error)
+    return data
   },
 
   async updateUser(id, updates) {
@@ -53,8 +47,15 @@ export const api = {
   },
 
   async deleteUser(id) {
-    const { error } = await supabase.auth.admin.deleteUser(id)
-    if (error) throw error
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { userId: id }
+    })
+    if (error) {
+      const message = error.context?.error || error.message || 'Failed to delete user'
+      throw new Error(message)
+    }
+    if (data?.error) throw new Error(data.error)
+    return data
   },
 
   async toggleUserActive(id, isActive) {
@@ -80,9 +81,13 @@ export const api = {
   },
 
   async createProduct(product) {
+    const payload = { ...product }
+    if (!payload.sku) payload.sku = `MDN-${Date.now().toString(36).toUpperCase()}`
+    if (!payload.category) payload.category = 'General'
+    delete payload.stock
     const { data, error } = await supabase
       .from('products')
-      .insert(product)
+      .insert(payload)
       .select()
       .single()
     if (error) throw error
@@ -98,6 +103,14 @@ export const api = {
       .single()
     if (error) throw error
     return data
+  },
+
+  async deleteProduct(id) {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
   },
 
   // ---- Dealers ----
@@ -148,14 +161,25 @@ export const api = {
   },
 
   async createOrder(order, items) {
+    const payload = { ...order }
+    if (!payload.order_number) {
+      payload.order_number = `ORD-${Date.now().toString(36).toUpperCase()}`
+    }
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
-      .insert(order)
+      .insert(payload)
       .select()
       .single()
     if (orderError) throw orderError
 
-    const orderItems = items.map(item => ({ ...item, order_id: orderData.id }))
+    const orderItems = items.map(item => ({
+      order_id: orderData.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price ?? item.total ?? item.quantity * item.unit_price,
+      discount_percent: item.discount_percent ?? 0,
+    }))
     const { error: itemsError } = await supabase
       .from('order_items')
       .insert(orderItems)
@@ -213,6 +237,35 @@ export const api = {
       .order('name')
     if (error) throw error
     return data || []
+  },
+
+  async createArea(area) {
+    const { data, error } = await supabase
+      .from('areas')
+      .insert(area)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async updateArea(id, updates) {
+    const { data, error } = await supabase
+      .from('areas')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async deleteArea(id) {
+    const { error } = await supabase
+      .from('areas')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
   },
 
   // ---- Notifications ----
@@ -334,6 +387,42 @@ export const api = {
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
+  },
+
+  // ---- Messages ----
+
+  async getMessages({ channel, userId = null, otherUserId = null, areaId = null } = {}) {
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .eq('channel', channel)
+      .order('created_at', { ascending: false })
+    if (channel === 'direct' && userId) {
+      query = query.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+    }
+    if (channel === 'group' && areaId) {
+      query = query.eq('area_id', areaId)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    let result = data || []
+    if (channel === 'direct' && userId && otherUserId) {
+      result = result.filter(m =>
+        (m.sender_id === userId && m.recipient_id === otherUserId) ||
+        (m.sender_id === otherUserId && m.recipient_id === userId)
+      )
+    }
+    return result
+  },
+
+  async sendMessage({ channel, sender_id, recipient_id = null, area_id = null, message }) {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({ channel, sender_id, recipient_id, area_id, message })
+      .select()
+      .single()
+    if (error) throw error
+    return data
   },
 
   // Expose supabase for direct queries

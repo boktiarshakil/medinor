@@ -15,6 +15,7 @@ export default function Dealers() {
   const [newDealer, setNewDealer] = useState({
     name: '',
     owner_name: '',
+    mobile: '',
     phone: '',
     address: '',
     district: '',
@@ -54,11 +55,16 @@ export default function Dealers() {
       toast.error('Dealer name is required')
       return
     }
+    if (!newDealer.mobile.trim()) {
+      toast.error('Mobile number is required')
+      return
+    }
     setCreating(true)
     try {
       await api.createDealer({
         name: newDealer.name,
         owner_name: newDealer.owner_name || null,
+        mobile: newDealer.mobile.trim(),
         phone: newDealer.phone || null,
         address: newDealer.address || null,
         district: newDealer.district || null,
@@ -66,7 +72,7 @@ export default function Dealers() {
         credit_limit: Number(newDealer.credit_limit) || 0,
       })
       toast.success(`Dealer "${newDealer.name}" created`)
-      setNewDealer({ name: '', owner_name: '', phone: '', address: '', district: '', area_id: '', credit_limit: 50000 })
+      setNewDealer({ name: '', owner_name: '', mobile: '', phone: '', address: '', district: '', area_id: '', credit_limit: 50000 })
       setShowCreate(false)
       fetchDealers()
     } catch (err) {
@@ -224,6 +230,16 @@ export default function Dealers() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="label">Mobile *</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="+8801XXXXXXXXX"
+                    value={newDealer.mobile}
+                    onChange={(e) => setNewDealer({ ...newDealer, mobile: e.target.value })}
+                  />
+                </div>
+                <div>
                   <label className="label">Phone</label>
                   <input
                     type="tel"
@@ -233,16 +249,16 @@ export default function Dealers() {
                     onChange={(e) => setNewDealer({ ...newDealer, phone: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="label">District</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="e.g. Dhaka"
-                    value={newDealer.district}
-                    onChange={(e) => setNewDealer({ ...newDealer, district: e.target.value })}
-                  />
-                </div>
+              </div>
+              <div>
+                <label className="label">District</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Dhaka"
+                  value={newDealer.district}
+                  onChange={(e) => setNewDealer({ ...newDealer, district: e.target.value })}
+                />
               </div>
               <div>
                 <label className="label">Address</label>

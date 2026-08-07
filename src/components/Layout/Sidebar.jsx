@@ -4,13 +4,15 @@ import {
   MdDashboard, MdInventory2, MdShoppingCart, MdReceipt,
   MdPeople, MdAssessment, MdLocalShipping, MdAssignmentReturn,
   MdCampaign, MdSupportAgent, MdSettings, MdClose, MdStore,
-  MdChat, MdMyLocation, MdQrCode, MdAccountTree, MdBadge, MdAccountBalance
+  MdChat, MdMyLocation, MdQrCode, MdAccountTree, MdBadge, MdAccountBalance,
+  MdLocationOn
 } from 'react-icons/md'
 
 const NAV_ITEMS = {
   super_admin: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/products', icon: MdInventory2, label: 'Products' },
+    { path: '/areas', icon: MdLocationOn, label: 'Areas' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
     { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/invoices', icon: MdReceipt, label: 'Invoices' },
@@ -34,6 +36,7 @@ const NAV_ITEMS = {
   admin: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
     { path: '/products', icon: MdInventory2, label: 'Products' },
+    { path: '/areas', icon: MdLocationOn, label: 'Areas' },
     { path: '/orders', icon: MdShoppingCart, label: 'Orders' },
     { path: '/order-tracker', icon: MdLocalShipping, label: 'Order Tracker' },
     { path: '/invoices', icon: MdReceipt, label: 'Invoices' },
@@ -52,6 +55,7 @@ const NAV_ITEMS = {
     { path: '/reports', icon: MdAssessment, label: 'Reports' },
     { path: '/campaigns', icon: MdCampaign, label: 'Campaigns' },
     { path: '/support', icon: MdSupportAgent, label: 'Support' },
+    { path: '/settings', icon: MdSettings, label: 'Settings' },
   ],
   sales_manager: [
     { path: '/dashboard', icon: MdDashboard, label: 'Dashboard' },
