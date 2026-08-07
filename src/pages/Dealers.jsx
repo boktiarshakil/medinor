@@ -12,6 +12,8 @@ export default function Dealers() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [areas, setAreas] = useState([])
+  const [menuOpen, setMenuOpen] = useState(null)
+  const [editingDealer, setEditingDealer] = useState(null)
   const [newDealer, setNewDealer] = useState({
     name: '',
     owner_name: '',
@@ -48,6 +50,39 @@ export default function Dealers() {
       toast.error('Dealers: ' + (err.message || 'Failed to load'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleEdit = async () => {
+    if (!editingDealer) return
+    if (!editingDealer.name.trim()) {
+      toast.error('Dealer name is required')
+      return
+    }
+    if (!editingDealer.mobile.trim()) {
+      toast.error('Mobile number is required')
+      return
+    }
+    setCreating(true)
+    try {
+      await api.updateDealer(editingDealer.id, {
+        name: editingDealer.name,
+        owner_name: editingDealer.owner_name || null,
+        email: (editingDealer.email || '').trim() || null,
+        mobile: editingDealer.mobile.trim(),
+        phone: editingDealer.phone || null,
+        address: editingDealer.address || null,
+        district: editingDealer.district || null,
+        area_id: editingDealer.area_id || null,
+        credit_limit: Number(editingDealer.credit_limit) || 0,
+      })
+      toast.success(`Dealer "${editingDealer.name}" updated`)
+      setEditingDealer(null)
+      fetchDealers()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -175,12 +210,41 @@ export default function Dealers() {
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <a href="/place-order" className="btn-primary flex-1 text-xs text-center">Place Order</a>
-              <button className="btn-secondary text-xs">
-                <MdMoreVert size={14} />
-              </button>
-            </div>
+              <div className="flex gap-2">
+                <a href="/place-order" className="btn-primary flex-1 text-xs text-center">Place Order</a>
+                <div className="relative">
+                  <button
+                    onClick={() => setMenuOpen(menuOpen === dealer.id ? null : dealer.id)}
+                    className="btn-secondary text-xs"
+                  >
+                    <MdMoreVert size={14} />
+                  </button>
+                  {menuOpen === dealer.id && (
+                    <div className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                      <button
+                        onClick={() => {
+                          setEditingDealer({
+                            id: dealer.id,
+                            name: dealer.name || '',
+                            owner_name: dealer.owner || '',
+                            email: dealer.email || '',
+                            mobile: dealer.mobile || '',
+                            phone: dealer.phone || '',
+                            address: dealer.address || '',
+                            district: dealer.district || '',
+                            area_id: dealer.area_id || '',
+                            credit_limit: dealer.creditLimit || 50000,
+                          })
+                          setMenuOpen(null)
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        Edit Dealer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
           </div>
         ))}
       </div>
@@ -320,6 +384,81 @@ export default function Dealers() {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
                   ) : (
                     <><MdAdd size={15} /> Create Dealer</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      )}
+      {editingDealer && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Edit Dealer</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Update dealer information</p>
+              </div>
+              <button onClick={() => setEditingDealer(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Dealer Name *</label>
+                  <input type="text" className="input" placeholder="e.g. Medicine Point" value={editingDealer.name} onChange={(e) => setEditingDealer({ ...editingDealer, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Owner Name</label>
+                  <input type="text" className="input" placeholder="e.g. Dr. Rahim Uddin" value={editingDealer.owner_name} onChange={(e) => setEditingDealer({ ...editingDealer, owner_name: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Mobile *</label>
+                  <input type="tel" className="input" placeholder="+8801XXXXXXXXX" value={editingDealer.mobile} onChange={(e) => setEditingDealer({ ...editingDealer, mobile: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Phone</label>
+                  <input type="tel" className="input" placeholder="+8801XXXXXXXXX" value={editingDealer.phone} onChange={(e) => setEditingDealer({ ...editingDealer, phone: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input type="email" className="input" placeholder="dealer@example.com" value={editingDealer.email} onChange={(e) => setEditingDealer({ ...editingDealer, email: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">District</label>
+                <input type="text" className="input" placeholder="e.g. Dhaka" value={editingDealer.district} onChange={(e) => setEditingDealer({ ...editingDealer, district: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Address</label>
+                <input type="text" className="input" placeholder="Full address" value={editingDealer.address} onChange={(e) => setEditingDealer({ ...editingDealer, address: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Area / Territory</label>
+                  <select className="input" value={editingDealer.area_id} onChange={(e) => setEditingDealer({ ...editingDealer, area_id: e.target.value })}>
+                    <option value="">Select area...</option>
+                    {areas.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Credit Limit</label>
+                  <input type="number" className="input" value={editingDealer.credit_limit} onChange={(e) => setEditingDealer({ ...editingDealer, credit_limit: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setEditingDealer(null)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleEdit} disabled={!editingDealer.name || creating} className="btn-primary flex-1 disabled:opacity-50">
+                  {creating ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                  ) : (
+                    <>Save Changes</>
                   )}
                 </button>
               </div>
