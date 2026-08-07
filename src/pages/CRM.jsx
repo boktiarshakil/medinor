@@ -24,6 +24,7 @@ const TYPE_COLORS = {
 
 export default function CRM() {
   const [contacts, setContacts] = useState([])
+  const [visits, setVisits] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
@@ -38,8 +39,12 @@ export default function CRM() {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.getCRMContacts()
+      const [data, visitData] = await Promise.all([
+        api.getCRMContacts(),
+        api.getCRMVisits().catch(() => []),
+      ])
       setContacts(data)
+      setVisits(visitData || [])
     } catch (err) {
       console.error('CRM fetch failed:', err)
       setError(err.message || 'Failed to load contacts')
@@ -49,6 +54,11 @@ export default function CRM() {
   }
 
   useEffect(() => { fetchContacts() }, [])
+
+  const lastVisitMap = {}
+  visits.forEach(v => {
+    if (v.contact_id && !lastVisitMap[v.contact_id]) lastVisitMap[v.contact_id] = v.visit_date
+  })
 
   const handleCreate = async () => {
     if (!newContact.name.trim()) {
@@ -63,7 +73,7 @@ export default function CRM() {
         phone: newContact.phone || null,
         specialty: newContact.specialty || null,
         address: newContact.address || null,
-        organization: newContact.organization || null,
+        notes: newContact.organization || null,
       })
       toast.success(`Contact "${newContact.name}" added`)
       setNewContact({ name: '', type: 'doctor', phone: '', specialty: '', address: '', organization: '' })
@@ -138,9 +148,9 @@ export default function CRM() {
                 </div>
               </div>
               <div className="space-y-1.5 text-xs text-gray-600">
-                {contact.organization && <p>📍 {contact.organization}</p>}
+                {contact.notes && <p>📍 {contact.notes}</p>}
                 {contact.phone && <p>📞 {contact.phone}</p>}
-                {contact.last_visit && <p>🗓 Last visit: {formatDate(contact.last_visit)}</p>}
+                {lastVisitMap[contact.id] && <p>🗓 Last visit: {formatDate(lastVisitMap[contact.id])}</p>}
               </div>
             </div>
           )

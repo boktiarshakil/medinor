@@ -8,11 +8,26 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
 
+  const applyProfile = (profile) => {
+    if (profile && profile.is_active === false) {
+      supabase.auth.signOut()
+      setUser(null)
+      throw new Error('This account has been deactivated. Contact an administrator.')
+    }
+    setUser(profile)
+    return profile
+  }
+
   useEffect(() => {
     const init = async () => {
       try {
         const profile = await getCurrentUser()
-        setUser(profile)
+        if (profile && profile.is_active === false) {
+          await supabase.auth.signOut()
+          setUser(null)
+        } else {
+          setUser(profile)
+        }
       } catch (err) {
         console.error('Auth init error:', err)
       } finally {
@@ -24,8 +39,17 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
-        const profile = await getCurrentUser()
-        setUser(profile)
+        try {
+          const profile = await getCurrentUser()
+          if (profile && profile.is_active === false) {
+            await supabase.auth.signOut()
+            setUser(null)
+          } else {
+            setUser(profile)
+          }
+        } catch (err) {
+          console.error('Auth state error:', err)
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
@@ -38,8 +62,7 @@ export function AuthProvider({ children }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     const profile = await getCurrentUser()
-    setUser(profile)
-    return profile
+    return applyProfile(profile)
   }, [])
 
   const signOut = useCallback(async () => {

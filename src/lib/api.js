@@ -10,7 +10,7 @@ export const api = {
   async getUsers() {
     const { data, error } = await supabase
       .from('user_profiles')
-      .select('*')
+      .select(`*, area:areas!fk_user_area(name)`)
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
@@ -300,6 +300,15 @@ export const api = {
     return data || []
   },
 
+  async getCRMVisits() {
+    const { data, error } = await supabase
+      .from('crm_visits')
+      .select('*, contact:crm_contacts(id, name)')
+      .order('visit_date', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
   async createCRMContact(contact) {
     const { data, error } = await supabase
       .from('crm_contacts')
@@ -387,6 +396,333 @@ export const api = {
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
+  },
+
+  // ---- Invoices ----
+
+  async createInvoice(invoice) {
+    const payload = { ...invoice }
+    if (!payload.invoice_number) {
+      payload.invoice_number = `INV-${Date.now().toString(36).toUpperCase()}`
+    }
+    const { data, error } = await supabase
+      .from('invoices')
+      .insert(payload)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async updateInvoice(id, updates) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Payments ----
+
+  async getPayments() {
+    const { data, error } = await supabase
+      .from('payments')
+      .select(`
+        *,
+        dealer:dealers(name),
+        invoice:invoices(invoice_number),
+        collector:user_profiles(full_name)
+      `)
+      .order('payment_date', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  async createPayment(payment) {
+    const { data, error } = await supabase
+      .from('payments')
+      .insert(payment)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Notifications / Announcements ----
+
+  async createNotification(notification) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert(notification)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async broadcastAnnouncement({ title, message, priority = 'medium', audience = 'all', senderId }) {
+    const typeMap = { high: 'warning', medium: 'info', low: 'info' }
+    const { data: users, error: usersError } = await supabase
+      .from('user_profiles')
+      .select('id, role')
+      .eq('is_active', true)
+    if (usersError) throw usersError
+
+    const roleAudience = {
+      all: ['super_admin', 'admin', 'sales_manager', 'area_manager', 'sales_executive', 'warehouse', 'dealer'],
+      management: ['super_admin', 'admin', 'sales_manager', 'area_manager'],
+      rsm_dm: ['sales_manager', 'area_manager'],
+      asm: ['area_manager'],
+      tso: ['sales_executive'],
+      dealers: ['dealer'],
+    }
+    const targetRoles = roleAudience[audience] || roleAudience.all
+    const targets = (users || []).filter(u => targetRoles.includes(u.role))
+
+    const rows = targets.map(u => ({
+      user_id: u.id,
+      title,
+      message,
+      type: typeMap[priority] || 'info',
+      reference_type: 'announcement',
+    }))
+    if (rows.length > 0) {
+      const { error } = await supabase.from('notifications').insert(rows)
+      if (error) throw error
+    }
+    return { broadcastTo: rows.length }
+  },
+
+  // ---- Campaigns ----
+
+  async createCampaign(campaign) {
+    const { data, error } = await supabase
+      .from('campaigns')
+      .insert(campaign)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async updateCampaign(id, updates) {
+    const { data, error } = await supabase
+      .from('campaigns')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Returns ----
+
+  async createReturn(returnData, items = []) {
+    const { data, error } = await supabase
+      .from('returns')
+      .insert(returnData)
+      .select()
+      .single()
+    if (error) throw error
+    if (items.length > 0) {
+      const { error: itemsError } = await supabase
+        .from('return_items')
+        .insert(items.map(i => ({ ...i, return_id: data.id })))
+      if (itemsError) throw itemsError
+    }
+    return data
+  },
+
+  async updateReturnStatus(id, status) {
+    const { data, error } = await supabase
+      .from('returns')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- CRM ----
+
+  async createCRMVisit(visit) {
+    const { data, error } = await supabase
+      .from('crm_visits')
+      .insert(visit)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Attendance ----
+
+  async getTodayAttendance(userId) {
+    const today = new Date().toISOString().split('T')[0]
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (error) throw error
+    return data?.[0] || null
+  },
+
+  async getTodayAttendanceList() {
+    const today = new Date().toISOString().split('T')[0]
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('user_id, check_in, date')
+      .eq('date', today)
+    if (error) throw error
+    return data || []
+  },
+
+  async checkIn(userId, { lat = null, lng = null } = {}) {
+    const today = new Date().toISOString().split('T')[0]
+    const existing = await this.getTodayAttendance(userId)
+    const payload = {
+      check_in: new Date().toISOString(),
+      check_in_lat: lat,
+      check_in_lng: lng,
+      status: 'present',
+      work_type: 'field',
+    }
+    if (existing) {
+      const { data, error } = await supabase
+        .from('attendance')
+        .update(payload)
+        .eq('id', existing.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
+    const { data, error } = await supabase
+      .from('attendance')
+      .insert({ ...payload, user_id: userId, date: today })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Stock movements ----
+
+  async getStockMovements(productId) {
+    let query = supabase
+      .from('stock_movements')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (productId) query = query.eq('product_id', productId)
+    const { data, error } = await query.limit(100)
+    if (error) throw error
+    return data || []
+  },
+
+  async addStockMovement(movement) {
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .insert(movement)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Products with stock merged from inventory ----
+
+  async getProductsWithStock() {
+    const [products, inventory] = await Promise.all([
+      this.getProducts(),
+      this.getInventory(),
+    ])
+    const stockMap = {}
+    inventory.forEach(i => {
+      stockMap[i.product_id] = (stockMap[i.product_id] || 0) + (i.quantity || 0)
+    })
+    return products.map(p => ({ ...p, stock: stockMap[p.id] ?? null }))
+  },
+
+  // ---- Warranty ----
+
+  async getWarrantyRegistrations() {
+    const { data, error } = await supabase
+      .from('warranties')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  async createWarrantyRegistration(reg) {
+    const { data, error } = await supabase
+      .from('warranties')
+      .insert(reg)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async getMissedCalls() {
+    const { data, error } = await supabase
+      .from('missed_calls')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  async createMissedCall(mc) {
+    const { data, error } = await supabase
+      .from('missed_calls')
+      .insert(mc)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async updateMissedCall(id, updates) {
+    const { data, error } = await supabase
+      .from('missed_calls')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // ---- Support tickets ----
+
+  async createSupportTicket(ticket) {
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .insert(ticket)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async updateSupportTicket(id, updates) {
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   },
 
   // ---- Messages ----

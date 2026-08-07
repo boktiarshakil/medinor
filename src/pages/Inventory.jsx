@@ -14,7 +14,14 @@ export default function Inventory() {
     setError(null)
     try {
       const data = await api.getInventory()
-      setInventory(data)
+      const movements = await api.getStockMovements().catch(() => [])
+      const inOut = {}
+      movements.forEach(m => {
+        if (!inOut[m.product_id]) inOut[m.product_id] = { in: 0, out: 0 }
+        if (m.movement_type === 'in') inOut[m.product_id].in += m.quantity
+        else inOut[m.product_id].out += m.quantity
+      })
+      setInventory(data.map(item => ({ ...item, in_quantity: inOut[item.product_id]?.in || 0, out_quantity: inOut[item.product_id]?.out || 0 })))
     } catch (err) {
       console.error('Inventory fetch failed:', err)
       setError(err.message || 'Failed to load inventory')
@@ -27,7 +34,7 @@ export default function Inventory() {
 
   const lowStock = inventory.filter(item => {
     const stock = item.quantity || item.stock || 0
-    const min = item.min_quantity || item.reorder_level || 0
+    const min = item.low_stock_threshold || 0
     return min > 0 && stock < min
   })
 
@@ -87,15 +94,15 @@ export default function Inventory() {
           <tbody>
             {inventory.map(item => {
               const stock = item.quantity || item.stock || 0
-              const min = item.min_quantity || item.reorder_level || 0
+              const min = item.low_stock_threshold || 0
               const isLow = min > 0 && stock < min
               return (
                 <tr key={item.id}>
                   <td className="font-medium">{item.product?.name || item.name || 'Unknown'}</td>
                   <td className="font-mono text-xs text-gray-500">{item.product?.sku || item.sku || '-'}</td>
-                  <td className="font-mono text-xs text-gray-400">{item.batch || '-'}</td>
-                  <td className="text-emerald-600 font-medium">+{item.in_quantity || item.inQty || 0}</td>
-                  <td className="text-red-500 font-medium">-{item.out_quantity || item.outQty || 0}</td>
+                  <td className="font-mono text-xs text-gray-400">{item.batch_number || item.batch || '-'}</td>
+                  <td className="text-emerald-600 font-medium">+{item.in_quantity || 0}</td>
+                  <td className="text-red-500 font-medium">-{item.out_quantity || 0}</td>
                   <td className="font-bold text-lg">{stock}</td>
                   <td className="text-gray-400">{min || '-'}</td>
                   <td>
@@ -105,7 +112,7 @@ export default function Inventory() {
                       <span className="badge-success">OK</span>
                     )}
                   </td>
-                  <td className="hidden md:table-cell text-gray-500">{item.expiry || '-'}</td>
+                  <td className="hidden md:table-cell text-gray-500">{item.expiry_date || item.expiry || '-'}</td>
                 </tr>
               )
             })}

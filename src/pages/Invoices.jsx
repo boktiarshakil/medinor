@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import {
   formatCurrency, formatDate, statusColor, statusLabel, generateInvoiceNo
 } from '../lib/utils'
 import {
   MdSearch, MdFileDownload, MdReceipt, MdAdd, MdSend, MdVisibility,
   MdPerson, MdLocationOn, MdPhone, MdClose, MdCheckCircle, MdDelete,
-  MdRefresh, MdErrorOutline
+  MdRefresh, MdErrorOutline, MdPayments
 } from 'react-icons/md'
+import toast from 'react-hot-toast'
 
 export default function Invoices() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [invoices, setInvoices] = useState([])
@@ -18,6 +21,11 @@ export default function Invoices() {
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [showPayment, setShowPayment] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [newInvoice, setNewInvoice] = useState({
     dealerId: '',
     items: [],
@@ -33,7 +41,7 @@ export default function Invoices() {
     try {
       const [invData, prodData, dealerData] = await Promise.all([
         api.getInvoices(),
-        api.getProducts(),
+        api.getProductsWithStock(),
         api.getDealers()
       ])
       setInvoices(invData)
@@ -82,7 +90,7 @@ export default function Invoices() {
     if (!product) return
     const existing = newInvoice.items.find(i => String(i.id) === String(product.id))
     const price = getProductPrice(product)
-    const stock = product.stock_quantity ?? product.stock ?? product.current_stock ?? 0
+    const stock = product.stock ?? 0
     if (existing) {
       setNewInvoice({
         ...newInvoice,
@@ -121,43 +129,97 @@ export default function Invoices() {
 
   const selectedDealer = dealers.find(d => String(d.id) === String(newInvoice.dealerId))
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault()
     if (!selectedDealer || newInvoice.items.length === 0) return
-
-    const invoice = {
-      id: String(Date.now()),
-      invoice_number: generateInvoiceNo(),
-      invoice_number_fallback: generateInvoiceNo(),
-      number: generateInvoiceNo(),
-      dealer: selectedDealer.name,
-      dealer_id: selectedDealer.id,
-      total_amount: total,
-      amount: total,
-      paid_amount: 0,
-      paid: 0,
-      due_amount: total,
-      due: total,
-      status: 'unpaid',
-      invoice_date: new Date().toISOString().split('T')[0],
-      date: new Date().toISOString().split('T')[0],
-      due_date: newInvoice.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      dueDate: newInvoice.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      created_by_name: 'You (SR)',
-      createdBy: 'You (SR)',
-      area_name: selectedDealer.area || selectedDealer.area_name || '-',
-      area: selectedDealer.area || selectedDealer.area_name || '-',
-      notes: newInvoice.notes,
-      items: newInvoice.items,
-    }
-
-    setInvoices(prev => [invoice, ...prev])
-    setCreateSuccess(true)
-    setTimeout(() => {
+    setCreating(true)
+    try {
+      const invoice = {
+        invoice_number: generateInvoiceNo(),
+        dealer_id: selectedDealer.id,
+        amount: total,
+        total_amount: total,
+        vat_amount: 0,
+        paid_amount: 0,
+        due_amount: total,
+        status: 'unpaid',
+        invoice_date: new Date().toISOString().split('T')[0],
+        due_date: newInvoice.dueDate || null,
+        notes: newInvoice.notes || null,
+      }
+      await api.createInvoice(invoice)
+      toast.success('Invoice created')
+      setCreateSuccess(true)
       setShowCreate(false)
       setCreateSuccess(false)
       setNewInvoice({ dealerId: '', items: [], discount: 0, notes: '', dueDate: '' })
-    }, 1500)
+      fetchAll()
+    } catch (err) {
+      console.error('Invoice create failed:', err)
+      toast.error('Failed: ' + (err.message || 'Could not create invoice'))
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRecordPayment = async () => {
+    const inv = normalizedInvoice(selectedInvoice)
+    const amount = Number(paymentAmount)
+    if (!amount || amount <= 0) {
+      toast.error('Enter a valid payment amount')
+      return
+    }
+    if (amount > inv.due) {
+      toast.error(`Amount exceeds due (${formatCurrency(inv.due)})`)
+      return
+    }
+    setSavingPayment(true)
+    try {
+      const newPaid = (inv.paid || 0) + amount
+      const newDue = inv.amount - newPaid
+      await api.createPayment({
+        invoice_id: selectedInvoice.id,
+        dealer_id: selectedInvoice.dealer_id,
+        collected_by: user?.id || null,
+        amount,
+        payment_method: paymentMethod,
+        payment_date: new Date().toISOString().split('T')[0],
+        notes: null,
+      })
+      await api.updateInvoice(selectedInvoice.id, {
+        paid_amount: newPaid,
+        due_amount: newDue < 0 ? 0 : newDue,
+        status: newDue <= 0 ? 'paid' : 'partial',
+      })
+      toast.success('Payment recorded')
+      setShowPayment(false)
+      setPaymentAmount('')
+      setSelectedInvoice(null)
+      fetchAll()
+    } catch (err) {
+      console.error('Payment failed:', err)
+      toast.error('Failed: ' + (err.message || 'Could not record payment'))
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleExport = () => {
+    const rows = filteredInvoices.map(inv => {
+      const n = normalizedInvoice(inv)
+      return [n.number, n.dealer, n.amount, n.paid, n.due, n.status, n.date]
+    })
+    const header = ['Invoice #', 'Dealer', 'Amount', 'Paid', 'Due', 'Status', 'Date']
+    const csv = [header, ...rows]
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `invoices-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // ── Loading State ──
@@ -200,7 +262,7 @@ export default function Invoices() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary">
+          <button className="btn-secondary" onClick={handleExport}>
             <MdFileDownload size={16} /> Export
           </button>
           <button onClick={() => setShowCreate(true)} className="btn-primary">
@@ -361,6 +423,51 @@ export default function Invoices() {
                     ))}
                   </div>
                 </div>
+                {n.status !== 'paid' && n.status !== 'cancelled' && (
+                  <button onClick={() => { setPaymentAmount(''); setPaymentMethod('cash'); setShowPayment(true) }} className="btn-primary w-full">
+                    <MdPayments size={15} /> Record Payment
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )})()}
+
+      {/* Record Payment Modal */}
+      {showPayment && selectedInvoice && (() => {
+        const n = normalizedInvoice(selectedInvoice)
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl w-full max-w-sm">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Record Payment</h3>
+                  <p className="text-xs text-gray-500">{n.number} · due {formatCurrency(n.due)}</p>
+                </div>
+                <button onClick={() => setShowPayment(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <MdClose size={18} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="label">Amount *</label>
+                  <input type="number" min="1" max={n.due} className="input" placeholder="Enter amount"
+                    value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Payment Method</label>
+                  <select className="input" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                    {['cash', 'bank', 'cheque', 'bkash', 'nagad', 'rocket', 'card', 'other'].map(m => (
+                      <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleRecordPayment} disabled={savingPayment || !paymentAmount} className="btn-primary flex-1 disabled:opacity-50">
+                    {savingPayment ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdPayments size={15} /> Confirm Payment</>}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -424,7 +531,7 @@ export default function Invoices() {
                     </div>
                     <div>
                       <p className="text-[10px] text-gray-400">Outstanding</p>
-                      <p className="text-xs font-semibold text-red-600">{formatCurrency(selectedDealer.outstanding || selectedDealer.outstanding_amount || 0)}</p>
+                      <p className="text-xs font-semibold text-red-600">{formatCurrency(selectedDealer.current_due || selectedDealer.outstanding || 0)}</p>
                     </div>
                   </div>
                 )}
@@ -438,7 +545,7 @@ export default function Invoices() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
                       {products.map(p => {
                         const price = getProductPrice(p)
-                        const stock = p.stock_quantity ?? p.stock ?? p.current_stock ?? 0
+                        const stock = p.stock ?? null
                         return (
                           <button
                             key={p.id}
@@ -453,8 +560,8 @@ export default function Invoices() {
                             <p className="font-semibold text-gray-800 truncate">{p.name}</p>
                             <div className="flex items-center justify-between mt-0.5">
                               <span className="text-gray-500">৳{price}</span>
-                              <span className={`text-[10px] font-semibold ${stock < 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                Stock: {stock}
+                              <span className={`text-[10px] font-semibold ${stock !== null && stock < 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                Stock: {stock === null ? '—' : stock}
                               </span>
                             </div>
                           </button>

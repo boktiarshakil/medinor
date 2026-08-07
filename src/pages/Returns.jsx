@@ -56,10 +56,10 @@ export default function Returns() {
           <tbody>
             {returns.map(r => (
               <tr key={r.id}>
-                <td className="font-mono text-xs font-semibold text-brand-600">{r.return_number || r.number || r.id}</td>
+                <td className="font-mono text-xs font-semibold text-brand-600">{r.return_number || `RET-${String(r.id).slice(0, 8).toUpperCase()}`}</td>
                 <td className="font-medium">{r.dealer?.name || r.dealer_name || '-'}</td>
                 <td className="capitalize text-gray-600">{(r.reason || '').replace(/_/g, ' ')}</td>
-                <td className="font-semibold">{formatCurrency(r.amount || 0)}</td>
+                <td className="font-semibold">{formatCurrency(r.total_amount || r.amount || 0)}</td>
                 <td><span className={statusColor(r.status)}>{statusLabel(r.status)}</span></td>
                 <td className="text-gray-500">{formatDate(r.created_at || r.date)}</td>
               </tr>

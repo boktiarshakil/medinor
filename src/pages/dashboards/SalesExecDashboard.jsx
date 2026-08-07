@@ -23,6 +23,11 @@ export default function SalesExecDashboard() {
         ])
         setOrders(ordersData)
         setDealers(dealersData)
+        if (user?.id) {
+          api.getTodayAttendance(user.id)
+            .then(att => { if (att?.check_in) setCheckedIn(true) })
+            .catch(() => {})
+        }
       } catch (err) {
         console.error('SalesExec dashboard fetch failed:', err)
       } finally {
@@ -30,7 +35,7 @@ export default function SalesExecDashboard() {
       }
     }
     fetch()
-  }, [])
+  }, [user?.id])
 
   const { start: todayStart, end: todayEnd } = todayRange()
   const { start: monthStart, end: monthEnd } = thisMonthRange()
@@ -52,20 +57,23 @@ export default function SalesExecDashboard() {
 
   const handleCheckIn = () => {
     setCheckingIn(true)
+    const persist = (lat = null, lng = null) => {
+      api.checkIn(user.id, { lat, lng })
+        .then(() => { setCheckedIn(true) })
+        .catch(err => {
+          console.error('Check-in failed:', err)
+          setCheckedIn(true)
+        })
+        .finally(() => setCheckingIn(false))
+    }
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        () => {
-          setCheckedIn(true)
-          setCheckingIn(false)
-        },
-        () => {
-          setCheckedIn(true)
-          setCheckingIn(false)
-        }
+        (pos) => persist(pos.coords.latitude, pos.coords.longitude),
+        () => persist(),
+        { timeout: 8000 }
       )
     } else {
-      setCheckedIn(true)
-      setCheckingIn(false)
+      persist()
     }
   }
 

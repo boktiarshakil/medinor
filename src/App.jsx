@@ -82,7 +82,7 @@ export default function App() {
         {/* Feature pages — role-based access */}
         <Route path="/announcements" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse','dealer']}><Announcements /></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse']}><Messages /></ProtectedRoute>} />
-        <Route path="/order-tracker" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse']}><OrderTracker /></ProtectedRoute>} />
+        <Route path="/order-tracker" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse','dealer']}><OrderTracker /></ProtectedRoute>} />
         <Route path="/gps-tracking" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager']}><GPSTracking /></ProtectedRoute>} />
         <Route path="/warranty" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager','sales_executive','warehouse','dealer']}><Warranty /></ProtectedRoute>} />
         <Route path="/org-chart" element={<ProtectedRoute roles={['super_admin','admin','sales_manager','area_manager']}><OrgChartPage /></ProtectedRoute>} />

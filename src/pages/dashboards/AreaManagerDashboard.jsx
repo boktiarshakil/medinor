@@ -12,20 +12,23 @@ export default function AreaManagerDashboard() {
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
   const [users, setUsers] = useState([])
+  const [attendance, setAttendance] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, usersData] = await Promise.all([
+        const [ordersData, invoicesData, usersData, attendanceData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getUsers().catch(() => []),
+          api.getTodayAttendanceList().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
         setUsers(usersData)
+        setAttendance(attendanceData)
       } catch (err) {
         console.error('AreaManager dashboard fetch failed:', err)
       } finally {
@@ -38,14 +41,16 @@ export default function AreaManagerDashboard() {
   const { start: monthStart, end: monthEnd } = thisMonthRange()
   const monthStartISO = monthStart.toISOString()
   const monthEndISO = monthEnd.toISOString()
+  const todayISO = new Date().toISOString().split('T')[0]
 
   // SRs in this area manager's team
   const mySRs = users.filter(u => u.role === 'sales_executive' && u.area_id === user?.area_id)
   const srIds = mySRs.map(sr => sr.id)
+  const attendedIds = new Set(attendance.filter(a => a.check_in).map(a => a.user_id))
 
   // Orders from this area's SRs
   const areaOrders = orders.filter(o => srIds.includes(o.sr_id) || srIds.includes(o.created_by))
-  const todayOrders = areaOrders.filter(o => o.created_at >= monthStartISO && o.status !== 'cancelled')
+  const todayOrders = areaOrders.filter(o => o.created_at >= todayISO && o.status !== 'cancelled')
   const monthOrders = areaOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled')
 
   const todayOrdersTotal = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
@@ -74,7 +79,7 @@ export default function AreaManagerDashboard() {
     return {
       id: sr.id,
       name: sr.full_name || sr.email || 'Unknown',
-      checkedIn: sr.is_active !== false,
+      checkedIn: attendedIds.has(sr.id),
       orders: todayOrders_sr.filter(o => o.status !== 'cancelled').length,
       visits: todayOrders_sr.length,
       lastLocation: sr.area?.name || 'Unknown',

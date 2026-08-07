@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatDate, statusColor } from '../lib/utils'
-import { MdCampaign, MdAdd } from 'react-icons/md'
+import { MdCampaign, MdAdd, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
@@ -8,6 +8,12 @@ export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newCampaign, setNewCampaign] = useState({
+    name: '', type: 'discount', discount_percent: 0, budget: 0,
+    start_date: '', end_date: '', description: '', status: 'draft'
+  })
 
   const fetchCampaigns = async () => {
     setLoading(true)
@@ -24,6 +30,36 @@ export default function Campaigns() {
   }
 
   useEffect(() => { fetchCampaigns() }, [])
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    if (!newCampaign.name.trim()) {
+      toast.error('Campaign name is required')
+      return
+    }
+    setCreating(true)
+    try {
+      await api.createCampaign({
+        name: newCampaign.name,
+        type: newCampaign.type,
+        discount_percent: Number(newCampaign.discount_percent) || 0,
+        budget: Number(newCampaign.budget) || null,
+        start_date: newCampaign.start_date || null,
+        end_date: newCampaign.end_date || null,
+        description: newCampaign.description || null,
+        status: newCampaign.status,
+      })
+      toast.success('Campaign created')
+      setShowCreate(false)
+      setNewCampaign({ name: '', type: 'discount', discount_percent: 0, budget: 0, start_date: '', end_date: '', description: '', status: 'draft' })
+      fetchCampaigns()
+    } catch (err) {
+      console.error('Campaign create failed:', err)
+      toast.error('Failed: ' + (err.message || 'Could not create campaign'))
+    } finally {
+      setCreating(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -50,7 +86,7 @@ export default function Campaigns() {
           <h1 className="text-xl font-bold text-gray-900">Campaigns</h1>
           <p className="text-sm text-gray-500">Marketing campaigns and promotions</p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>
           <MdAdd size={16} /> New Campaign
         </button>
       </div>
@@ -73,7 +109,7 @@ export default function Campaigns() {
             <div className="grid grid-cols-3 gap-3 text-xs">
               <div>
                 <span className="text-gray-400">Discount</span>
-                <p className="font-semibold text-gray-800">{c.discount || 0}%</p>
+                <p className="font-semibold text-gray-800">{c.discount_percent ?? c.discount ?? 0}%</p>
               </div>
               <div>
                 <span className="text-gray-400">Budget</span>
@@ -81,7 +117,7 @@ export default function Campaigns() {
               </div>
               <div>
                 <span className="text-gray-400">Period</span>
-                <p className="font-semibold text-gray-800">{formatDate(c.start, 'dd MMM')} - {formatDate(c.end, 'dd MMM')}</p>
+                <p className="font-semibold text-gray-800">{formatDate(c.start_date || c.start, 'dd MMM')} - {formatDate(c.end_date || c.end, 'dd MMM')}</p>
               </div>
             </div>
           </div>
@@ -92,6 +128,85 @@ export default function Campaigns() {
         <div className="card p-12 text-center">
           <MdCampaign size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">No campaigns yet</p>
+        </div>
+      )}
+
+      {/* Create Campaign Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">New Campaign</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Create a marketing campaign</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="p-5 space-y-4">
+              <div>
+                <label className="label">Name *</label>
+                <input type="text" className="input" placeholder="Campaign name" value={newCampaign.name}
+                  onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Type</label>
+                  <select className="input" value={newCampaign.type}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, type: e.target.value })}>
+                    {['discount', 'free_product', 'bundle', 'coupon', 'gift', 'bonus'].map(t => (
+                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Status</label>
+                  <select className="input" value={newCampaign.status}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, status: e.target.value })}>
+                    {['draft', 'active', 'paused', 'completed'].map(s => (
+                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Discount %</label>
+                  <input type="number" min="0" max="100" className="input" value={newCampaign.discount_percent}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, discount_percent: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Budget</label>
+                  <input type="number" min="0" className="input" value={newCampaign.budget}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, budget: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Start Date</label>
+                  <input type="date" className="input" value={newCampaign.start_date}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, start_date: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">End Date</label>
+                  <input type="date" className="input" value={newCampaign.end_date}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, end_date: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Description</label>
+                <textarea className="input min-h-[80px] resize-none" placeholder="Optional description"
+                  value={newCampaign.description} onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={creating} className="btn-primary flex-1 disabled:opacity-50">
+                  {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Create Campaign</>}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

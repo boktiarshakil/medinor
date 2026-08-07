@@ -8,18 +8,24 @@ export default function DealerDashboard() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
+  const [dealerRecord, setDealerRecord] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData] = await Promise.all([
+        const [ordersData, invoicesData, dealersData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
+          api.getDealers().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
+        const match = dealersData.find(
+          d => d.email && d.email.toLowerCase() === String(user?.email || '').toLowerCase()
+        )
+        setDealerRecord(match || null)
       } catch (err) {
         console.error('Dealer dashboard fetch failed:', err)
       } finally {
@@ -27,17 +33,18 @@ export default function DealerDashboard() {
       }
     }
     fetch()
-  }, [])
+  }, [user?.email])
 
   // Filter for this dealer's orders and invoices
-  const myOrders = orders.filter(o => o.dealer_id === user?.id || o.dealer?.id === user?.id)
-  const myInvoices = invoices.filter(inv => inv.dealer_id === user?.id || inv.dealer?.id === user?.id)
+  const dealerId = dealerRecord?.id
+  const myOrders = orders.filter(o => dealerId && o.dealer_id === dealerId)
+  const myInvoices = invoices.filter(inv => dealerId && inv.dealer_id === dealerId)
 
   // Compute credit info
-  const creditLimit = user?.credit_limit || user?.dealer?.credit_limit || 50000
+  const creditLimit = dealerRecord?.credit_limit || 50000
   const totalDue = myInvoices
     .filter(inv => inv.status === 'pending' || inv.status === 'unpaid' || inv.status === 'partial')
-    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+    .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
   const available = Math.max(0, creditLimit - totalDue)
 
   // Recent payments from paid invoices
@@ -61,13 +68,18 @@ export default function DealerDashboard() {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-brand-100">Welcome back,</p>
-            <h2 className="text-xl font-bold mt-0.5">{user?.full_name || user?.name || 'Dealer'}</h2>
+            <h2 className="text-xl font-bold mt-0.5">{dealerRecord?.name || user?.full_name || user?.name || 'Dealer'}</h2>
             <p className="text-xs text-brand-200 mt-1">{user?.email || ''}</p>
           </div>
           <button className="btn bg-white/15 text-white hover:bg-white/25 text-xs backdrop-blur-sm">
             <MdFileDownload size={14} /> Statement
           </button>
         </div>
+        {!dealerRecord && (
+          <p className="text-xs text-brand-100 mt-3 bg-white/10 rounded px-3 py-2">
+            Your login is not linked to a dealer record yet. Contact admin to link it, then orders placed here will appear.
+          </p>
+        )}
         <div className="grid grid-cols-3 gap-4 mt-5 pt-4 border-t border-white/20">
           <div>
             <p className="text-[10px] text-brand-200 uppercase font-medium">Credit Limit</p>

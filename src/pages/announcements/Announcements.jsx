@@ -36,12 +36,12 @@ export default function Announcements() {
       const data = await api.getNotifications(user.id)
       const mapped = data.map(n => ({
         id: n.id,
-        from: n.from_role || 'Management',
-        fromRole: n.from_role,
+        from: 'Management',
+        fromRole: n.reference_type === 'announcement' ? 'Management' : undefined,
         to: n.title || 'All',
         message: n.message,
         timestamp: n.created_at,
-        priority: n.priority || 'medium',
+        priority: n.type === 'warning' ? 'high' : n.type === 'error' ? 'high' : 'medium',
       }))
       setAnnouncements(mapped)
     } catch (err) {
@@ -61,19 +61,23 @@ export default function Announcements() {
     e.preventDefault()
     if (!newAnnouncement.message.trim()) return
 
-    const announcement = {
-      id: Date.now(),
-      from: user?.full_name || 'You',
-      fromRole: user?.role,
-      to: AUDIENCE_OPTIONS.find(o => o.value === newAnnouncement.to)?.label || 'All',
-      message: newAnnouncement.message,
-      timestamp: new Date().toISOString(),
-      priority: newAnnouncement.priority,
+    try {
+      const audienceLabel = AUDIENCE_OPTIONS.find(o => o.value === newAnnouncement.to)?.label || 'All'
+      await api.broadcastAnnouncement({
+        title: audienceLabel,
+        message: newAnnouncement.message,
+        priority: newAnnouncement.priority,
+        audience: newAnnouncement.to,
+        senderId: user?.id,
+      })
+      setNewAnnouncement({ message: '', to: 'all', priority: 'medium' })
+      setShowForm(false)
+      toast.success('Announcement sent')
+      fetchAnnouncements()
+    } catch (err) {
+      console.error('Announcement send failed:', err)
+      toast.error('Failed to send announcement')
     }
-    setAnnouncements([announcement, ...announcements])
-    setNewAnnouncement({ message: '', to: 'all', priority: 'medium' })
-    setShowForm(false)
-    toast.success('Announcement sent')
   }
 
   const priorityStyles = {

@@ -20,24 +20,27 @@ export default function SuperAdminDashboard() {
   const [dealers, setDealers] = useState([])
   const [inventory, setInventory] = useState([])
   const [users, setUsers] = useState([])
+  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, dealersData, invData, usersData] = await Promise.all([
+        const [ordersData, invoicesData, dealersData, invData, usersData, paymentsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getDealers().catch(() => []),
           api.getInventory().catch(() => []),
           api.getUsers().catch(() => []),
+          api.getPayments().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
         setDealers(dealersData)
         setInventory(invData)
         setUsers(usersData)
+        setPayments(paymentsData)
       } catch (err) {
         console.error('Dashboard fetch failed:', err)
       } finally {
@@ -66,11 +69,11 @@ export default function SuperAdminDashboard() {
     return sum + (qty * price)
   }, 0)
   const totalOutstanding = invoices
-    .filter(inv => inv.status === 'pending' || inv.status === 'unpaid' || inv.status === 'partial')
-    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
-  const collectionsToday = invoices
-    .filter(inv => inv.paid_at >= todayStartISO && inv.paid_at <= todayEndISO)
-    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+    .filter(inv => inv.status === 'unpaid' || inv.status === 'partial' || inv.status === 'overdue')
+    .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
+  const collectionsToday = payments
+    .filter(p => p.payment_date === todayStartISO.split('T')[0] || (p.created_at >= todayStartISO && p.created_at <= todayEndISO))
+    .reduce((sum, p) => sum + (p.amount || 0), 0)
   const activeDealers = dealers.filter(d => d.is_active !== false).length
   const salesTeam = users.filter(u => u.role === 'sales_executive' || u.role === 'area_manager' || u.role === 'sales_manager').length
 

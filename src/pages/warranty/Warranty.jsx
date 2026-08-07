@@ -7,6 +7,20 @@ import {
 import { formatDate, formatCurrency } from '../../lib/utils'
 import { api } from '../../lib/api'
 
+const normalizeWarranty = (w) => ({
+  id: w.id,
+  code: w.code || w.warranty_code || `CUST-${String(w.id || '').slice(0, 4).toUpperCase()}`,
+  product: w.product || w.product_name || 'Unknown Product',
+  customer: w.customer || w.name || w.full_name || 'Unknown',
+  phone: w.phone || '',
+  address: w.address || '',
+  purchaseDate: w.purchase_date || w.purchaseDate || w.created_at,
+  warrantyTill: w.warranty_till || w.warranty_end || '',
+  status: w.status || (w.warranty_till && new Date(w.warranty_till) > new Date() ? 'active' : 'expired'),
+  registeredVia: w.registered_via || w.source || 'Direct',
+  stickerNo: w.sticker_no || w.sticker || `STK-${Date.now()}`,
+})
+
 export default function Warranty() {
   const [warranties, setWarranties] = useState([])
   const [missedCalls, setMissedCalls] = useState([])
@@ -45,24 +59,12 @@ export default function Warranty() {
         // Fallback to crm_contacts
         try {
           const contacts = await api.getCRMContacts()
-          warrantyData = contacts.map((c, i) => ({
-            id: c.id ?? i,
-            code: c.code || c.warranty_code || `CUST-${String(i + 1).padStart(4, '0')}`,
-            product: c.product || c.product_name || 'Unknown Product',
-            customer: c.name || c.full_name || 'Unknown',
-            phone: c.phone || '',
-            address: c.address || '',
-            purchaseDate: c.purchase_date || c.created_at || new Date().toISOString(),
-            warrantyTill: c.warranty_till || c.warranty_end || '',
-            status: c.status || (c.warranty_till && new Date(c.warranty_till) > new Date() ? 'active' : 'expired'),
-            registeredVia: c.registered_via || c.source || 'Direct',
-            stickerNo: c.sticker_no || c.sticker || `STK-${String(i + 1).padStart(4, '0')}`
-          }))
+          warrantyData = contacts.map(normalizeWarranty)
         } catch {
           warrantyData = []
         }
       }
-      setWarranties(warrantyData)
+      setWarranties(warrantyData.map(normalizeWarranty))
 
       // Try missed_calls table
       try {
@@ -108,7 +110,9 @@ export default function Warranty() {
     e.preventDefault()
     const cleanPhone = phoneSearch.trim()
     if (!cleanPhone) return
-    const matches = warranties.filter(w => w.phone?.includes(cleanPhone) || cleanPhone.includes(w.phone?.slice(-8) || ''))
+    const matches = warranties.filter(w =>
+      w.phone && (w.phone.includes(cleanPhone) || cleanPhone.includes(w.phone.slice(-8)))
+    )
     setPhoneResult(matches.length > 0 ? { found: true, matches } : { found: false })
   }
 
@@ -140,7 +144,7 @@ export default function Warranty() {
           .select()
           .single()
         if (!dbErr && data) {
-          setWarranties(prev => [data, ...prev])
+          setWarranties(prev => [normalizeWarranty(data), ...prev])
           setRegSuccess(true)
           setTimeout(() => {
             setShowRegister(false)
@@ -160,7 +164,7 @@ export default function Warranty() {
           type: 'other',
           phone: registerForm.phone,
           address: registerForm.address,
-          organization: registerForm.product,
+          notes: registerForm.product,
           specialty: `Warranty: ${newWarranty.code}`,
         })
       } catch {
@@ -188,8 +192,13 @@ export default function Warranty() {
     }, 2000)
   }
 
-  const handleMissedCallAction = (call) => {
+  const handleMissedCallAction = async (call) => {
     setMissedCalls(prev => prev.map(c => c.id === call.id ? { ...c, handled: true } : c))
+    try {
+      await api.updateMissedCall(call.id, { handled: true })
+    } catch (err) {
+      console.error('Failed to mark missed call handled:', err)
+    }
     setShowRegister(true)
     setRegisterForm(prev => ({ ...prev, phone: call.phone }))
   }

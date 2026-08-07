@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 export default function Settlements() {
   const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState(null)
 
@@ -17,18 +18,25 @@ export default function Settlements() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [ordersData, productsData] = await Promise.all([
+      const [ordersData, productsData, usersData] = await Promise.all([
         api.getOrders(),
-        api.getProducts()
+        api.getProducts(),
+        api.getUsers().catch(() => []),
       ])
-      setOrders(ordersData.filter(o => o.status === 'payment_received' || o.status === 'delivered' || o.status === 'completed'))
+      setOrders(ordersData.filter(o => o.status === 'delivered' || o.status === 'completed'))
       setProducts(productsData)
+      setUsers(usersData)
     } catch (err) {
       console.error('Settlements fetch failed:', err)
       toast.error('Failed to load settlement data')
     } finally {
       setLoading(false)
     }
+  }
+
+  const userName = (id) => {
+    const u = users.find(x => x.id === id)
+    return u ? (u.full_name || u.email) : (id ? String(id).slice(0, 8) : '—')
   }
 
   const getSettlement = (order) => {
@@ -148,7 +156,7 @@ export default function Settlements() {
                   <tr key={order.id}>
                     <td className="font-mono text-xs font-medium">{order.order_number}</td>
                     <td className="text-xs">{order.dealer?.name || '—'}</td>
-                    <td className="text-xs text-gray-500">{order.sr_name || order.sr_id || '—'}</td>
+                    <td className="text-xs text-gray-500">{userName(order.sr_id) || '—'}</td>
                     <td className="font-semibold text-xs">{formatCurrency(settlement.grand_total)}</td>
                     <td className="text-xs text-emerald-600 font-medium">{formatCurrency(settlement.company_total)}</td>
                     <td className="text-xs text-purple-600 font-medium">{formatCurrency(settlement.dealer_margin_total)}</td>

@@ -73,7 +73,7 @@ export default function Support() {
           <tbody>
             {tickets.map(t => (
               <tr key={t.id}>
-                <td className="font-mono text-xs font-semibold text-brand-600">{t.number || t.id}</td>
+                <td className="font-mono text-xs font-semibold text-brand-600">{t.ticket_number || t.number || t.id}</td>
                 <td className="font-medium">{t.subject}</td>
                 <td className="text-gray-600">{t.dealer?.name || t.dealer_name || '-'}</td>
                 <td className="capitalize text-gray-600">{(t.type || '').replace(/_/g, ' ')}</td>

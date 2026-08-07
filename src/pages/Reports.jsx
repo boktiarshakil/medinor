@@ -18,23 +18,72 @@ const REPORT_CARDS = [
 export default function Reports() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [dataCache, setDataCache] = useState({ orders: [], invoices: [], dealers: [], inventory: [] })
+
+  const downloadCSV = (filename, header, rows) => {
+    const csv = [header, ...rows]
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExport = (report) => {
+    const { orders, invoices, dealers, inventory } = dataCache
+    const date = new Date().toISOString().split('T')[0]
+    switch (report.title) {
+      case 'Sales Report':
+        return downloadCSV(`sales-report-${date}.csv`,
+          ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
+          orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]))
+      case 'Dealer Report':
+        return downloadCSV(`dealer-report-${date}.csv`,
+          ['Name', 'Mobile', 'District', 'Area', 'Credit Limit', 'Current Due', 'Status'],
+          dealers.map(d => [d.name, d.mobile, d.district, d.area, d.credit_limit, d.current_due, d.status]))
+      case 'Collection Report':
+        return downloadCSV(`collection-report-${date}.csv`,
+          ['Invoice #', 'Dealer', 'Paid', 'Status'],
+          invoices.map(i => [i.invoice_number, i.dealer?.name || '', i.paid_amount || 0, i.status]))
+      case 'Outstanding Report':
+        return downloadCSV(`outstanding-report-${date}.csv`,
+          ['Invoice #', 'Dealer', 'Amount', 'Paid', 'Due', 'Status'],
+          invoices
+            .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+            .map(i => [i.invoice_number, i.dealer?.name || '', i.total_amount || 0, i.paid_amount || 0, (i.due_amount ?? i.total_amount) || 0, i.status]))
+      case 'Stock Report':
+        return downloadCSV(`stock-report-${date}.csv`,
+          ['Product', 'Quantity', 'Low Stock Threshold', 'Expiry'],
+          inventory.map(i => [i.product?.name || '', i.quantity || 0, i.low_stock_threshold || 0, i.expiry_date]))
+      default:
+        return downloadCSV(`${report.title.toLowerCase().replace(/\s+/g, '-')}-${date}.csv`,
+          ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
+          orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]))
+    }
+  }
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [orders, invoices, dealers] = await Promise.all([
+        const [orders, invoices, dealers, inventory] = await Promise.all([
           api.getOrders(),
           api.getInvoices(),
           api.getDealers(),
+          api.getInventory().catch(() => []),
         ])
+        setDataCache({ orders, invoices, dealers, inventory })
 
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
         const mtdOrders = orders.filter(o => new Date(o.created_at) >= monthStart)
         const totalRevenue = mtdOrders.reduce((s, o) => s + (o.net_amount || o.total_amount || 0), 0)
-        const totalPaid = invoices.reduce((s, i) => s + (i.paid || 0), 0)
-        const outstanding = invoices.reduce((s, i) => s + ((i.amount || 0) - (i.paid || 0)), 0)
+        const totalPaid = invoices.reduce((s, i) => s + (i.paid_amount || 0), 0)
+        const outstanding = invoices.reduce((s, i) => s + ((i.due_amount ?? (i.total_amount || 0)) - (i.paid_amount || 0)), 0)
         const activeDealers = dealers.filter(d => d.status === 'active').length
         const avgOrder = mtdOrders.length > 0 ? totalRevenue / mtdOrders.length : 0
 
@@ -104,10 +153,10 @@ export default function Reports() {
                 </div>
               </div>
               <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50">
-                <button className="btn-ghost text-xs flex-1">
+                <button onClick={() => handleExport(report)} className="btn-ghost text-xs flex-1">
                   <MdAssessment size={14} /> View
                 </button>
-                <button className="btn-ghost text-xs flex-1">
+                <button onClick={() => handleExport(report)} className="btn-ghost text-xs flex-1">
                   <MdFileDownload size={14} /> Export
                 </button>
               </div>

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete } from 'react-icons/md'
-import { supabase } from '../lib/supabase'
 import { api } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Orders() {
+  const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,6 +14,7 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState(null)
   const [dealers, setDealers] = useState([])
   const [products, setProducts] = useState([])
   const [orderDraft, setOrderDraft] = useState({
@@ -23,42 +25,29 @@ export default function Orders() {
     notes: '',
   })
 
-  const statuses = ['all', 'draft', 'submitted', 'approved', 'packed', 'dispatched', 'delivered', 'completed']
+  const statuses = ['all', 'draft', 'submitted', 'approved', 'packed', 'dispatched', 'delivered', 'completed', 'cancelled']
 
   const fetchOrders = async () => {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: fetchError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          status,
-          total_amount,
-          net_amount,
-          created_at,
-          dealers ( id, name ),
-          sr:user_profiles!orders_sr_id_fkey ( id, full_name ),
-          area:areas ( id, name ),
-          order_items ( id )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (fetchError) throw fetchError
-
+      const [data, users] = await Promise.all([
+        api.getOrders(),
+        api.getUsers().catch(() => []),
+      ])
+      const userMap = {}
+      users.forEach(u => { userMap[u.id] = u.full_name || u.email })
       const mapped = (data || []).map(order => ({
         id: order.id,
         number: order.order_number || order.order_no || order.id,
         dealer: order.dealer?.name || order.dealer_name || 'Unknown',
-        sr: order.sr_name || order.sr_id || 'Unassigned',
+        sr: userMap[order.sr_id] || 'Unassigned',
         amount: order.net_amount || order.total_amount || order.amount || 0,
-        items: order.items?.length || order.order_items?.length || 0,
+        items: (order.items || []).length,
         status: order.status,
         date: order.created_at,
-        area: order.area?.name || '',
+        _raw: order,
       }))
-
       setOrders(mapped)
     } catch (err) {
       console.error('Error fetching orders:', err)
@@ -127,12 +116,13 @@ export default function Orders() {
     }
     setCreating(true)
     try {
+      const selectedDealer = dealers.find(d => d.id === orderDraft.dealer_id)
       const totalAmount = validItems.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0)
       await api.createOrder(
         {
           dealer_id: orderDraft.dealer_id,
-          sr_id: orderDraft.sr_id || null,
-          area_id: orderDraft.area_id || null,
+          sr_id: user?.id || orderDraft.sr_id || null,
+          area_id: selectedDealer?.area_id || orderDraft.area_id || null,
           status: 'submitted',
           total_amount: totalAmount,
           net_amount: totalAmount,
@@ -250,7 +240,7 @@ export default function Orders() {
                   <td><span className={statusColor(order.status)}>{statusLabel(order.status)}</span></td>
                   <td className="text-gray-500">{formatDate(order.date)}</td>
                   <td>
-                    <button className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg">
+                    <button onClick={() => setSelectedOrder(order)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg">
                       <MdVisibility size={16} />
                     </button>
                   </td>
@@ -265,6 +255,61 @@ export default function Orders() {
         <div className="card p-12 text-center">
           <MdShoppingCart size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">No orders found</p>
+        </div>
+      )}
+
+      {/* Order Detail Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">{selectedOrder.number}</h3>
+                <p className="text-xs text-gray-500">{selectedOrder.dealer}</p>
+              </div>
+              <button onClick={() => setSelectedOrder(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                <MdClose size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase">Status</p>
+                  <span className={statusColor(selectedOrder.status)}>{statusLabel(selectedOrder.status)}</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase">SR</p>
+                  <p className="text-sm font-semibold text-gray-800">{selectedOrder.sr}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase">Amount</p>
+                  <p className="text-sm font-bold text-gray-900">{formatCurrency(selectedOrder.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase">Date</p>
+                  <p className="text-sm font-semibold text-gray-800">{formatDate(selectedOrder.date)}</p>
+                </div>
+              </div>
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Items ({selectedOrder.items})</p>
+                {(selectedOrder._raw?.items || []).length === 0 ? (
+                  <p className="text-xs text-gray-400">No item details</p>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {selectedOrder._raw.items.map(item => (
+                      <div key={item.id} className="py-2 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{item.product?.name || item.product_name || 'Unknown'}</p>
+                          <p className="text-[10px] text-gray-400">Qty: {item.quantity} × {formatCurrency(item.unit_price)}</p>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900">{formatCurrency(item.total_price || item.quantity * item.unit_price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

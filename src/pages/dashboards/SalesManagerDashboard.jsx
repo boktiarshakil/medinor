@@ -44,13 +44,13 @@ export default function SalesManagerDashboard() {
     .reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const teamCollections = invoices
     .filter(inv => inv.status === 'paid')
-    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+    .reduce((sum, inv) => sum + ((inv.paid_amount ?? inv.total_amount) || inv.amount || 0), 0)
   const overdueAccounts = invoices
     .filter(inv => {
       if (inv.status === 'paid' || inv.status === 'cancelled') return false
       return inv.due_date && new Date(inv.due_date) < new Date()
     })
-    .reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0)
+    .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
 
   const STATS = [
     { label: 'Pipeline Value', value: formatCurrency(pipelineValue), icon: MdTrendingUp, color: 'brand' },

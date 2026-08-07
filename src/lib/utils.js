@@ -65,6 +65,11 @@ export const statusColor = (status) => {
     active: 'badge-success',
     inactive: 'badge-gray',
     rejected: 'badge-danger',
+    open: 'badge-info',
+    in_progress: 'badge-warning',
+    resolved: 'badge-success',
+    closed: 'badge-gray',
+    expired: 'badge-gray',
   }
   return colors[status] || 'badge-gray'
 }

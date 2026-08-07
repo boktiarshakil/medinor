@@ -3,11 +3,23 @@ import { MdLocationOn, MdMyLocation, MdRefresh, MdPeople, MdCheckCircle, MdCance
 import { HiLocationMarker } from 'react-icons/hi'
 import { api } from '../../lib/api'
 
-// Sales roles eligible for GPS tracking
-const SALES_ROLES = ['TSO', 'ASM', 'SR', 'Sales Rep', 'Territory Sales Officer', 'Area Sales Manager']
+// Sales roles eligible for GPS tracking (matches user_profiles.role values)
+const SALES_ROLES = ['sales_executive', 'area_manager', 'sales_manager', 'admin', 'super_admin']
 
 // Consider online if last GPS record within 30 minutes
 const ONLINE_THRESHOLD_MS = 30 * 60 * 1000
+
+// Project lat/lng onto the placeholder map (Dhaka bounding box)
+const projectCoords = (lat, lng) => {
+  if (lat == null || lng == null) return null
+  const minLat = 23.4, maxLat = 24.0, minLng = 90.2, maxLng = 90.6
+  const left = ((lng - minLng) / (maxLng - minLng)) * 100
+  const top = ((maxLat - lat) / (maxLat - minLat)) * 100
+  return {
+    left: Math.max(5, Math.min(95, left)),
+    top: Math.max(5, Math.min(95, top)),
+  }
+}
 
 function timeAgo(dateString) {
   if (!dateString) return 'Never'
@@ -48,20 +60,22 @@ export default function GPSTracking() {
             if (latest) {
               const lastSeen = new Date(latest.recorded_at).getTime()
               const isOnline = Date.now() - lastSeen < ONLINE_THRESHOLD_MS
+              const lat = Number(latest.latitude ?? latest.lat)
+              const lng = Number(latest.longitude ?? latest.lng)
               return {
                 id: user.id,
                 name: user.full_name || user.email || 'Unknown',
                 role: user.role || 'N/A',
                 status: isOnline ? 'online' : 'offline',
-                location: latest.lat && latest.lng
-                  ? `${latest.lat.toFixed(4)}, ${latest.lng.toFixed(4)}`
-                  : 'Unknown',
-                lat: latest.lat,
-                lng: latest.lng,
+                location: lat && lng
+                  ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+                  : 'No coordinates',
+                lat,
+                lng,
                 lastUpdate: timeAgo(latest.recorded_at),
                 orders: '—',
                 visits: '—',
-                battery: latest.battery_pct ?? '—',
+                battery: '—',
               }
             }
 
@@ -211,30 +225,33 @@ export default function GPSTracking() {
                 </svg>
               </div>
               {/* Staff pins */}
-              {filteredStaff.map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedStaff(s)}
-                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all ${
-                    selectedStaff?.id === s.id ? 'z-20 scale-125' : 'z-10 hover:scale-110'
-                  }`}
-                  style={{
-                    left: `${20 + (i * 12) % 60}%`,
-                    top: `${25 + (i * 17) % 50}%`,
-                  }}
-                >
-                  <div className={`relative ${s.status === 'online' ? '' : 'opacity-50'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${
-                      s.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400'
-                    }`}>
-                      {s.name.charAt(0)}
+              {filteredStaff.map((s, i) => {
+                const pos = projectCoords(s.lat, s.lng)
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedStaff(s)}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all ${
+                      selectedStaff?.id === s.id ? 'z-20 scale-125' : 'z-10 hover:scale-110'
+                    }`}
+                    style={{
+                      left: pos ? `${pos.left}%` : `${20 + (i * 12) % 60}%`,
+                      top: pos ? `${pos.top}%` : `${25 + (i * 17) % 50}%`,
+                    }}
+                  >
+                    <div className={`relative ${s.status === 'online' ? '' : 'opacity-50'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${
+                        s.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400'
+                      }`}>
+                        {s.name.charAt(0)}
+                      </div>
+                      {s.status === 'online' && (
+                        <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
+                      )}
                     </div>
-                    {s.status === 'online' && (
-                      <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
-                    )}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                )
+              })}
               {/* Legend */}
               <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg p-2 text-[10px]">
                 <div className="flex items-center gap-1.5 mb-1">

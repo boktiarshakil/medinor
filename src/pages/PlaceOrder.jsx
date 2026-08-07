@@ -8,8 +8,9 @@ import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
-// Stock status helper
+// Stock status helper — null/undefined means no inventory record (assume available)
 const getStockStatus = (stock) => {
+  if (stock === null || stock === undefined) return { label: 'In Stock — ship in 1-2 days', color: 'text-emerald-600 bg-emerald-50', badge: 'badge-success', icon: MdCheckCircle }
   if (stock === 0) return { label: 'Out of Stock', color: 'text-red-600 bg-red-50', badge: 'badge-danger', icon: MdErrorOutline }
   if (stock <= 10) return { label: `Only ${stock} left — ${Math.ceil(stock / 5)} days wait`, color: 'text-amber-600 bg-amber-50', badge: 'badge-warning', icon: MdWarning }
   if (stock <= 25) return { label: `Low Stock — ship in 3-5 days`, color: 'text-amber-600 bg-amber-50', badge: 'badge-warning', icon: MdWarning }
@@ -22,6 +23,7 @@ export default function PlaceOrder() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [cart, setCart] = useState({})
+  const [dealers, setDealers] = useState([])
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
@@ -30,8 +32,11 @@ export default function PlaceOrder() {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.getProducts()
+      const data = await api.getProductsWithStock()
       setProducts(data)
+      if (role === 'dealer') {
+        setDealers(await api.getDealers().catch(() => []))
+      }
     } catch (err) {
       console.error('Products fetch failed:', err)
       setError(err.message || 'Failed to load products')
@@ -45,14 +50,14 @@ export default function PlaceOrder() {
 
   const getPrice = (product) => {
     if (!role) return product.mrp
-    return getPriceForRole(role, product) || product.mrp
+    return getPriceForRole(product, role) || product.mrp
   }
 
   const addToCart = (id) => {
     const product = products.find(p => p.id === id)
-    if (!product || (product.stock || 0) === 0) return
+    if (!product || product.stock === 0) return
     const currentQty = cart[id] || 0
-    if (currentQty >= product.stock) return
+    if (product.stock !== null && currentQty >= product.stock) return
     setCart(prev => ({ ...prev, [id]: currentQty + 1 }))
   }
 
@@ -79,7 +84,7 @@ export default function PlaceOrder() {
     return status.label !== 'In Stock — ship in 1-2 days'
   })
 
-  const hasStockOut = cartItems.some(item => (item.stock || 0) === 0)
+  const hasStockOut = cartItems.some(item => item.stock === 0)
 
   const filtered = products.filter(p =>
     (p.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -88,17 +93,30 @@ export default function PlaceOrder() {
 
   const handlePlaceOrder = async () => {
     try {
+      let dealer_id = null
+      if (role === 'dealer') {
+        const dealerRecord = dealers.find(
+          d => d.email && d.email.toLowerCase() === String(user.email || '').toLowerCase()
+        )
+        if (!dealerRecord) {
+          toast.error('Your login is not linked to a dealer record. Contact admin.')
+          return
+        }
+        dealer_id = dealerRecord.id
+      }
       const orderData = {
-        sr_id: user.id,
-        status: 'draft',
+        dealer_id,
+        sr_id: role === 'dealer' ? null : user.id,
+        area_id: user.area_id || null,
+        status: 'submitted',
         total_amount: cartTotal,
         net_amount: cartTotal,
       }
       const items = cartItems.map(item => ({
         product_id: item.id,
         quantity: item.qty,
-        price: getPrice(item),
-        total: getPrice(item) * item.qty,
+        unit_price: getPrice(item),
+        total_price: getPrice(item) * item.qty,
       }))
       await api.createOrder(orderData, items)
       setOrderPlaced(true)
@@ -174,14 +192,14 @@ export default function PlaceOrder() {
           const status = getStockStatus(product.stock)
           const StatusIcon = status.icon
           const inCart = cart[product.id] || 0
-          const atMaxStock = inCart >= product.stock
+          const atMaxStock = product.stock !== null && inCart >= product.stock
 
           return (
-            <div key={product.id} className={`card p-4 flex flex-col ${(product.stock || 0) === 0 ? 'opacity-70' : ''}`}>
+            <div key={product.id} className={`card p-4 flex flex-col ${product.stock === 0 ? 'opacity-70' : ''}`}>
               <div className="aspect-square bg-gray-50 rounded-lg flex items-center justify-center text-4xl mb-3 relative">
                 {product.image || '📦'}
                 <span className={`absolute top-2 right-2 ${status.badge} text-[9px] px-1.5 py-0.5 rounded-full`}>
-                  {(product.stock || 0) === 0 ? 'Out' : `${product.stock} units`}
+                  {product.stock === 0 ? 'Out' : product.stock === null ? 'In stock' : `${product.stock} units`}
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">{product.name}</h3>
@@ -196,25 +214,25 @@ export default function PlaceOrder() {
 
               {inCart > 0 ? (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => removeFromCart(product.id)} className="btn-secondary p-2" disabled={(product.stock || 0) === 0}>
+                  <button onClick={() => removeFromCart(product.id)} className="btn-secondary p-2" disabled={product.stock === 0}>
                     <MdRemove size={16} />
                   </button>
                   <span className="flex-1 text-center font-bold text-lg">{inCart}</span>
-                  <button onClick={() => addToCart(product.id)} className="btn-secondary p-2" disabled={atMaxStock || (product.stock || 0) === 0}>
+                  <button onClick={() => addToCart(product.id)} className="btn-secondary p-2" disabled={atMaxStock || product.stock === 0}>
                     <MdAdd size={16} />
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => addToCart(product.id)}
-                  disabled={(product.stock || 0) === 0}
+                  disabled={product.stock === 0}
                   className="btn-primary w-full mt-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {(product.stock || 0) === 0 ? 'Out of Stock' : <><MdAdd size={16} /> Add to Cart</>}
+                  {product.stock === 0 ? 'Out of Stock' : <><MdAdd size={16} /> Add to Cart</>}
                 </button>
               )}
 
-              {atMaxStock && (product.stock || 0) > 0 && (
+              {atMaxStock && product.stock !== null && product.stock > 0 && (
                 <p className="text-[10px] text-amber-600 font-semibold mt-1 text-center">Max stock reached</p>
               )}
             </div>

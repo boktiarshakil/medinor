@@ -51,7 +51,15 @@ export default function OrderTracker() {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.getOrders()
+      let data = await api.getOrders()
+      if (user?.role === 'dealer') {
+        const dealers = await api.getDealers().catch(() => [])
+        const match = dealers.find(
+          d => d.email && d.email.toLowerCase() === String(user?.email || '').toLowerCase()
+        )
+        if (match) data = data.filter(o => o.dealer_id === match.id)
+        else data = []
+      }
       const mapped = data.map(mapOrder)
       setOrders(mapped)
       setSelectedOrder(prev => {
@@ -71,7 +79,7 @@ export default function OrderTracker() {
 
   useEffect(() => {
     fetchOrders()
-  }, [])
+  }, [user?.role, user?.email])
 
   const handleAddComment = (e) => {
     e.preventDefault()

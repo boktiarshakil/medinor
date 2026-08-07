@@ -36,7 +36,7 @@ export default function WarehouseDashboard() {
   }, 0)
   const lowStockItems = inventory.filter(item => {
     const stock = item.quantity || item.stock || 0
-    const min = item.min_quantity || item.reorder_level || 0
+    const min = item.low_stock_threshold ?? item.min_quantity ?? item.reorder_level ?? 0
     return min > 0 && stock < min
   })
   const pendingDispatch = orders.filter(o => o.status === 'approved' || o.status === 'packed').length
@@ -106,7 +106,7 @@ export default function WarehouseDashboard() {
               <tbody>
                 {inventory.map((item) => {
                   const stock = item.quantity || item.stock || 0
-                  const min = item.min_quantity || item.reorder_level || 0
+                  const min = item.low_stock_threshold ?? item.min_quantity ?? item.reorder_level ?? 0
                   const isLow = min > 0 && stock < min
                   return (
                     <tr key={item.id}>
