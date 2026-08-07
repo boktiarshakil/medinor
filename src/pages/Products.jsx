@@ -151,7 +151,7 @@ export default function Products() {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const data = await api.getProducts()
+      const data = await api.getProductsWithStock()
       const normalized = data.map(p => ({
         ...p,
         purchase: p.purchase_price,

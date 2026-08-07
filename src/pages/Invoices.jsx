@@ -90,7 +90,7 @@ export default function Invoices() {
     if (!product) return
     const existing = newInvoice.items.find(i => String(i.id) === String(product.id))
     const price = getProductPrice(product)
-    const stock = product.stock ?? 0
+    const stock = product.stock ?? null
     if (existing) {
       setNewInvoice({
         ...newInvoice,
@@ -590,7 +590,7 @@ export default function Invoices() {
                             <input
                               type="number"
                               min="1"
-                              max={item.stock}
+                              max={item.stock && item.stock > 0 ? item.stock : undefined}
                               value={item.qty}
                               onChange={(e) => updateQty(item.id, parseInt(e.target.value) || 1)}
                               className="w-12 text-center text-xs border border-gray-200 rounded py-0.5"

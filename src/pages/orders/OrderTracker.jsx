@@ -14,7 +14,7 @@ const ORDER_STEPS = [
   { key: 'payment', label: 'Payment Received', icon: MdPayment, description: 'Payment confirmed' },
 ]
 
-const STATUS_TO_STEP = {
+const STATUS_INDEX = {
   draft: 0,
   submitted: 1,
   approved: 2,
@@ -24,7 +24,27 @@ const STATUS_TO_STEP = {
   completed: 6,
 }
 
-function mapOrder(order) {
+const STEP_KEYS = ['placed', 'approved', 'accounts', 'warehouse', 'dispatched', 'delivered', 'payment']
+
+function mapOrder(order, invoices, payments) {
+  const invoice = invoices.find(inv => inv.order_id === order.id)
+  const hasInvoice = !!invoice
+  const orderPayments = invoice ? payments.filter(p => p.invoice_id === invoice.id) : []
+  const hasPayment = orderPayments.length > 0
+
+  const si = STATUS_INDEX[order.status] ?? 0
+  const stepComplete = {
+    placed: true,
+    approved: si >= 1,        // submitted or beyond
+    accounts: hasInvoice,     // invoice generated for this order
+    warehouse: si >= 3,       // packed or beyond
+    dispatched: si >= 4,      // dispatched or beyond
+    delivered: si >= 5,       // delivered or beyond
+    payment: hasPayment,      // payment recorded against invoice
+  }
+  let currentStep = STEP_KEYS.findIndex(k => !stepComplete[k])
+  if (currentStep === -1) currentStep = STEP_KEYS.length - 1
+
   return {
     id: order.order_number || order.order_no || order.id,
     dbId: order.id,
@@ -32,9 +52,12 @@ function mapOrder(order) {
     sr: order.sr_name || null,
     amount: order.net_amount ?? order.total_amount ?? order.amount ?? 0,
     items: order.items?.length || order.order_items?.length || 0,
-    currentStep: STATUS_TO_STEP[order.status] ?? 0,
+    currentStep,
     placedAt: order.created_at,
     status: order.status,
+    hasInvoice,
+    hasPayment,
+    invoiceNumber: invoice?.invoice_number || null,
     comments: [],
   }
 }
@@ -51,7 +74,12 @@ export default function OrderTracker() {
     setLoading(true)
     setError(null)
     try {
-      let data = await api.getOrders()
+      const [allOrders, invoices, payments] = await Promise.all([
+        api.getOrders(),
+        api.getInvoices().catch(() => []),
+        api.getPayments().catch(() => []),
+      ])
+      let data = allOrders
       if (user?.role === 'dealer') {
         const dealers = await api.getDealers().catch(() => [])
         const match = dealers.find(
@@ -60,7 +88,7 @@ export default function OrderTracker() {
         if (match) data = data.filter(o => o.dealer_id === match.id)
         else data = []
       }
-      const mapped = data.map(mapOrder)
+      const mapped = data.map(order => mapOrder(order, invoices, payments))
       setOrders(mapped)
       setSelectedOrder(prev => {
         if (prev) {
@@ -214,6 +242,18 @@ export default function OrderTracker() {
                 </p>
               </div>
               <span className="text-lg font-bold text-brand-600">৳{selectedOrder.amount.toLocaleString()}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {selectedOrder.hasInvoice ? (
+                <span className="badge badge-info text-[10px]">Invoice: {selectedOrder.invoiceNumber || 'Generated'}</span>
+              ) : (
+                <span className="badge badge-gray text-[10px]">No invoice yet</span>
+              )}
+              {selectedOrder.hasPayment ? (
+                <span className="badge badge-success text-[10px]">Payment received</span>
+              ) : (
+                <span className="badge badge-gray text-[10px]">Payment pending</span>
+              )}
             </div>
           </div>
 
