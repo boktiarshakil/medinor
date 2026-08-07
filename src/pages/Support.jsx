@@ -155,11 +155,10 @@ export default function Support() {
                   <label className="label">Type</label>
                   <select className="input" value={newTicket.type} onChange={(e) => setNewTicket({ ...newTicket, type: e.target.value })}>
                     <option value="general">General</option>
-                    <option value="technical">Technical</option>
-                    <option value="billing">Billing</option>
-                    <option value="delivery">Delivery</option>
-                    <option value="product">Product</option>
-                    <option value="other">Other</option>
+                    <option value="complaint">Complaint</option>
+                    <option value="warranty">Warranty</option>
+                    <option value="replacement">Replacement</option>
+                    <option value="service">Service</option>
                   </select>
                 </div>
                 <div>

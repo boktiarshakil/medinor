@@ -81,7 +81,7 @@ export default function Products() {
       if (newProduct.stock) {
         const created = await api.getProducts().then(ps => ps.find(p => p.name === newProduct.name))
         if (created) {
-          await api.addStockMovement({ product_id: created.id, type: 'in', quantity: Number(newProduct.stock), reference_type: 'opening_stock', notes: 'Initial stock' })
+          await api.addStockMovement({ product_id: created.id, movement_type: 'in', quantity: Number(newProduct.stock), reference_type: 'opening_stock', notes: 'Initial stock' })
           const invCheck = await api.getInventory().then(inv => inv.find(i => i.product_id === created.id))
           if (invCheck) {
             await api.updateInventory(invCheck.id, { quantity: (invCheck.quantity || 0) + Number(newProduct.stock) })

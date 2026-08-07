@@ -284,7 +284,7 @@ export const api = {
 
       await supabase.from('stock_movements').insert({
         product_id: item.product_id,
-        type: 'out',
+        movement_type: 'out',
         quantity: item.quantity,
         reference_type: 'order',
         reference_id: order.id,

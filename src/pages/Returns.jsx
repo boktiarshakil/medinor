@@ -62,6 +62,7 @@ export default function Returns() {
       items: (order?.items || []).map(item => ({
         product_id: item.product_id,
         quantity: item.quantity,
+        unit_price: item.unit_price || 0,
         reason: 'damaged'
       }))
     }))
@@ -195,9 +196,9 @@ export default function Returns() {
                 <label className="label">Reason *</label>
                 <select className="input" value={newReturn.reason} onChange={(e) => setNewReturn({ ...newReturn, reason: e.target.value })}>
                   <option value="damaged">Damaged Product</option>
-                  <option value="defective">Defective Product</option>
-                  <option value="wrong_item">Wrong Item Shipped</option>
+                  <option value="wrong_product">Wrong Product Shipped</option>
                   <option value="expired">Expired Product</option>
+                  <option value="quality_issue">Quality Issue</option>
                   <option value="other">Other</option>
                 </select>
               </div>

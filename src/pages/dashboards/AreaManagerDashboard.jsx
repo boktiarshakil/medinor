@@ -14,6 +14,7 @@ export default function AreaManagerDashboard() {
   const [users, setUsers] = useState([])
   const [attendance, setAttendance] = useState([])
   const [targets, setTargets] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {

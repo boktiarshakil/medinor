@@ -4,11 +4,13 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { MdLocationOn, MdShoppingCart, MdReceipt, MdCheckCircle, MdMyLocation, MdRefresh } from 'react-icons/md'
 import { HiLocationMarker } from 'react-icons/hi'
+import toast from 'react-hot-toast'
 
 export default function SalesExecDashboard() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [dealers, setDealers] = useState([])
+  const [payments, setPayments] = useState([])
   const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
   const [checkedIn, setCheckedIn] = useState(false)
@@ -18,14 +20,16 @@ export default function SalesExecDashboard() {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, dealersData, targetsData] = await Promise.all([
+        const [ordersData, dealersData, targetsData, paymentsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getDealers().catch(() => []),
           api.getTargets({ userId: user?.id }).catch(() => []),
+          api.getPayments().catch(() => []),
         ])
         setOrders(ordersData)
         setDealers(dealersData)
         setTargets(targetsData)
+        setPayments(paymentsData)
         if (user?.id) {
           api.getTodayAttendance(user.id)
             .then(att => { if (att?.check_in) setCheckedIn(true) })
@@ -53,7 +57,10 @@ export default function SalesExecDashboard() {
 
   const visitsDone = todayOrders.length
   const ordersTaken = todayOrders.length
-  const collections = todayOrders.filter(o => o.status === 'paid' || o.payment_collected).reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
+  const todayCollected = payments
+    .filter(p => p.collected_by === user?.id && (p.payment_date || String(p.created_at).slice(0, 10)) >= todayStartISO.slice(0, 10))
+    .reduce((sum, p) => sum + (p.amount || 0), 0)
+  const collections = todayCollected
   const dbMonthTarget = targets
     .filter(t => t.target_type === 'sales')
     .reduce((sum, t) => sum + (t.target_value || 0), 0)

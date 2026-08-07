@@ -18,7 +18,7 @@ export default function Inventory() {
       const inOut = {}
       movements.forEach(m => {
         if (!inOut[m.product_id]) inOut[m.product_id] = { in: 0, out: 0 }
-        if (m.type === 'in') inOut[m.product_id].in += m.quantity
+        if (m.movement_type === 'in') inOut[m.product_id].in += m.quantity
         else inOut[m.product_id].out += m.quantity
       })
       setInventory(data.map(item => ({ ...item, in_quantity: inOut[item.product_id]?.in || 0, out_quantity: inOut[item.product_id]?.out || 0 })))
