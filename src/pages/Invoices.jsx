@@ -47,7 +47,19 @@ export default function Invoices() {
         api.getDealers(),
         api.getOrders().catch(() => []),
       ])
-      setInvoices(invData)
+      let invoices = invData
+      if (user?.role === 'dealer') {
+        const match = dealerData.find(
+          d => d.email && d.email.toLowerCase() === String(user?.email || '').toLowerCase()
+        )
+        invoices = match ? invoices.filter(inv => inv.dealer_id === match.id) : []
+      } else if (user?.role === 'sales_executive') {
+        const myDealerIds = new Set(
+          dealerData.filter(d => d.assigned_sr_id === user?.id).map(d => d.id)
+        )
+        invoices = invoices.filter(inv => myDealerIds.has(inv.dealer_id))
+      }
+      setInvoices(invoices)
       setProducts(prodData)
       setDealers(dealerData)
       setAllOrders(ordersData)
@@ -269,9 +281,11 @@ export default function Invoices() {
           <button className="btn-secondary" onClick={handleExport}>
             <MdFileDownload size={16} /> Export
           </button>
-          <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <MdAdd size={16} /> Create Invoice
-          </button>
+          {['super_admin', 'admin', 'sales_manager'].includes(user?.role) && (
+            <button onClick={() => setShowCreate(true)} className="btn-primary">
+              <MdAdd size={16} /> Create Invoice
+            </button>
+          )}
         </div>
       </div>
 
@@ -307,7 +321,7 @@ export default function Invoices() {
               ? 'Create your first invoice to get started'
               : 'Try adjusting your search'}
           </p>
-          {invoices.length === 0 && (
+          {invoices.length === 0 && ['super_admin', 'admin', 'sales_manager'].includes(user?.role) && (
             <button onClick={() => setShowCreate(true)} className="btn-primary mt-4">
               <MdAdd size={16} /> Create Invoice
             </button>

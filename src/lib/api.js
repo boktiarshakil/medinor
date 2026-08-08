@@ -301,7 +301,7 @@ export const api = {
       .from('invoices')
       .select(`
         *,
-        dealer:dealers(name, area:areas(name), area_id),
+        dealer:dealers(name, area:areas(name), area_id, assigned_sr_id),
         order:orders(order_number),
         creator:user_profiles!invoices_created_by_fkey(full_name)
       `)

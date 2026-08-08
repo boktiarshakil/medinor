@@ -87,6 +87,8 @@ export default function OrderTracker() {
         )
         if (match) data = data.filter(o => o.dealer_id === match.id)
         else data = []
+      } else if (user?.role === 'sales_executive') {
+        data = data.filter(o => o.sr_id === user?.id)
       }
       const mapped = data.map(order => mapOrder(order, invoices, payments))
       setOrders(mapped)

@@ -75,8 +75,8 @@ export default function App() {
         <Route path="/my-dealers" element={<ProtectedRoute roles={['sales_executive']}><Dealers /></ProtectedRoute>} />
         <Route path="/collections" element={<ProtectedRoute roles={['sales_executive']}><Invoices /></ProtectedRoute>} />
 
-        {/* Dealer */}
-        <Route path="/place-order" element={<ProtectedRoute roles={['dealer']}><PlaceOrder /></ProtectedRoute>} />
+        {/* Dealer / SR order placement */}
+        <Route path="/place-order" element={<ProtectedRoute roles={['dealer','sales_executive']}><PlaceOrder /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute roles={['dealer']}><Invoices /></ProtectedRoute>} />
 
         {/* Feature pages — role-based access */}

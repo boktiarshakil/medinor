@@ -24,6 +24,7 @@ export default function PlaceOrder() {
   const [error, setError] = useState(null)
   const [cart, setCart] = useState({})
   const [dealers, setDealers] = useState([])
+  const [selectedDealerId, setSelectedDealerId] = useState('')
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
@@ -34,7 +35,7 @@ export default function PlaceOrder() {
     try {
       const data = await api.getProductsWithStock()
       setProducts(data)
-      if (role === 'dealer') {
+      if (role === 'dealer' || role === 'sales_executive') {
         setDealers(await api.getDealers().catch(() => []))
       }
     } catch (err) {
@@ -103,6 +104,12 @@ export default function PlaceOrder() {
           return
         }
         dealer_id = dealerRecord.id
+      } else {
+        if (!selectedDealerId) {
+          toast.error('Select a dealer to order for')
+          return
+        }
+        dealer_id = selectedDealerId
       }
       const orderData = {
         dealer_id,
@@ -166,6 +173,24 @@ export default function PlaceOrder() {
           </div>
         )}
       </div>
+
+      {/* SR: select dealer to order for */}
+      {role === 'sales_executive' && (
+        <div className="card p-4">
+          <label className="label">Ordering for Dealer *</label>
+          <select
+            className="input"
+            value={selectedDealerId}
+            onChange={(e) => setSelectedDealerId(e.target.value)}
+          >
+            <option value="">Select dealer...</option>
+            {dealers.map(d => (
+              <option key={d.id} value={d.id}>{d.name} — {d.area?.name || d.area_name || d.area || 'Unassigned'}</option>
+            ))}
+          </select>
+          <p className="text-[10px] text-gray-400 mt-1">Order will be attributed to this dealer and recorded against you.</p>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
