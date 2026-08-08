@@ -94,27 +94,25 @@ export default function PlaceOrder() {
 
   const handlePlaceOrder = async () => {
     try {
-      let dealer_id = null
-      if (role === 'dealer') {
-        const dealerRecord = dealers.find(
-          d => d.email && d.email.toLowerCase() === String(user.email || '').toLowerCase()
-        )
-        if (!dealerRecord) {
-          toast.error('Your login is not linked to a dealer record. Contact admin.')
-          return
-        }
-        dealer_id = dealerRecord.id
-      } else {
-        if (!selectedDealerId) {
-          toast.error('Select a dealer to order for')
-          return
-        }
-        dealer_id = selectedDealerId
+      const dealerRecord = role === 'dealer'
+        ? dealers.find(
+            d => d.email && d.email.toLowerCase() === String(user.email || '').toLowerCase()
+          )
+        : dealers.find(d => d.id === selectedDealerId)
+
+      if (role === 'dealer' && !dealerRecord) {
+        toast.error('Your login is not linked to a dealer record. Contact admin.')
+        return
       }
+      if (role !== 'dealer' && !selectedDealerId) {
+        toast.error('Select a dealer to order for')
+        return
+      }
+
       const orderData = {
-        dealer_id,
+        dealer_id: dealerRecord ? dealerRecord.id : null,
         sr_id: role === 'dealer' ? null : user.id,
-        area_id: user.area_id || null,
+        area_id: dealerRecord?.area_id || user.area_id || null,
         status: 'submitted',
         total_amount: cartTotal,
         net_amount: cartTotal,
