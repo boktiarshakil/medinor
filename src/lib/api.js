@@ -3,6 +3,7 @@
 // ============================================================
 
 import { supabase } from './supabase'
+import { generateInvoiceNo } from './utils'
 
 export const api = {
   // ---- Users / Profiles ----
@@ -230,7 +231,7 @@ export const api = {
     )
 
     const invoicePayload = {
-      invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
+      invoice_number: generateInvoiceNo(),
       order_id: order.id,
       dealer_id: order.dealer_id,
       created_by: createdBy || null,
@@ -297,17 +298,27 @@ export const api = {
   // ---- Invoices ----
 
   async getInvoices() {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        dealer:dealers(name, area:areas(name), area_id, assigned_sr_id),
-        order:orders(order_number),
-        creator:user_profiles!invoices_created_by_fkey(full_name)
-      `)
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data || []
+    const baseSelect = `
+      *,
+      dealer:dealers(name, area:areas(name), area_id, assigned_sr_id),
+      order:orders(order_number)
+    `
+    try {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`${baseSelect}, creator:user_profiles!invoices_created_by_fkey(full_name)`)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      // Migration 004 (invoices.created_by) may not be applied yet — retry without the creator join
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(baseSelect)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data || []
+    }
   },
 
   // ---- Inventory ----
@@ -529,7 +540,7 @@ export const api = {
   async createInvoice(invoice) {
     const payload = { ...invoice }
     if (!payload.invoice_number) {
-      payload.invoice_number = `INV-${Date.now().toString(36).toUpperCase()}`
+      payload.invoice_number = generateInvoiceNo()
     }
     const { data, error } = await supabase
       .from('invoices')
