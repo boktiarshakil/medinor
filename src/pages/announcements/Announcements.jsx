@@ -15,7 +15,6 @@ const AUDIENCE_OPTIONS = [
   { value: 'asm', label: 'Area Sales Managers' },
   { value: 'tso', label: 'Territory Sales Officers' },
   { value: 'dealers', label: 'All Dealers' },
-  { value: 'specific', label: 'Specific Person' },
 ]
 
 export default function Announcements() {

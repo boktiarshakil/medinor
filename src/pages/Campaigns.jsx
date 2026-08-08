@@ -39,13 +39,14 @@ export default function Campaigns() {
     }
     setCreating(true)
     try {
+      const today = new Date().toISOString().split('T')[0]
       await api.createCampaign({
         name: newCampaign.name,
         type: newCampaign.type,
         discount_percent: Number(newCampaign.discount_percent) || 0,
         budget: Number(newCampaign.budget) || null,
-        start_date: newCampaign.start_date || null,
-        end_date: newCampaign.end_date || null,
+        start_date: newCampaign.start_date || today,
+        end_date: newCampaign.end_date || today,
         description: newCampaign.description || null,
         status: newCampaign.status,
       })

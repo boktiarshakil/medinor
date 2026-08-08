@@ -250,7 +250,22 @@ export const api = {
       .insert(invoicePayload)
       .select()
       .single()
-    if (invError) throw invError
+    if (invError) throw error
+
+    // Record dealer ledger debit for the invoice
+    try {
+      await this.recordDealerLedger({
+        dealer_id: order.dealer_id,
+        transaction_type: 'invoice',
+        reference_id: invData.id,
+        debit: totalAmount,
+        credit: 0,
+        description: `Invoice ${invData.invoice_number}`,
+        transaction_date: invoicePayload.invoice_date,
+      })
+    } catch (ledgerErr) {
+      console.warn('Dealer ledger write failed:', ledgerErr)
+    }
 
     await this.deductStockForOrder(order)
     return invData
@@ -503,6 +518,56 @@ export const api = {
       .select()
       .single()
     if (error) throw error
+    return data
+  },
+
+  async updatePersonalId(id, updates) {
+    const { data, error } = await supabase
+      .from('personal_ids')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // Record a dealer ledger entry and update the dealer's running balance
+  async recordDealerLedger({ dealer_id, transaction_type, reference_id, debit = 0, credit = 0, description = '', transaction_date }) {
+    // Compute running balance from the latest entry for this dealer
+    const { data: last } = await supabase
+      .from('dealer_ledger')
+      .select('balance')
+      .eq('dealer_id', dealer_id)
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const prevBalance = last?.balance ?? 0
+    const balance = prevBalance + debit - credit
+
+    const { data, error } = await supabase
+      .from('dealer_ledger')
+      .insert({
+        dealer_id,
+        transaction_type,
+        reference_id,
+        debit,
+        credit,
+        balance,
+        description,
+        transaction_date: transaction_date || new Date().toISOString().split('T')[0],
+      })
+      .select()
+      .single()
+    if (error) throw error
+
+    // Keep dealers.current_due in sync
+    await supabase
+      .from('dealers')
+      .update({ current_due: Math.max(balance, 0) })
+      .eq('id', dealer_id)
+
     return data
   },
 

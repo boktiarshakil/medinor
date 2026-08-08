@@ -23,6 +23,11 @@ export default function PersonalIds() {
   })
   const [copied, setCopied] = useState(null)
   const [areas, setAreas] = useState([])
+  const [previewCode, setPreviewCode] = useState('')
+
+  useEffect(() => {
+    setPreviewCode(generatePersonalId(newId.entity_type))
+  }, [newId.entity_type])
 
   const fetchIds = async () => {
     setLoading(true)
@@ -102,22 +107,23 @@ export default function PersonalIds() {
       return
     }
     setCreating(true)
-    try {
-      const code = generatePersonalId(newId.entity_type)
-
-      // Persist to personal_ids table
       try {
-        await api.createPersonalId({
-          code,
-          entity_type: newId.entity_type,
-          entity_name: newId.entity_name,
-          area: newId.area || 'Unassigned',
-          is_active: true,
-        })
-      } catch (dbErr) {
-        console.warn('Could not save to personal_ids table:', dbErr)
-        // Continue — table may not exist yet
-      }
+        const code = previewCode || generatePersonalId(newId.entity_type)
+
+        // Persist to personal_ids table
+        try {
+          const areaName = areas.find(a => a.id === newId.area)?.name || newId.area || 'Unassigned'
+          await api.createPersonalId({
+            code,
+            entity_type: newId.entity_type,
+            entity_name: newId.entity_name,
+            area: areaName,
+            is_active: true,
+          })
+        } catch (dbErr) {
+          console.warn('Could not save to personal_ids table:', dbErr)
+          // Continue — table may not exist yet
+        }
 
       // Optionally create user account
       if (newId.create_account && newId.email) {
@@ -149,10 +155,17 @@ export default function PersonalIds() {
     }
   }
 
-  const toggleActive = (id) => {
-    setIds(ids.map(item =>
-      item.id === id ? { ...item, is_active: !item.is_active } : item
-    ))
+  const toggleActive = async (id) => {
+    const item = ids.find(i => i.id === id)
+    if (!item) return
+    const newActive = !item.is_active
+    setIds(ids.map(i => i.id === id ? { ...i, is_active: newActive } : i))
+    try {
+      await api.updatePersonalId(id, { is_active: newActive })
+    } catch (err) {
+      setIds(ids.map(i => i.id === id ? { ...i, is_active: item.is_active } : i))
+      toast.error('Failed to update status')
+    }
   }
 
   const totalActive = ids.filter(i => i.is_active).length
@@ -407,7 +420,7 @@ export default function PersonalIds() {
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-[10px] text-gray-400 uppercase font-medium mb-1">Preview Code</p>
                 <code className="text-sm font-mono font-bold text-brand-600">
-                  {generatePersonalId(newId.entity_type)}
+                  {previewCode}
                 </code>
               </div>
 

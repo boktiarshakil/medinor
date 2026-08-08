@@ -202,6 +202,20 @@ export default function Invoices() {
         payment_date: new Date().toISOString().split('T')[0],
         notes: null,
       })
+      // Record dealer ledger credit for the payment
+      try {
+        await api.recordDealerLedger({
+          dealer_id: selectedInvoice.dealer_id,
+          transaction_type: 'payment',
+          reference_id: selectedInvoice.id,
+          debit: 0,
+          credit: amount,
+          description: `Payment via ${paymentMethod}`,
+          payment_date: new Date().toISOString().split('T')[0],
+        })
+      } catch (ledgerErr) {
+        console.warn('Dealer ledger write failed:', ledgerErr)
+      }
       await api.updateInvoice(selectedInvoice.id, {
         paid_amount: newPaid,
         due_amount: newDue < 0 ? 0 : newDue,
