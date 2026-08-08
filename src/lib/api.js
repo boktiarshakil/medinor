@@ -188,7 +188,7 @@ export const api = {
     return orderData
   },
 
-  async updateOrderStatus(id, status) {
+  async updateOrderStatus(id, status, createdBy = null) {
     const { data, error } = await supabase
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
@@ -199,12 +199,12 @@ export const api = {
 
     let invoice = null
     if (status === 'delivered' || status === 'completed') {
-      invoice = await this.createInvoiceForOrder(id)
+      invoice = await this.createInvoiceForOrder(id, createdBy)
     }
     return { order: data, invoice }
   },
 
-  async createInvoiceForOrder(orderId) {
+  async createInvoiceForOrder(orderId, createdBy = null) {
     const { data: order, error } = await supabase
       .from('orders')
       .select(`
@@ -233,6 +233,7 @@ export const api = {
       invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
       order_id: order.id,
       dealer_id: order.dealer_id,
+      created_by: createdBy || null,
       amount: totalAmount,
       vat_amount: 0,
       total_amount: totalAmount,
@@ -300,8 +301,9 @@ export const api = {
       .from('invoices')
       .select(`
         *,
-        dealer:dealers(name),
-        order:orders(order_number)
+        dealer:dealers(name, area:areas(name), area_id),
+        order:orders(order_number),
+        creator:user_profiles!invoices_created_by_fkey(full_name)
       `)
       .order('created_at', { ascending: false })
     if (error) throw error

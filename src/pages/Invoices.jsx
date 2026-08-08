@@ -73,8 +73,8 @@ export default function Invoices() {
     status: inv.status || 'unpaid',
     date: inv.invoice_date || inv.date || inv.created_at,
     dueDate: inv.due_date || inv.dueDate,
-    createdBy: typeof inv.created_by === 'object' ? inv.created_by?.full_name : (inv.created_by_name || inv.createdBy || '-'),
-    area: inv.area_name || inv.area || '-',
+    createdBy: inv.creator?.full_name || inv.created_by_name || inv.createdBy || '-',
+    area: inv.dealer?.area?.name || inv.area_name || inv.area || '-',
   })
 
   const filtered = (inv) => {
@@ -142,6 +142,7 @@ export default function Invoices() {
         invoice_number: generateInvoiceNo(),
         dealer_id: selectedDealer.id,
         order_id: newInvoice.orderId || null,
+        created_by: user?.id || null,
         amount: total,
         total_amount: total,
         vat_amount: 0,

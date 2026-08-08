@@ -170,7 +170,7 @@ export default function Orders() {
   const handleAdvance = async (order, action) => {
     if (!window.confirm(`Move order ${order.number} to "${action.label}"?`)) return
     try {
-      const { order: updated, invoice } = await api.updateOrderStatus(order._raw.id, action.status)
+      const { order: updated, invoice } = await api.updateOrderStatus(order._raw.id, action.status, user?.id)
       const newStatus = updated?.status || action.status
       toast.success(
         newStatus === 'delivered'
