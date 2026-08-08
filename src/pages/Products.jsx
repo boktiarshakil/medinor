@@ -77,15 +77,14 @@ export default function Products() {
       if (newProduct.dealer_price) productPayload.dealer_price = Number(newProduct.dealer_price)
       if (newProduct.purchase_price) productPayload.purchase_price = Number(newProduct.purchase_price)
       if (newProduct.image_url) productPayload.image_url = newProduct.image_url
-      await api.createProduct(productPayload)
-      if (newProduct.stock) {
-        const created = await api.getProducts().then(ps => ps.find(p => p.name === newProduct.name))
-        if (created) {
-          await api.addStockMovement({ product_id: created.id, movement_type: 'in', quantity: Number(newProduct.stock), reference_type: 'opening_stock', notes: 'Initial stock' })
-          const invCheck = await api.getInventory().then(inv => inv.find(i => i.product_id === created.id))
-          if (invCheck) {
-            await api.updateInventory(invCheck.id, { quantity: (invCheck.quantity || 0) + Number(newProduct.stock) })
-          }
+      const created = await api.createProduct(productPayload)
+      if (newProduct.stock && created) {
+        await api.addStockMovement({ product_id: created.id, movement_type: 'in', quantity: Number(newProduct.stock), reference_type: 'opening_stock', notes: 'Initial stock' })
+        const invCheck = await api.getInventory().then(inv => inv.find(i => i.product_id === created.id))
+        if (invCheck) {
+          await api.updateInventory(invCheck.id, { quantity: (invCheck.quantity || 0) + Number(newProduct.stock) })
+        } else {
+          await api.createInventory({ product_id: created.id, quantity: Number(newProduct.stock), low_stock_threshold: 50 })
         }
       }
       toast.success(`Product "${newProduct.name}" created`)
@@ -283,7 +282,7 @@ export default function Products() {
 
                 <div>
                   <span className="text-gray-400">Stock</span>
-                  <p className={`font-semibold ${product.stock < 50 ? 'text-amber-600' : 'text-gray-800'}`}>{product.stock} pcs</p>
+                  <p className={`font-semibold ${(product.stock ?? 0) < 50 ? 'text-amber-600' : 'text-gray-800'}`}>{(product.stock ?? 0)} pcs</p>
                 </div>
               </div>
 

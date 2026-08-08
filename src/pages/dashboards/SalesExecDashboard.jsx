@@ -12,6 +12,8 @@ export default function SalesExecDashboard() {
   const [dealers, setDealers] = useState([])
   const [payments, setPayments] = useState([])
   const [targets, setTargets] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [visits, setVisits] = useState([])
   const [loading, setLoading] = useState(true)
   const [checkedIn, setCheckedIn] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
@@ -20,16 +22,20 @@ export default function SalesExecDashboard() {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, dealersData, targetsData, paymentsData] = await Promise.all([
+        const [ordersData, dealersData, targetsData, paymentsData, invoicesData, visitsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getDealers().catch(() => []),
           api.getTargets({ userId: user?.id }).catch(() => []),
           api.getPayments().catch(() => []),
+          api.getInvoices().catch(() => []),
+          api.getCRMVisits().catch(() => []),
         ])
         setOrders(ordersData)
         setDealers(dealersData)
         setTargets(targetsData)
         setPayments(paymentsData)
+        setInvoices(invoicesData)
+        setVisits(visitsData)
         if (user?.id) {
           api.getTodayAttendance(user.id)
             .then(att => { if (att?.check_in) setCheckedIn(true) })
@@ -51,12 +57,14 @@ export default function SalesExecDashboard() {
   const monthStartISO = monthStart.toISOString()
 
   // Filter orders for current SR
-  const myOrders = orders.filter(o => o.sr_id === user?.id || o.created_by === user?.id)
+  const myOrders = orders.filter(o => o.sr_id === user?.id)
   const todayOrders = myOrders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled')
-  const monthOrders = myOrders.filter(o => o.created_at >= monthStartISO && o.status !== 'cancelled')
+  const monthOrders = myOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEnd.toISOString() && o.status !== 'cancelled')
 
-  const visitsDone = todayOrders.length
+  const todayKey = todayStartISO.slice(0, 10)
+  const visitsDone = visits.filter(v => v.sr_id === user?.id && String(v.visit_date || '').slice(0, 10) === todayKey).length
   const ordersTaken = todayOrders.length
+  const myDealers = dealers.filter(d => d.assigned_sr_id === user?.id)
   const todayCollected = payments
     .filter(p => p.collected_by === user?.id && (p.payment_date || String(p.created_at).slice(0, 10)) >= todayStartISO.slice(0, 10))
     .reduce((sum, p) => sum + (p.amount || 0), 0)
@@ -109,7 +117,7 @@ export default function SalesExecDashboard() {
           <div className="text-center">
             <p className="text-3xl font-bold text-brand-600">{visitsDone}</p>
             <p className="text-[10px] text-gray-500 font-medium uppercase mt-0.5">Visits Done</p>
-            <p className="text-[10px] text-gray-400">of {dealers.length}</p>
+            <p className="text-[10px] text-gray-400">of {myDealers.length}</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold text-emerald-600">{ordersTaken}</p>
@@ -175,20 +183,20 @@ export default function SalesExecDashboard() {
       <div className="card">
         <div className="p-5 pb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-900">My Dealers</h3>
-          <span className="badge-info text-[10px]">{dealers.length} dealers</span>
+          <span className="badge-info text-[10px]">{myDealers.length} dealers</span>
         </div>
-        {dealers.length === 0 ? (
+        {myDealers.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-xs text-gray-500">No dealers assigned</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {dealers.slice(0, 10).map(dealer => {
-              const dealerOrders = orders.filter(o => o.dealer_id === dealer.id || o.dealer?.name === dealer.name)
+            {myDealers.slice(0, 10).map(dealer => {
+              const dealerOrders = orders.filter(o => o.dealer_id === dealer.id)
               const lastOrder = dealerOrders[0]
-              const due = dealerOrders
-                .filter(o => o.status !== 'paid' && o.status !== 'delivered' && o.status !== 'cancelled')
-                .reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
+              const due = invoices
+                .filter(i => i.dealer_id === dealer.id && i.status !== 'paid' && i.status !== 'cancelled')
+                .reduce((sum, i) => sum + (i.due_amount || i.total_amount || 0), 0)
 
               return (
                 <div key={dealer.id} className="p-4 flex items-center gap-3">
@@ -197,7 +205,7 @@ export default function SalesExecDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{dealer.name}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{dealer.address || dealer.area?.name || dealer.area_name || ''}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{dealer.area || dealer.area_name || dealer.address || ''}</p>
                     <div className="flex items-center gap-3 mt-1">
                       {due > 0 && (
                         <span className="text-[10px] text-red-500 font-medium">Due: {formatCurrency(due)}</span>

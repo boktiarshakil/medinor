@@ -95,6 +95,14 @@ export const generateOrderNo = () => {
   return `${prefix}-${timestamp}-${random}`
 }
 
+// Generate support ticket number
+export const generateTicketNo = () => {
+  const prefix = 'TKT'
+  const timestamp = Date.now().toString(36).toUpperCase()
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase()
+  return `${prefix}-${timestamp}-${random}`
+}
+
 // Calculate percentage
 export const calcPercent = (value, total) => {
   if (!total) return 0

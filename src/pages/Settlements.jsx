@@ -66,14 +66,19 @@ export default function Settlements() {
     return calculateSettlement(items, products)
   }
 
+  const settledOrderIds = new Set((settlements || []).map(s => s.order_id))
+
   const allSettlements = orders.map(order => ({
     order,
     settlement: getSettlement(order),
+    settled: settledOrderIds.has(order.id),
   }))
 
-  const totalCompanyShare = allSettlements.reduce((sum, s) => sum + s.settlement.company_total, 0)
-  const totalDealerMargin = allSettlements.reduce((sum, s) => sum + s.settlement.dealer_margin_total, 0)
-  const totalCollected = allSettlements.reduce((sum, s) => sum + s.settlement.grand_total, 0)
+  const pendingSettlements = allSettlements.filter(s => !s.settled)
+
+  const totalCompanyShare = pendingSettlements.reduce((sum, s) => sum + s.settlement.company_total, 0)
+  const totalDealerMargin = pendingSettlements.reduce((sum, s) => sum + s.settlement.dealer_margin_total, 0)
+  const totalCollected = pendingSettlements.reduce((sum, s) => sum + s.settlement.grand_total, 0)
 
   if (loading) {
     return (
@@ -156,7 +161,7 @@ export default function Settlements() {
         <div className="card">
           <div className="p-5 pb-3">
             <h3 className="text-sm font-bold text-gray-900">Settlements</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{orders.length} orders settled</p>
+            <p className="text-xs text-gray-400 mt-0.5">{settledOrderIds.size} settled · {pendingSettlements.length} pending</p>
           </div>
           <div className="table-container border-0 rounded-none">
             <table className="data-table">
@@ -171,7 +176,7 @@ export default function Settlements() {
                 </tr>
               </thead>
               <tbody>
-                 {allSettlements.map(({ order, settlement }) => (
+                 {allSettlements.map(({ order, settlement, settled }) => (
                   <tr key={order.id}>
                     <td className="font-mono text-xs font-medium">{order.order_number}</td>
                     <td className="text-xs">{order.dealer?.name || '—'}</td>
@@ -180,13 +185,19 @@ export default function Settlements() {
                     <td className="text-xs text-emerald-600 font-medium">{formatCurrency(settlement.company_total)}</td>
                     <td className="text-xs text-purple-600 font-medium">{formatCurrency(settlement.dealer_margin_total)}</td>
                     <td className="text-xs">
-                      <button
-                        onClick={() => handleSettleOrder(order)}
-                        disabled={saving}
-                        className="text-brand-600 hover:text-brand-700 font-medium"
-                      >
-                        Record
-                      </button>
+                      {settled ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                          <MdCheckCircle size={14} /> Settled
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSettleOrder(order)}
+                          disabled={saving}
+                          className="text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+                        >
+                          Record
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

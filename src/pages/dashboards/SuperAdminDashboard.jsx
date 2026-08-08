@@ -74,7 +74,7 @@ export default function SuperAdminDashboard() {
   const collectionsToday = payments
     .filter(p => p.payment_date === todayStartISO.split('T')[0] || (p.created_at >= todayStartISO && p.created_at <= todayEndISO))
     .reduce((sum, p) => sum + (p.amount || 0), 0)
-  const activeDealers = dealers.filter(d => d.is_active !== false).length
+  const activeDealers = dealers.filter(d => d.status === 'active').length
   const salesTeam = users.filter(u => u.role === 'sales_executive' || u.role === 'area_manager' || u.role === 'sales_manager').length
 
   const STATS = [
@@ -91,7 +91,7 @@ export default function SuperAdminDashboard() {
   // Compute low stock alerts from real inventory
   const lowStockItems = inventory.filter(item => {
     const stock = item.quantity || item.stock || 0
-    const min = item.min_quantity || item.reorder_level || 0
+    const min = item.low_stock_threshold || item.min_quantity || item.reorder_level || 0
     return min > 0 && stock < min
   })
 
@@ -135,19 +135,19 @@ export default function SuperAdminDashboard() {
 
   // Compute area performance from dealers + orders
   const areaMap = {}
-  dealers.forEach(d => {
-    const area = d.area?.name || d.area_name || d.territory || 'Unassigned'
-    if (!areaMap[area]) areaMap[area] = { area, dealers: 0, actual: 0 }
-    areaMap[area].dealers++
-  })
-  orders.forEach(o => {
-    if (o.status === 'cancelled') return
-    const dName = o.dealer?.name || o.dealer_name
-    const dealer = dealers.find(dd => (dd.name === dName) || (dd.id === o.dealer_id))
-    const area = dealer?.area?.name || dealer?.area_name || dealer?.territory || 'Unassigned'
-    if (!areaMap[area]) areaMap[area] = { area, dealers: 0, actual: 0 }
-    areaMap[area].actual += (o.total_amount || o.amount || 0)
-  })
+   dealers.forEach(d => {
+     const area = d.area || d.area_name || d.territory || 'Unassigned'
+     if (!areaMap[area]) areaMap[area] = { area, dealers: 0, actual: 0 }
+     areaMap[area].dealers++
+   })
+   orders.forEach(o => {
+     if (o.status === 'cancelled') return
+     const dName = o.dealer?.name || o.dealer_name
+     const dealer = dealers.find(dd => (dd.name === dName) || (dd.id === o.dealer_id))
+     const area = dealer?.area || dealer?.area_name || dealer?.territory || 'Unassigned'
+     if (!areaMap[area]) areaMap[area] = { area, dealers: 0, actual: 0 }
+     areaMap[area].actual += (o.total_amount || o.amount || 0)
+   })
   const AREA_PERFORMANCE = Object.values(areaMap)
     .map(a => ({ ...a, target: a.actual > 0 ? Math.round(a.actual * 1.2) : 500000, percent: a.actual > 0 ? Math.min(Math.round((a.actual / Math.max(a.actual * 1.2, 1)) * 100), 100) : 0 }))
     .sort((a, b) => b.actual - a.actual)

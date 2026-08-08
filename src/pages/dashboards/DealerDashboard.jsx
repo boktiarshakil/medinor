@@ -8,6 +8,7 @@ export default function DealerDashboard() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
+  const [payments, setPayments] = useState([])
   const [dealerRecord, setDealerRecord] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -15,13 +16,15 @@ export default function DealerDashboard() {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, dealersData] = await Promise.all([
+        const [ordersData, invoicesData, dealersData, paymentsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getDealers().catch(() => []),
+          api.getPayments().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
+        setPayments(paymentsData)
         const match = dealersData.find(
           d => d.email && d.email.toLowerCase() === String(user?.email || '').toLowerCase()
         )
@@ -47,9 +50,10 @@ export default function DealerDashboard() {
     .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
   const available = Math.max(0, creditLimit - totalDue)
 
-  // Recent payments from paid invoices
-  const recentPayments = myInvoices
-    .filter(inv => inv.status === 'paid')
+  // Recent payments from actual payments table
+  const recentPayments = payments
+    .filter(p => dealerId && p.dealer_id === dealerId)
+    .sort((a, b) => String(b.payment_date || b.created_at).localeCompare(String(a.payment_date || a.created_at)))
     .slice(0, 10)
 
   if (loading) {
@@ -183,11 +187,11 @@ export default function DealerDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentPayments.map(p => (
+                 {recentPayments.map(p => (
                   <tr key={p.id}>
-                    <td className="font-semibold text-emerald-600">{formatCurrency(p.total_amount || p.amount || 0)}</td>
-                    <td><span className={statusColor(p.status)}>{statusLabel(p.status)}</span></td>
-                    <td className="hidden sm:table-cell text-gray-500">{formatDate(p.paid_at || p.updated_at || p.created_at)}</td>
+                    <td className="font-semibold text-emerald-600">{formatCurrency(p.amount || 0)}</td>
+                    <td><span className="badge-info">{p.payment_method || '—'}</span></td>
+                    <td className="hidden sm:table-cell text-gray-500">{formatDate(p.payment_date || p.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

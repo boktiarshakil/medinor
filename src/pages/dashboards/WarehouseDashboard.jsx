@@ -7,18 +7,21 @@ import { MdInventory2, MdLocalShipping, MdWarning, MdArrowUpward, MdArrowDownwar
 export default function WarehouseDashboard() {
   const [inventory, setInventory] = useState([])
   const [orders, setOrders] = useState([])
+  const [movements, setMovements] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [invData, ordersData] = await Promise.all([
+        const [invData, ordersData, moveData] = await Promise.all([
           api.getInventory().catch(() => []),
           api.getOrders().catch(() => []),
+          api.getStockMovements().catch(() => []),
         ])
         setInventory(invData)
         setOrders(ordersData)
+        setMovements(moveData)
       } catch (err) {
         console.error('Warehouse dashboard fetch failed:', err)
       } finally {
@@ -41,6 +44,14 @@ export default function WarehouseDashboard() {
   })
   const pendingDispatch = orders.filter(o => o.status === 'packed').length
 
+  const movementTotals = {}
+  movements.forEach(m => {
+    if (!m.product_id) return
+    movementTotals[m.product_id] = movementTotals[m.product_id] || { in: 0, out: 0 }
+    if (m.movement_type === 'in') movementTotals[m.product_id].in += m.quantity || 0
+    else if (m.movement_type === 'out') movementTotals[m.product_id].out += m.quantity || 0
+  })
+
   const STATS = [
     { label: 'Total SKUs', value: formatNumber(totalSKUs), icon: MdInventory2, color: 'brand' },
     { label: 'Stock Value', value: formatCurrency(stockValue), icon: MdInventory2, color: 'blue' },
@@ -54,11 +65,12 @@ export default function WarehouseDashboard() {
       const stock = item.quantity || item.stock || 0
       const min = item.low_stock_threshold ?? item.min_quantity ?? item.reorder_level ?? 0
       const isLow = min > 0 && stock < min
+      const mv = movementTotals[item.product_id] || { in: 0, out: 0 }
       return [
         item.product?.name || item.name || 'Unknown',
         item.product?.sku || item.sku || '-',
-        item.in_quantity || item.inQty || 0,
-        item.out_quantity || item.outQty || 0,
+        mv.in,
+        mv.out,
         stock,
         min || '-',
         isLow ? 'Low Stock' : 'In Stock'
@@ -136,12 +148,13 @@ export default function WarehouseDashboard() {
                   const stock = item.quantity || item.stock || 0
                   const min = item.low_stock_threshold ?? item.min_quantity ?? item.reorder_level ?? 0
                   const isLow = min > 0 && stock < min
+                  const mv = movementTotals[item.product_id] || { in: 0, out: 0 }
                   return (
                     <tr key={item.id}>
                       <td className="font-medium">{item.product?.name || item.name || 'Unknown'}</td>
                       <td className="font-mono text-xs text-gray-500">{item.product?.sku || item.sku || '-'}</td>
-                      <td className="text-emerald-600 font-medium">+{item.in_quantity || item.inQty || 0}</td>
-                      <td className="text-red-500 font-medium">-{item.out_quantity || item.outQty || 0}</td>
+                      <td className="text-emerald-600 font-medium">+{mv.in}</td>
+                      <td className="text-red-500 font-medium">-{mv.out}</td>
                       <td className="font-bold">{stock}</td>
                       <td>
                         {isLow ? (

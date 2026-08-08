@@ -18,7 +18,7 @@ const REPORT_CARDS = [
 export default function Reports() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dataCache, setDataCache] = useState({ orders: [], invoices: [], dealers: [], inventory: [] })
+  const [dataCache, setDataCache] = useState({ orders: [], invoices: [], dealers: [], inventory: [], products: [], users: [], visits: [] })
   const [viewReport, setViewReport] = useState(null)
 
   const downloadCSV = (filename, header, rows) => {
@@ -32,6 +32,101 @@ export default function Reports() {
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const getReportRows = (report) => {
+    const { orders, invoices, dealers, inventory, products, users, visits } = dataCache
+    const userMap = {}
+    users.forEach(u => { userMap[u.id] = u.full_name || u.email })
+    switch (report.title) {
+      case 'Sales Report':
+        return {
+          headers: ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
+          rows: orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]),
+        }
+      case 'Dealer Report':
+        return {
+          headers: ['Name', 'Mobile', 'District', 'Area', 'Credit Limit', 'Current Due', 'Status'],
+          rows: dealers.map(d => [d.name, d.mobile, d.district, d.area, d.credit_limit, d.current_due, d.status]),
+        }
+      case 'Executive Report': {
+        const bySr = {}
+        orders.filter(o => o.status !== 'cancelled').forEach(o => {
+          const key = o.sr_id || 'unassigned'
+          bySr[key] = bySr[key] || { count: 0, revenue: 0 }
+          bySr[key].count += 1
+          bySr[key].revenue += o.net_amount || o.total_amount || 0
+        })
+        return {
+          headers: ['Executive', 'Orders', 'Revenue'],
+          rows: Object.entries(bySr).map(([id, v]) => [userMap[id] || 'Unassigned', v.count, v.revenue]),
+        }
+      }
+      case 'Collection Report':
+        return {
+          headers: ['Invoice #', 'Dealer', 'Paid', 'Status'],
+          rows: invoices
+            .filter(i => (i.paid_amount || 0) > 0)
+            .map(i => [i.invoice_number, i.dealer?.name || '', i.paid_amount || 0, i.status]),
+        }
+      case 'Outstanding Report':
+        return {
+          headers: ['Invoice #', 'Dealer', 'Amount', 'Paid', 'Due', 'Status'],
+          rows: invoices
+            .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+            .map(i => [i.invoice_number, i.dealer?.name || '', i.total_amount || 0, i.paid_amount || 0, i.due_amount || i.total_amount || 0, i.status]),
+        }
+      case 'Stock Report':
+        return {
+          headers: ['Product', 'Quantity', 'Low Stock Threshold', 'Expiry'],
+          rows: inventory.map(i => [i.product?.name || '', i.quantity || 0, i.low_stock_threshold || 0, i.expiry_date]),
+        }
+      case 'Product Performance': {
+        const prodMap = {}
+        orders.forEach(o => (o.items || []).forEach(it => {
+          const pid = it.product_id
+          prodMap[pid] = prodMap[pid] || { units: 0, revenue: 0 }
+          prodMap[pid].units += it.quantity || 0
+          prodMap[pid].revenue += it.total_price || it.quantity * it.unit_price || 0
+        }))
+        return {
+          headers: ['Product', 'Units Sold', 'Revenue'],
+          rows: Object.entries(prodMap).map(([pid, v]) => {
+            const p = products.find(pr => pr.id === pid)
+            return [p?.name || pid, v.units, v.revenue]
+          }).sort((a, b) => b[2] - a[2]),
+        }
+      }
+      case 'Visit Report':
+        return {
+          headers: ['SR', 'Contact', 'Date', 'Purpose', 'Outcome'],
+          rows: visits.map(v => [userMap[v.sr_id] || v.sr_id, v.contact?.name || v.contact_name || '—', v.visit_date, v.purpose || '—', v.outcome || '—']),
+        }
+      case 'Profit Report': {
+        const prodCost = {}
+        products.forEach(p => { prodCost[p.id] = p.purchase_price || 0 })
+        const itemMap = {}
+        orders.forEach(o => (o.items || []).forEach(it => {
+          const pid = it.product_id
+          itemMap[pid] = itemMap[pid] || { units: 0, revenue: 0 }
+          itemMap[pid].units += it.quantity || 0
+          itemMap[pid].revenue += it.total_price || it.quantity * it.unit_price || 0
+        }))
+        return {
+          headers: ['Product', 'Units', 'Revenue', 'Cost', 'Profit'],
+          rows: Object.entries(itemMap).map(([pid, v]) => {
+            const p = products.find(pr => pr.id === pid)
+            const cost = (prodCost[pid] || 0) * v.units
+            return [p?.name || pid, v.units, v.revenue, cost, v.revenue - cost]
+          }),
+        }
+      }
+      default:
+        return {
+          headers: ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
+          rows: orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]),
+        }
+    }
   }
 
   const handleExport = (report) => {
@@ -70,13 +165,16 @@ export default function Reports() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [orders, invoices, dealers, inventory] = await Promise.all([
+        const [orders, invoices, dealers, inventory, products, users, visits] = await Promise.all([
           api.getOrders(),
           api.getInvoices(),
           api.getDealers(),
           api.getInventory().catch(() => []),
+          api.getProducts().catch(() => []),
+          api.getUsers().catch(() => []),
+          api.getCRMVisits().catch(() => []),
         ])
-        setDataCache({ orders, invoices, dealers, inventory })
+        setDataCache({ orders, invoices, dealers, inventory, products, users, visits })
 
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -84,7 +182,9 @@ export default function Reports() {
         const mtdOrders = orders.filter(o => new Date(o.created_at) >= monthStart)
         const totalRevenue = mtdOrders.reduce((s, o) => s + (o.net_amount || o.total_amount || 0), 0)
         const totalPaid = invoices.reduce((s, i) => s + (i.paid_amount || 0), 0)
-        const outstanding = invoices.reduce((s, i) => s + ((i.due_amount ?? (i.total_amount || 0)) - (i.paid_amount || 0)), 0)
+        const outstanding = invoices
+          .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
+          .reduce((s, i) => s + (i.due_amount || i.total_amount || 0), 0)
         const activeDealers = dealers.filter(d => d.status === 'active').length
         const avgOrder = mtdOrders.length > 0 ? totalRevenue / mtdOrders.length : 0
 

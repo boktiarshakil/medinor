@@ -3,7 +3,7 @@
 // ============================================================
 
 import { supabase } from './supabase'
-import { generateInvoiceNo } from './utils'
+import { generateInvoiceNo, generateTicketNo } from './utils'
 
 export const api = {
   // ---- Users / Profiles ----
@@ -340,6 +340,16 @@ export const api = {
       .from('inventory')
       .update(updates)
       .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async createInventory(inv) {
+    const { data, error } = await supabase
+      .from('inventory')
+      .insert(inv)
       .select()
       .single()
     if (error) throw error
@@ -898,9 +908,13 @@ export const api = {
   // ---- Support tickets ----
 
   async createSupportTicket(ticket) {
+    const payload = { ...ticket }
+    if (!payload.ticket_number) {
+      payload.ticket_number = generateTicketNo()
+    }
     const { data, error } = await supabase
       .from('support_tickets')
-      .insert(ticket)
+      .insert(payload)
       .select()
       .single()
     if (error) throw error
