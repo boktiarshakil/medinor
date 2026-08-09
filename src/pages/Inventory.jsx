@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MdInventory2, MdWarning, MdAdd, MdRemove, MdTune, MdClose } from 'react-icons/md'
+import { MdInventory2, MdWarning, MdAdd, MdRemove, MdTune, MdClose, MdSearch, MdCheckCircle, MdErrorOutline } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
@@ -10,6 +10,7 @@ export default function Inventory() {
   const [inventory, setInventory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
   const [modal, setModal] = useState(null)
   const [qty, setQty] = useState('')
   const [reason, setReason] = useState('')
@@ -28,7 +29,6 @@ export default function Inventory() {
       setProducts(prods || [])
       setInventory(inv || [])
     } catch (err) {
-      console.error('Inventory fetch failed:', err)
       setError(err.message || 'Failed to load inventory')
     } finally {
       setLoading(false)
@@ -37,13 +37,17 @@ export default function Inventory() {
 
   useEffect(() => { fetchData() }, [])
 
-  // Build merged view: each product with its total stock and inventory rows
   const rows = products.map(p => {
     const invRows = inventory.filter(i => i.product_id === p.id)
     const stock = invRows.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
     const min = invRows.length ? Math.min(...invRows.map(i => Number(i.low_stock_threshold) || 0)) : 0
     return { product: p, invRows, stock, min }
   })
+
+  const filtered = rows.filter(r =>
+    r.product.name.toLowerCase().includes(search.toLowerCase()) ||
+    (r.product.sku || '').toLowerCase().includes(search.toLowerCase())
+  )
 
   const openModal = (type, row) => {
     setModal({ type, row })
@@ -58,18 +62,17 @@ export default function Inventory() {
     setReason('')
   }
 
-  // Find or create the primary inventory row for a product
   const primaryInv = (row) => row.invRows[0] || null
 
   const handleAdd = async () => {
     const quantity = Number(qty)
-    if (!modal?.row || !quantity || quantity <= 0) {
+    const row = modal?.row
+    if (!row || !quantity || quantity <= 0) {
       toast.error('Enter a valid quantity')
       return
     }
     setSaving(true)
     try {
-      const row = modal.row
       const inv = primaryInv(row)
       await api.addStockMovement({
         product_id: row.product.id,
@@ -87,7 +90,6 @@ export default function Inventory() {
       closeModal()
       fetchData()
     } catch (err) {
-      console.error('Add stock failed:', err)
       toast.error(err.message || 'Failed to add stock')
     } finally {
       setSaving(false)
@@ -116,9 +118,8 @@ export default function Inventory() {
         movement_type: 'out',
         quantity,
         reference_type: 'manual_remove',
-        notes: reason || 'Manual stock remove'
+        notes: reason
       })
-      // Reduce from inventory rows (oldest first)
       let remaining = quantity
       const sorted = [...row.invRows].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       for (const inv of sorted) {
@@ -132,7 +133,6 @@ export default function Inventory() {
       closeModal()
       fetchData()
     } catch (err) {
-      console.error('Remove stock failed:', err)
       toast.error(err.message || 'Failed to remove stock')
     } finally {
       setSaving(false)
@@ -162,7 +162,6 @@ export default function Inventory() {
           notes: `${diff > 0 ? 'Up' : 'Down'} adjust to ${newQty}: ${reason}`
         })
       }
-      // Clear existing rows, set one row to the new quantity
       const inv = primaryInv(row)
       if (inv) {
         for (const r of row.invRows) {
@@ -176,15 +175,20 @@ export default function Inventory() {
       closeModal()
       fetchData()
     } catch (err) {
-      console.error('Adjust stock failed:', err)
       toast.error(err.message || 'Failed to adjust stock')
     } finally {
       setSaving(false)
     }
   }
 
-  const lowStock = rows.filter(r => r.min > 0 && r.stock < r.min)
+  const lowStock = rows.filter(r => r.min > 0 && r.stock > 0 && r.stock < r.min)
   const outOfStock = rows.filter(r => r.stock === 0)
+
+  const statusBadge = (stock, min) => {
+    if (stock === 0) return <span className="badge-danger">Out</span>
+    if (min > 0 && stock < min) return <span className="badge-warning">Low</span>
+    return <span className="badge-success">OK</span>
+  }
 
   if (loading) {
     return (
@@ -206,15 +210,18 @@ export default function Inventory() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Inventory</h1>
-        <p className="text-sm text-gray-500">{rows.length} SKUs · {outOfStock.length} out of stock · {lowStock.length} low stock</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Inventory</h1>
+          <p className="text-sm text-gray-500">{rows.length} SKUs · {outOfStock.length} out of stock · {lowStock.length} low stock</p>
+        </div>
       </div>
 
-      {/* Out of stock alerts */}
+      {/* Alerts */}
       {outOfStock.length > 0 && (
         <div className="card p-4 border-l-4 border-l-red-400 flex items-start gap-3">
-          <MdWarning size={18} className="text-red-500 mt-0.5 flex-shrink-0" />
+          <MdErrorOutline size={18} className="text-red-500 mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-sm font-semibold text-red-700">Out of Stock</p>
             <p className="text-xs text-gray-600 mt-0.5">
@@ -224,7 +231,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Low stock alerts */}
       {lowStock.length > 0 && (
         <div className="card p-4 border-l-4 border-l-amber-400 flex items-start gap-3">
           <MdWarning size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
@@ -237,6 +243,31 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* Filters */}
+      <div className="card p-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <MdSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Search products..."
+            className="input pl-10"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="input w-full sm:w-48"
+          value={modal?.filterStatus || 'all'}
+          onChange={(e) => setModal(m => m ? { ...m, filterStatus: e.target.value } : { filterStatus: e.target.value })}
+        >
+          <option value="all">All Status</option>
+          <option value="out">Out of Stock</option>
+          <option value="low">Low Stock</option>
+          <option value="ok">In Stock</option>
+        </select>
+      </div>
+
+      {/* Table */}
       <div className="table-container">
         <table className="data-table">
           <thead>
@@ -250,119 +281,118 @@ export default function Inventory() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(row => {
-              const isOut = row.stock === 0
-              const isLow = !isOut && row.min > 0 && row.stock < row.min
-              return (
-                <tr key={row.product.id}>
-                  <td className="font-medium">{row.product.name}</td>
-                  <td className="font-mono text-xs text-gray-500">{row.product.sku || '-'}</td>
-                  <td className="text-xs text-gray-500">{row.product.category || '-'}</td>
-                  <td className="font-bold text-lg">{row.stock}</td>
-                  <td>
-                    {isOut ? (
-                      <span className="badge-danger">Out</span>
-                    ) : isLow ? (
-                      <span className="badge-warning">Low</span>
-                    ) : (
-                      <span className="badge-success">OK</span>
-                    )}
+            {filtered.map(row => (
+              <tr key={row.product.id}>
+                <td className="font-medium">{row.product.name}</td>
+                <td className="font-mono text-xs text-gray-500">{row.product.sku || '-'}</td>
+                <td className="text-xs text-gray-500">{row.product.category || '-'}</td>
+                <td className="font-bold text-lg">{row.stock}</td>
+                <td>{statusBadge(row.stock, row.min)}</td>
+                {canManage && (
+                  <td className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <button className="btn-secondary text-xs" title="Add stock" onClick={() => openModal('add', row)}>
+                        <MdAdd size={12} /> Add
+                      </button>
+                      <button className="btn-secondary text-xs" title="Remove stock" onClick={() => openModal('remove', row)}>
+                        <MdRemove size={12} /> Remove
+                      </button>
+                      <button className="btn-secondary text-xs" title="Adjust stock" onClick={() => openModal('adjust', row)}>
+                        <MdTune size={12} /> Adjust
+                      </button>
+                    </div>
                   </td>
-                  {canManage && (
-                    <td className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <button className="btn-secondary text-xs" title="Add stock" onClick={() => openModal('add', row)}>
-                          <MdAdd size={12} /> Add
-                        </button>
-                        <button className="btn-secondary text-xs" title="Remove stock" onClick={() => openModal('remove', row)}>
-                          <MdRemove size={12} /> Remove
-                        </button>
-                        <button className="btn-secondary text-xs" title="Adjust stock" onClick={() => openModal('adjust', row)}>
-                          <MdTune size={12} /> Adjust
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              )
-            })}
+                )}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {rows.length === 0 && (
+      {filtered.length === 0 && (
         <div className="card p-12 text-center">
           <MdInventory2 size={48} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-gray-500">No products</p>
+          <p className="text-sm text-gray-500">No products found</p>
         </div>
       )}
 
       {/* Manage Stock modal */}
       {modal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">
-                {modal.type === 'add' && 'Add Stock'}
-                {modal.type === 'remove' && 'Remove Stock'}
-                {modal.type === 'adjust' && 'Adjust Stock'}
-              </h3>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">
+                  {modal.type === 'add' && 'Add Stock'}
+                  {modal.type === 'remove' && 'Remove Stock'}
+                  {modal.type === 'adjust' && 'Adjust Stock'}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">{modal.row.product.name}</p>
+              </div>
               <button onClick={closeModal} className="p-1 text-gray-400 hover:text-gray-600">
                 <MdClose size={20} />
               </button>
             </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Product: <span className="font-semibold">{modal.row.product.name}</span>
-              <br />
-              Current stock: <span className="font-semibold">{modal.row.stock} units</span>
-            </p>
+            <div className="p-5 space-y-4">
+              <div className="card p-3 bg-gray-50 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center">
+                  <MdInventory2 size={18} className="text-brand-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Current stock</p>
+                  <p className="text-lg font-bold text-gray-900">{modal.row.stock} units</p>
+                </div>
+              </div>
 
-            {modal.type === 'adjust' ? (
-              <>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">New quantity</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  className="input w-full mb-4"
-                  placeholder="e.g. 50"
-                />
-              </>
-            ) : (
-              <>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  {modal.type === 'remove' ? 'Quantity to remove' : 'Quantity to add'}
+              {modal.type === 'adjust' ? (
+                <div>
+                  <label className="label">New quantity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    className="input"
+                    placeholder="e.g. 50"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="label">
+                    {modal.type === 'remove' ? 'Quantity to remove' : 'Quantity to add'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    className="input"
+                    placeholder="e.g. 20"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="label">
+                  {modal.type === 'remove' || modal.type === 'adjust' ? 'Reason *' : 'Notes (optional)'}
                 </label>
                 <input
-                  type="number"
-                  min="1"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  className="input w-full mb-4"
-                  placeholder="e.g. 20"
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="input"
+                  placeholder={modal.type === 'remove' ? 'e.g. damaged, expired' : modal.type === 'adjust' ? 'e.g. recount, correction' : 'optional note'}
                 />
-              </>
-            )}
+              </div>
 
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              {modal.type === 'remove' || modal.type === 'adjust' ? 'Reason *' : 'Notes (optional)'}
-            </label>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="input w-full mb-5"
-              placeholder={modal.type === 'remove' ? 'e.g. damaged, expired' : modal.type === 'adjust' ? 'e.g. recount, correction' : 'optional note'}
-            />
-
-            <div className="flex gap-2">
-              <button className="btn-primary flex-1" onClick={modal.type === 'add' ? handleAdd : modal.type === 'remove' ? handleRemove : handleAdjust} disabled={saving}>
-                {saving ? 'Saving...' : modal.type === 'add' ? 'Add Stock' : modal.type === 'remove' ? 'Remove Stock' : 'Adjust Stock'}
-              </button>
-              <button className="btn-secondary flex-1" onClick={closeModal} disabled={saving}>
-                Cancel
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button className="btn-primary flex-1" onClick={modal.type === 'add' ? handleAdd : modal.type === 'remove' ? handleRemove : handleAdjust} disabled={saving}>
+                  {saving ? 'Saving...' : modal.type === 'add' ? 'Add Stock' : modal.type === 'remove' ? 'Remove Stock' : 'Adjust Stock'}
+                </button>
+                <button className="btn-secondary flex-1" onClick={closeModal} disabled={saving}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
