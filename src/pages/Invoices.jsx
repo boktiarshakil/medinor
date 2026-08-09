@@ -99,7 +99,7 @@ export default function Invoices() {
   }
 
   const getProductPrice = (product) =>
-    product.dealer_price || product.trade_price || product.mrp || product.price || 0
+    product.trade_price || product.dealer_price || product.mrp || product.price || 0
 
   const addItem = (productId) => {
     const product = products.find(p => String(p.id) === String(productId))
@@ -165,7 +165,36 @@ export default function Invoices() {
         due_date: newInvoice.dueDate || null,
         notes: newInvoice.notes || null,
       }
-      await api.createInvoice(invoice)
+      const created = await api.createInvoice(invoice)
+      // Record dealer ledger debit for the manual invoice
+      try {
+        await api.recordDealerLedger({
+          dealer_id: selectedDealer.id,
+          transaction_type: 'invoice',
+          reference_id: created.id,
+          debit: total,
+          credit: 0,
+          description: `Invoice ${created.invoice_number}`,
+          transaction_date: invoice.invoice_date,
+        })
+      } catch (ledgerErr) {
+        console.warn('Dealer ledger write failed:', ledgerErr)
+      }
+      // Deduct stock for manual invoice items
+      try {
+        for (const item of newInvoice.items) {
+          await api.addStockMovement({
+            product_id: item.id,
+            movement_type: 'out',
+            quantity: item.qty,
+            reference_type: 'invoice',
+            reference_id: created.id,
+            notes: `Invoice ${created.invoice_number}`,
+          })
+        }
+      } catch (stockErr) {
+        console.warn('Stock movement write failed:', stockErr)
+      }
       toast.success('Invoice created')
       setShowCreate(false)
       setNewInvoice({ dealerId: '', orderId: '', items: [], discount: 0, notes: '', dueDate: '' })

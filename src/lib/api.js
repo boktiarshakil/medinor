@@ -250,7 +250,7 @@ export const api = {
       .insert(invoicePayload)
       .select()
       .single()
-    if (invError) throw error
+    if (invError) throw invError
 
     // Record dealer ledger debit for the invoice
     try {
@@ -282,6 +282,11 @@ export const api = {
         .eq('product_id', item.product_id)
         .order('created_at', { ascending: true })
       if (invErr) throw invErr
+
+      const available = (invRecords || []).reduce((s, r) => s + (Number(r.quantity) || 0), 0)
+      if (available < item.quantity) {
+        throw new Error(`Insufficient stock for product ${item.product_id}: need ${item.quantity}, have ${available}`)
+      }
 
       let remaining = item.quantity
       const updates = []
