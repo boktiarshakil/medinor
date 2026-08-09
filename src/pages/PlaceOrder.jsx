@@ -58,7 +58,9 @@ export default function PlaceOrder() {
     const product = products.find(p => p.id === id)
     if (!product || product.stock === 0) return
     const currentQty = cart[id] || 0
-    if (product.stock !== null && currentQty >= product.stock) return
+    // Block if we already have all known stock. null/undefined stock = no inventory record → allow up to a sane limit.
+    if (product.stock !== null && product.stock !== undefined && currentQty >= product.stock) return
+    if (currentQty >= 999) return
     setCart(prev => ({ ...prev, [id]: currentQty + 1 }))
   }
 

@@ -762,6 +762,51 @@ export const api = {
       .select()
       .single()
     if (error) throw error
+
+    // On approval, restock returned items into inventory
+    if (status === 'approved') {
+      try {
+        const { data: returnData } = await supabase
+          .from('returns')
+          .select('*, items:return_items(*)')
+          .eq('id', id)
+          .single()
+
+        if (returnData?.items) {
+          for (const item of returnData.items) {
+            await this.addStockMovement({
+              product_id: item.product_id,
+              movement_type: 'in',
+              quantity: item.quantity,
+              reference_type: 'return',
+              reference_id: id,
+              notes: `Return ${returnData.return_number || id}`,
+            })
+            // Find or create inventory row
+            const { data: invRows } = await supabase
+              .from('inventory')
+              .select('id, quantity')
+              .eq('product_id', item.product_id)
+              .order('created_at', { ascending: true })
+              .limit(1)
+            if (invRows && invRows.length > 0) {
+              await this.updateInventory(invRows[0].id, {
+                quantity: Number(invRows[0].quantity || 0) + Number(item.quantity),
+              })
+            } else {
+              await this.createInventory({
+                product_id: item.product_id,
+                quantity: item.quantity,
+                low_stock_threshold: 50,
+              })
+            }
+          }
+        }
+      } catch (stockErr) {
+        console.warn('Return restock failed:', stockErr)
+      }
+    }
+
     return data
   },
 

@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
-import { MdAssignmentReturn, MdAdd, MdClose } from 'react-icons/md'
+import { MdAssignmentReturn, MdAdd, MdClose, MdCheck, MdCancel } from 'react-icons/md'
 import { api } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Returns() {
+  const { role } = useAuth()
+  const canManage = ['super_admin', 'admin', 'sales_manager'].includes(role)
   const [returns, setReturns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -103,6 +106,28 @@ export default function Returns() {
     }
   }
 
+  const handleApprove = async (r) => {
+    if (!window.confirm(`Approve return ${r.return_number || r.id}? Stock will be restored.`)) return
+    try {
+      await api.updateReturnStatus(r.id, 'approved')
+      toast.success('Return approved — stock restored')
+      fetchReturns()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    }
+  }
+
+  const handleReject = async (r) => {
+    if (!window.confirm(`Reject return ${r.return_number || r.id}?`)) return
+    try {
+      await api.updateReturnStatus(r.id, 'rejected')
+      toast.success('Return rejected')
+      fetchReturns()
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    }
+  }
+
   if (loading) {
     return (
       <div className="card p-12 text-center">
@@ -134,6 +159,7 @@ export default function Returns() {
               <th>Amount</th>
               <th>Status</th>
               <th>Date</th>
+              {canManage && <th className="text-right">Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -145,6 +171,20 @@ export default function Returns() {
                 <td className="font-semibold">{formatCurrency(r.total_amount || r.amount || 0)}</td>
                 <td><span className={statusColor(r.status)}>{statusLabel(r.status)}</span></td>
                 <td className="text-gray-500">{formatDate(r.created_at || r.date)}</td>
+                {canManage && (
+                  <td className="text-right">
+                    {r.status === 'pending' && (
+                      <div className="flex justify-end gap-1">
+                        <button className="btn-secondary text-xs" title="Approve" onClick={() => handleApprove(r)}>
+                          <MdCheck size={12} /> Approve
+                        </button>
+                        <button className="btn-secondary text-xs" title="Reject" onClick={() => handleReject(r)}>
+                          <MdCancel size={12} /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
