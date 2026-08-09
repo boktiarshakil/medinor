@@ -132,6 +132,79 @@ Each price tier is what the **next party down the chain pays**:
 
 ---
 
+### How Roles Map to the Org Chart
+
+The Org Chart page shows the **full intended company structure**, while the app
+implements **7 login roles**. Each login role maps to a position in the chart:
+
+```
+Chairman
+ └─ Managing Director
+     └─ CEO
+         ├─ Board of Directors
+         │   ├─ National Sales Manager (NSM)      ─┐
+         │   ├─ Marketing Director                 │
+         │   ├─ Finance Director                   │  (not separate logins —
+         │   └─ Supply Chain Director              │   folded into admin)
+         └─ Regional Sales Manager (RSM)           ─┘→ sales_manager
+             └─ District Manager (DM)                 ─┐
+                 └─ Area Sales Manager (ASM)            │→ area_manager
+                     └─ Territory Sales Officer (TSO)   │→ sales_executive
+                         └─ Master Dealer               ─┘
+                             └─ Sub Dealer               → dealer
+                                 └─ Sub Agent             │
+                                     └─ Retailer          │→ customers
+                                         └─ Customer      ┘
+```
+
+| App role (login) | Org chart position | What it really means |
+|---|---|---|
+| `super_admin` | Chairman / MD / CEO | Owner — everything |
+| `admin` | Director / NSM level | Head of operations — all data + approvals |
+| `sales_manager` | RSM | Manages multiple areas/regions |
+| `area_manager` | ASM (also covers DM) | Manages one area, supervises SRs |
+| `sales_executive` | **TSO** (the field rep) | The person on the ground |
+| `warehouse` | Supply Chain arm | Packs/dispatches, no pricing |
+| `dealer` | **Dealer** (sub-dealer level) | Your customer/distributor |
+
+The chart's **NSM / DM / RSM** titles are more granular than the app's roles —
+the app collapses them: `sales_manager` covers NSM+RSM, `area_manager` covers
+DM+ASM.
+
+### SR vs Dealer — The Key Distinction
+
+The single most important relationship in the system. **SR and Dealer sit on
+opposite sides of your company.**
+
+```
+        YOUR COMPANY (distributor)
+                │
+    ┌───────────┴────────────┐
+    │                        │
+  EMPLOYEE                 CUSTOMER
+  (sales_executive)        (dealer)
+```
+
+| | SR / TSO (`sales_executive`) | Dealer |
+|---|---|---|
+| Relationship | **Employee — inside the company** | **Independent business — outside the company** |
+| Paid by | Salary + commission from your company | Their own profit (margin) |
+| What they do | Places orders **for** dealers, collects payments **from** dealers, logs visits/attendance | Buys from you at trade price, resells to retail at dealer price |
+| Money they earn | `commission` from the company | `dealer_price − trade_price` per unit |
+| Prices they see | Trade price + MRP (**not** dealer price) | Own dealer price + MRP only |
+| Debt tracking | Not tracked as credit | Credit/ledger per dealer |
+| In the org chart | Above the dealer (sales chain) | Below the SR |
+
+**One-line summary:** SR is your **sales force** (works for you, gets paid by
+you); dealer is your **buyer** (buys from you, pays you). The SR's job is to
+make the dealer order and pay; the dealer's job is to buy and sell on.
+
+> **Note:** In the org chart the SR appears *above* the dealer, but that is the
+> **sales chain, not authority**. The dealer is not the SR's subordinate — the
+> SR simply *serves* that dealer's territory.
+
+---
+
 ## 4. Pricing Model & Price Isolation
 
 ### What each role can see
