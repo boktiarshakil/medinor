@@ -107,10 +107,22 @@ export const api = {
   },
 
   async deleteProduct(id) {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id)
+    // Prevent deletion if product has transaction history
+    const { count: orderCount } = await supabase
+      .from('order_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', id)
+    const { count: invCount } = await supabase
+      .from('inventory')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', id)
+    if ((orderCount || 0) > 0) {
+      throw new Error(`Cannot delete: product has ${orderCount} order history records. Deactivate instead.`)
+    }
+    if ((invCount || 0) > 0) {
+      throw new Error(`Cannot delete: product has inventory records. Clear stock first.`)
+    }
+    const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) throw error
   },
 
@@ -165,6 +177,23 @@ export const api = {
     const payload = { ...order }
     if (!payload.order_number) {
       payload.order_number = `ORD-${Date.now().toString(36).toUpperCase()}`
+    }
+    // Credit limit check: dealer cannot exceed credit_limit
+    if (payload.dealer_id && (payload.total_amount || payload.net_amount)) {
+      const orderAmount = payload.total_amount || payload.net_amount || 0
+      const { data: dealer } = await supabase
+        .from('dealers')
+        .select('credit_limit, current_due')
+        .eq('id', payload.dealer_id)
+        .single()
+      if (dealer) {
+        const limit = Number(dealer.credit_limit) || 0
+        const due = Number(dealer.current_due) || 0
+        const available = limit - due
+        if (limit > 0 && orderAmount > available) {
+          throw new Error(`Order exceeds available credit (${available} BDT available, ${limit} limit, ${due} due)`)
+        }
+      }
     }
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
