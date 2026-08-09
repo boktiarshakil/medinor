@@ -40,8 +40,10 @@ export default function Inventory() {
   const rows = products.map(p => {
     const invRows = inventory.filter(i => i.product_id === p.id)
     const stock = invRows.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
+    const reserved = invRows.reduce((s, i) => s + (Number(i.quantity_reserved) || 0), 0)
+    const available = stock - reserved
     const min = invRows.length ? Math.min(...invRows.map(i => Number(i.low_stock_threshold) || 0)) : 0
-    return { product: p, invRows, stock, min }
+    return { product: p, invRows, stock, reserved, available, min }
   })
 
   const filtered = rows.filter(r =>
@@ -275,7 +277,9 @@ export default function Inventory() {
               <th>Product</th>
               <th>SKU</th>
               <th>Category</th>
-              <th>Stock</th>
+              <th>In Stock</th>
+              <th>Reserved</th>
+              <th>Available</th>
               <th>Status</th>
               {canManage && <th className="text-right">Manage</th>}
             </tr>
@@ -283,11 +287,13 @@ export default function Inventory() {
           <tbody>
             {filtered.map(row => (
               <tr key={row.product.id}>
-                <td className="font-medium">{row.product.name}</td>
-                <td className="font-mono text-xs text-gray-500">{row.product.sku || '-'}</td>
-                <td className="text-xs text-gray-500">{row.product.category || '-'}</td>
-                <td className="font-bold text-lg">{row.stock}</td>
-                <td>{statusBadge(row.stock, row.min)}</td>
+                  <td className="font-medium">{row.product.name}</td>
+                  <td className="font-mono text-xs text-gray-500">{row.product.sku || '-'}</td>
+                  <td className="text-xs text-gray-500">{row.product.category || '-'}</td>
+                  <td className="font-bold text-lg">{row.stock}</td>
+                  <td className="text-amber-600 font-medium">{row.reserved || 0}</td>
+                  <td className="font-bold text-lg">{row.available}</td>
+                  <td>{statusBadge(row.available, row.min)}</td>
                 {canManage && (
                   <td className="text-right">
                     <div className="flex justify-end gap-1">

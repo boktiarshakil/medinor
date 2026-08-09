@@ -6,10 +6,10 @@ import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
 const NEXT_ACTIONS = {
-  submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'] },
+  submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'], note: 'Stock reserved' },
   approved: { status: 'packed', label: 'Pack', icon: MdInventory, roles: ['super_admin', 'admin', 'warehouse'] },
-  packed: { status: 'dispatched', label: 'Dispatch', icon: MdLocalShipping, roles: ['super_admin', 'admin', 'warehouse'] },
-  dispatched: { status: 'delivered', label: 'Deliver', icon: MdHandshake, roles: ['super_admin', 'admin', 'warehouse'] },
+  packed: { status: 'dispatched', label: 'Dispatch', icon: MdLocalShipping, roles: ['super_admin', 'admin', 'warehouse'], note: 'Invoice generated' },
+  dispatched: { status: 'delivered', label: 'Deliver', icon: MdHandshake, roles: ['super_admin', 'admin', 'warehouse'], note: 'Stock deducted' },
   delivered: { status: 'completed', label: 'Complete', icon: MdCheck, roles: ['super_admin', 'admin'] },
 }
 
@@ -168,15 +168,18 @@ export default function Orders() {
   }
 
   const handleAdvance = async (order, action) => {
-    if (!window.confirm(`Move order ${order.number} to "${action.label}"?`)) return
+    const confirmMsg = action.note
+      ? `Move order ${order.number} to "${action.label}"? (${action.note})`
+      : `Move order ${order.number} to "${action.label}"?`
+    if (!window.confirm(confirmMsg)) return
     try {
       const { order: updated, invoice } = await api.updateOrderStatus(order._raw.id, action.status, user?.id)
       const newStatus = updated?.status || action.status
-      toast.success(
-        newStatus === 'delivered'
-          ? `Order delivered. Invoice ${invoice?.invoice_number ? invoice.invoice_number + ' ' : ''}auto-generated.`
-          : `Order moved to "${statusLabel(newStatus)}"`
-      )
+      let msg = `Order moved to "${statusLabel(newStatus)}"`
+      if (invoice?.invoice_number) msg += ` — Invoice ${invoice.invoice_number} generated`
+      if (newStatus === 'delivered') msg = `Order delivered — stock deducted`
+      if (newStatus === 'approved') msg = `Order approved — stock reserved`
+      toast.success(msg)
       setSelectedOrder(null)
       fetchOrders()
     } catch (err) {

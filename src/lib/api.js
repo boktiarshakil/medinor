@@ -199,8 +199,15 @@ export const api = {
     if (error) throw error
 
     let invoice = null
-    if (status === 'delivered' || status === 'completed') {
+    // Reserve stock at approval, generate invoice at dispatch, deduct at delivery
+    if (status === 'approved') {
+      await this.reserveStockForOrder(data)
+    } else if (status === 'dispatched') {
       invoice = await this.createInvoiceForOrder(id, createdBy)
+    } else if (status === 'delivered' || status === 'completed') {
+      await this.deductReservedStockForOrder(data)
+    } else if (status === 'cancelled') {
+      await this.releaseReservedStockForOrder(data)
     }
     return { order: data, invoice }
   },
@@ -267,52 +274,110 @@ export const api = {
       console.warn('Dealer ledger write failed:', ledgerErr)
     }
 
-    await this.deductStockForOrder(order)
     return invData
   },
 
-  async deductStockForOrder(order) {
-    const items = order.items || []
+  async reserveStockForOrder(order) {
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('items:order_items(product_id, quantity)')
+      .eq('id', order.id)
+      .single()
+    const items = orderData?.items || []
     if (items.length === 0) return
 
+    const reservations = []
     for (const item of items) {
-      const { data: invRecords, error: invErr } = await supabase
+      const { data: invRecords } = await supabase
         .from('inventory')
-        .select('id, quantity')
+        .select('id, quantity, quantity_reserved')
         .eq('product_id', item.product_id)
         .order('created_at', { ascending: true })
-      if (invErr) throw invErr
 
-      const available = (invRecords || []).reduce((s, r) => s + (Number(r.quantity) || 0), 0)
+      const available = (invRecords || []).reduce(
+        (s, r) => s + (Number(r.quantity) || 0) - (Number(r.quantity_reserved) || 0),
+        0
+      )
       if (available < item.quantity) {
-        throw new Error(`Insufficient stock for product ${item.product_id}: need ${item.quantity}, have ${available}`)
+        throw new Error(`Insufficient stock for product ${item.product_id}: need ${item.quantity}, have ${available} available`)
       }
 
       let remaining = item.quantity
-      const updates = []
       for (const rec of invRecords || []) {
         if (remaining <= 0) break
-        const deduct = Math.min(rec.quantity, remaining)
-        updates.push({ id: rec.id, newQty: rec.quantity - deduct })
-        remaining -= deduct
+        const free = (Number(rec.quantity) || 0) - (Number(rec.quantity_reserved) || 0)
+        const reserve = Math.min(free, remaining)
+        if (reserve > 0) {
+          await supabase
+            .from('inventory')
+            .update({ quantity_reserved: (Number(rec.quantity_reserved) || 0) + reserve })
+            .eq('id', rec.id)
+          reservations.push({ inventory_id: rec.id, product_id: item.product_id, quantity: reserve })
+          remaining -= reserve
+        }
       }
+    }
 
-      for (const u of updates) {
+    // Persist reservation references on the order
+    await supabase
+      .from('orders')
+      .update({ stock_reservations: reservations })
+      .eq('id', order.id)
+  },
+
+  async deductReservedStockForOrder(order) {
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('items:order_items(product_id, quantity), stock_reservations')
+      .eq('id', order.id)
+      .single()
+
+    const reservations = orderData?.stock_reservations || []
+    // Deduct from both quantity and quantity_reserved
+    for (const r of reservations) {
+      const { data: inv } = await supabase
+        .from('inventory')
+        .select('id, quantity, quantity_reserved')
+        .eq('id', r.inventory_id)
+        .single()
+      if (inv) {
         await supabase
           .from('inventory')
-          .update({ quantity: u.newQty })
-          .eq('id', u.id)
+          .update({
+            quantity: Math.max((Number(inv.quantity) || 0) - (Number(r.quantity) || 0), 0),
+            quantity_reserved: Math.max((Number(inv.quantity_reserved) || 0) - (Number(r.quantity) || 0), 0),
+          })
+          .eq('id', r.inventory_id)
       }
-
       await supabase.from('stock_movements').insert({
-        product_id: item.product_id,
+        product_id: r.product_id,
         movement_type: 'out',
-        quantity: item.quantity,
+        quantity: r.quantity,
         reference_type: 'order',
         reference_id: order.id,
         notes: `Order ${order.order_number || order.order_no || order.id}`,
       })
     }
+
+    // Clear reservations after deduction
+    await supabase
+      .from('orders')
+      .update({ stock_reservations: [] })
+      .eq('id', order.id)
+  },
+
+  async releaseReservedStockForOrder(order) {
+    const reservations = order.stock_reservations || []
+    for (const r of reservations) {
+      await supabase
+        .from('inventory')
+        .update({ quantity_reserved: Math.max((Number(r.quantity_reserved) || 0) - (Number(r.quantity) || 0), 0) })
+        .eq('id', r.inventory_id)
+    }
+    await supabase
+      .from('orders')
+      .update({ stock_reservations: [] })
+      .eq('id', order.id)
   },
 
   // ---- Invoices ----
