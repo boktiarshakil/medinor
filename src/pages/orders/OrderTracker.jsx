@@ -34,9 +34,11 @@ function mapOrder(order, invoices, payments) {
   const orderPayments = invoice ? payments.filter(p => p.invoice_id === invoice.id && p.status !== 'rejected') : []
   const confirmedPayments = orderPayments.filter(p => (p.status || 'approved') === 'approved')
   const hasPayment = confirmedPayments.length > 0
-  const invoiceFullyPaid = invoice ? (Number(invoice.due_amount || 0) <= 0 && hasPayment) : false
 
   const si = STATUS_INDEX[order.status] ?? 0
+  // An order marked "completed" always had payment — the Complete action is
+  // blocked server-side unless the invoice is fully paid.
+  const invoiceFullyPaid = invoice ? (Number(invoice.due_amount || 0) <= 0) : false
   const stepComplete = {
     placed: true,
     approved: si >= 2,        // approved by management or beyond
@@ -44,7 +46,7 @@ function mapOrder(order, invoices, payments) {
     warehouse: si >= 3,       // packed or beyond
     dispatched: si >= 4,      // dispatched or beyond
     delivered: si >= 5,       // delivered or beyond
-    payment: invoiceFullyPaid, // payment confirmed and invoice fully paid
+    payment: invoiceFullyPaid || si >= 6, // payment confirmed and invoice fully paid
   }
   let currentStep = STEP_KEYS.findIndex(k => !stepComplete[k])
   if (currentStep === -1) currentStep = STEP_KEYS.length

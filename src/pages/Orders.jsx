@@ -10,7 +10,7 @@ const NEXT_ACTIONS = {
   approved: { status: 'packed', label: 'Pack', icon: MdInventory, roles: ['super_admin', 'admin', 'warehouse'] },
   packed: { status: 'dispatched', label: 'Dispatch', icon: MdLocalShipping, roles: ['super_admin', 'admin', 'warehouse'] },
   dispatched: { status: 'delivered', label: 'Deliver', icon: MdHandshake, roles: ['super_admin', 'admin', 'warehouse'], note: 'Stock deducted' },
-  delivered: { status: 'completed', label: 'Complete', icon: MdCheck, roles: ['super_admin', 'admin'] },
+  delivered: { status: 'completed', label: 'Complete', icon: MdCheck, roles: ['super_admin', 'admin'], note: 'Requires full payment received' },
 }
 
 const CANCEL_ACTION = { status: 'cancelled', label: 'Cancel', icon: MdDelete, roles: ['super_admin', 'admin'] }

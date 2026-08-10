@@ -225,6 +225,21 @@ export const api = {
       await this.checkStockForOrder(id)
     }
 
+    // An order cannot be completed until the invoice is fully paid.
+    if (status === 'completed') {
+      const { data: inv } = await supabase
+        .from('invoices')
+        .select('status, due_amount')
+        .eq('order_id', id)
+        .maybeSingle()
+      const fullyPaid = inv
+        ? inv.status === 'paid' || Number(inv.due_amount || 0) <= 0
+        : false
+      if (!fullyPaid) {
+        throw new Error('Cannot complete: payment not fully received')
+      }
+    }
+
     const { data, error } = await supabase
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
