@@ -802,6 +802,21 @@ export const api = {
     return data
   },
 
+  async confirmPayment(id, status, confirmedBy = null) {
+    const { data, error } = await supabase
+      .from('payments')
+      .update({
+        status,
+        confirmed_by: confirmedBy || null,
+        confirmed_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- Notifications / Announcements ----
 
   async createNotification(notification) {

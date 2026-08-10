@@ -27,6 +27,8 @@ export default function Invoices() {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [savingPayment, setSavingPayment] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [payments, setPayments] = useState([])
+  const [showPendingPayments, setShowPendingPayments] = useState(false)
   const [newInvoice, setNewInvoice] = useState({
     dealerId: '',
     orderId: '',
@@ -47,6 +49,7 @@ export default function Invoices() {
         api.getDealers(),
         api.getOrders().catch(() => []),
       ])
+      api.getPayments().then(setPayments).catch(() => setPayments([]))
       let invoices = invData
       if (user?.role === 'dealer') {
         const match = dealerData.find(
@@ -222,6 +225,8 @@ export default function Invoices() {
     try {
       const newPaid = (inv.paid || 0) + amount
       const newDue = (inv.total_amount || inv.amount) - newPaid
+      // Dealers submit payments for approval; management confirms them directly.
+      const isManagement = ['super_admin', 'admin', 'sales_manager'].includes(user?.role)
       await api.createPayment({
         invoice_id: selectedInvoice.id,
         dealer_id: selectedInvoice.dealer_id,
@@ -230,27 +235,34 @@ export default function Invoices() {
         payment_method: paymentMethod,
         payment_date: new Date().toISOString().split('T')[0],
         notes: null,
+        status: isManagement ? 'approved' : 'pending',
+        confirmed_by: isManagement ? user?.id : null,
+        confirmed_at: isManagement ? new Date().toISOString() : null,
       })
-      // Record dealer ledger credit for the payment
-      try {
-        await api.recordDealerLedger({
-          dealer_id: selectedInvoice.dealer_id,
-          transaction_type: 'payment',
-          reference_id: selectedInvoice.id,
-          debit: 0,
-          credit: amount,
-          description: `Payment via ${paymentMethod}`,
-          payment_date: new Date().toISOString().split('T')[0],
+      // Only management confirmations update the invoice as paid/partial
+      if (isManagement) {
+        try {
+          await api.recordDealerLedger({
+            dealer_id: selectedInvoice.dealer_id,
+            transaction_type: 'payment',
+            reference_id: selectedInvoice.id,
+            debit: 0,
+            credit: amount,
+            description: `Payment via ${paymentMethod}`,
+            payment_date: new Date().toISOString().split('T')[0],
+          })
+        } catch (ledgerErr) {
+          console.warn('Dealer ledger write failed:', ledgerErr)
+        }
+        await api.updateInvoice(selectedInvoice.id, {
+          paid_amount: newPaid,
+          due_amount: newDue < 0 ? 0 : newDue,
+          status: newDue <= 0 ? 'paid' : 'partial',
         })
-      } catch (ledgerErr) {
-        console.warn('Dealer ledger write failed:', ledgerErr)
+        toast.success('Payment recorded')
+      } else {
+        toast.success('Payment submitted for approval')
       }
-      await api.updateInvoice(selectedInvoice.id, {
-        paid_amount: newPaid,
-        due_amount: newDue < 0 ? 0 : newDue,
-        status: newDue <= 0 ? 'paid' : 'partial',
-      })
-      toast.success('Payment recorded')
       setShowPayment(false)
       setPaymentAmount('')
       setSelectedInvoice(null)
@@ -351,6 +363,86 @@ export default function Invoices() {
           <span className="font-semibold">Hierarchy visibility:</span> Invoices created by you are visible to all above in organization hierarchy (ASM → RSM → NSM → Directors)
         </p>
       </div>
+
+      {/* Pending payments approval (management only) */}
+      {['super_admin', 'admin', 'sales_manager'].includes(user?.role) && (() => {
+        const pending = payments.filter(p => p.status === 'pending')
+        return (
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <MdPayments className="text-amber-500" size={18} />
+                Pending Payment Approvals
+              </h3>
+              <span className={`badge ${pending.length > 0 ? 'badge-warning' : 'badge-success'} text-[10px]`}>
+                {pending.length} pending
+              </span>
+            </div>
+            {pending.length === 0 ? (
+              <p className="text-xs text-gray-400">No payments awaiting approval.</p>
+            ) : (
+              <div className="space-y-2">
+                {pending.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 p-3 bg-amber-50/60 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-900">
+                        {formatCurrency(p.amount)}
+                        <span className="ml-2 text-gray-500 font-normal">
+                          on {p.invoice?.invoice_number || 'Invoice'}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-gray-500">
+                        {p.dealer?.name || 'Dealer'} · via {p.payment_method} · {formatDate(p.payment_date)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.confirmPayment(p.id, 'approved', user?.id)
+                          // Update the linked invoice paid/due/status
+                          if (p.invoice_id) {
+                            const inv = normalizedInvoice(
+                              invoices.find(i => i.id === p.invoice_id) || {}
+                            )
+                            const newPaid = (inv.paid || 0) + Number(p.amount || 0)
+                            const newDue = Math.max((inv.total_amount || inv.amount || 0) - newPaid, 0)
+                            await api.updateInvoice(p.invoice_id, {
+                              paid_amount: newPaid,
+                              due_amount: newDue,
+                              status: newDue <= 0 ? 'paid' : 'partial',
+                            })
+                          }
+                          toast.success('Payment approved')
+                          fetchAll()
+                        } catch (err) {
+                          toast.error('Failed: ' + err.message)
+                        }
+                      }}
+                      className="btn-primary text-xs px-3 py-1.5"
+                    >
+                      <MdCheckCircle size={14} /> Approve
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.confirmPayment(p.id, 'rejected', user?.id)
+                          toast.success('Payment rejected')
+                          fetchAll()
+                        } catch (err) {
+                          toast.error('Failed: ' + err.message)
+                        }
+                      }}
+                      className="btn-secondary text-xs px-3 py-1.5"
+                    >
+                      <MdClose size={14} /> Reject
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Empty State */}
       {filteredInvoices.length === 0 && (

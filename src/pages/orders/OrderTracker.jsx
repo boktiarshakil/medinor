@@ -29,8 +29,11 @@ const STEP_KEYS = ['placed', 'approved', 'accounts', 'warehouse', 'dispatched', 
 function mapOrder(order, invoices, payments) {
   const invoice = invoices.find(inv => inv.order_id === order.id)
   const hasInvoice = !!invoice
-  const orderPayments = invoice ? payments.filter(p => p.invoice_id === invoice.id) : []
-  const hasPayment = orderPayments.length > 0
+  // Only confirmed payments count toward the "Payment Received" step
+  const orderPayments = invoice ? payments.filter(p => p.invoice_id === invoice.id && p.status !== 'rejected') : []
+  const confirmedPayments = orderPayments.filter(p => p.status === 'approved')
+  const hasPayment = confirmedPayments.length > 0
+  const invoiceFullyPaid = invoice ? (Number(invoice.due_amount || 0) <= 0 && hasPayment) : false
 
   const si = STATUS_INDEX[order.status] ?? 0
   const stepComplete = {
@@ -40,7 +43,7 @@ function mapOrder(order, invoices, payments) {
     warehouse: si >= 3,       // packed or beyond
     dispatched: si >= 4,      // dispatched or beyond
     delivered: si >= 5,       // delivered or beyond
-    payment: hasPayment,      // payment recorded against invoice
+    payment: invoiceFullyPaid, // payment confirmed and invoice fully paid
   }
   let currentStep = STEP_KEYS.findIndex(k => !stepComplete[k])
   if (currentStep === -1) currentStep = STEP_KEYS.length
