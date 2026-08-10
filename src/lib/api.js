@@ -219,6 +219,12 @@ export const api = {
   },
 
   async updateOrderStatus(id, status, createdBy = null) {
+    // Validate stock sufficiency BEFORE changing status, so we never mark
+    // an order approved when stock cannot cover it.
+    if (status === 'approved') {
+      await this.checkStockForOrder(id)
+    }
+
     const { data, error } = await supabase
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
@@ -306,6 +312,38 @@ export const api = {
     }
 
     return invData
+  },
+
+  async checkStockForOrder(orderId) {
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('items:order_items(product_id, quantity)')
+      .eq('id', orderId)
+      .single()
+    const items = orderData?.items || []
+
+    const missing = []
+    for (const item of items) {
+      const { data: invRecords } = await supabase
+        .from('inventory')
+        .select('quantity, quantity_reserved')
+        .eq('product_id', item.product_id)
+      const available = (invRecords || []).reduce(
+        (s, r) => s + (Number(r.quantity) || 0) - (Number(r.quantity_reserved) || 0),
+        0
+      )
+      if (available < item.quantity) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('name, sku')
+          .eq('id', item.product_id)
+          .single()
+        missing.push(`${product?.name || product?.sku || item.product_id} (need ${item.quantity}, have ${available})`)
+      }
+    }
+    if (missing.length > 0) {
+      throw new Error(`Cannot approve: insufficient stock for ${missing.join(', ')}`)
+    }
   },
 
   async reserveStockForOrder(order) {
