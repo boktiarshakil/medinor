@@ -29,9 +29,10 @@ const STEP_KEYS = ['placed', 'approved', 'accounts', 'warehouse', 'dispatched', 
 function mapOrder(order, invoices, payments) {
   const invoice = invoices.find(inv => inv.order_id === order.id)
   const hasInvoice = !!invoice
-  // Only confirmed payments count toward the "Payment Received" step
+  // Only confirmed payments count toward the "Payment Received" step.
+  // Legacy payments (before the approval workflow) have no status → treat as approved.
   const orderPayments = invoice ? payments.filter(p => p.invoice_id === invoice.id && p.status !== 'rejected') : []
-  const confirmedPayments = orderPayments.filter(p => p.status === 'approved')
+  const confirmedPayments = orderPayments.filter(p => (p.status || 'approved') === 'approved')
   const hasPayment = confirmedPayments.length > 0
   const invoiceFullyPaid = invoice ? (Number(invoice.due_amount || 0) <= 0 && hasPayment) : false
 
