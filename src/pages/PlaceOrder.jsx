@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatCurrency, getPriceForRole, canSeePrice } from '../lib/utils'
 import {
   MdAdd, MdRemove, MdShoppingCart, MdCheckCircle, MdWarning,
@@ -28,6 +28,8 @@ export default function PlaceOrder() {
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const cartRef = useRef(null)
+  const [cartHeight, setCartHeight] = useState(0)
 
   const fetchProducts = async () => {
     setLoading(true)
@@ -48,6 +50,16 @@ export default function PlaceOrder() {
   }
 
   useEffect(() => { fetchProducts() }, [])
+
+  useEffect(() => {
+    if (!cartRef.current) return
+    const el = cartRef.current
+    const measure = () => setCartHeight(el.offsetHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [cartCount > 0])
 
   const getPrice = (product) => {
     if (!role) return product.mrp
@@ -157,7 +169,7 @@ export default function PlaceOrder() {
   }
 
   return (
-    <div className="space-y-5 pb-56 lg:pb-40">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -285,9 +297,12 @@ export default function PlaceOrder() {
         </div>
       )}
 
+      {/* Spacer so the fixed cart never covers the product grid */}
+      <div style={{ height: cartCount > 0 ? cartHeight + 96 : 0 }} aria-hidden="true" />
+
       {/* Cart Summary */}
       {cartCount > 0 && (
-        <div className="fixed bottom-20 lg:bottom-4 left-4 right-4 lg:left-auto lg:right-6 lg:w-96 card p-5 shadow-xl z-40">
+        <div ref={cartRef} className="fixed bottom-20 lg:bottom-4 left-4 right-4 lg:left-auto lg:right-6 lg:w-96 card p-5 shadow-xl z-40">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-900">Cart ({cartCount} items)</h3>
             <span className="text-lg font-bold text-brand-600">{formatCurrency(cartTotal)}</span>
@@ -298,11 +313,13 @@ export default function PlaceOrder() {
               <p className="text-[10px] font-bold text-amber-700 flex items-center gap-1 mb-1">
                 <MdWarning size={12} /> Stock Notice
               </p>
-              {stockIssues.map(item => (
-                <p key={item.id} className="text-[10px] text-amber-600">
-                  • {item.name}: {getStockStatus(item.stock).label}
-                </p>
-              ))}
+              <div className="max-h-24 overflow-y-auto">
+                {stockIssues.map(item => (
+                  <p key={item.id} className="text-[10px] text-amber-600">
+                    • {item.name}: {getStockStatus(item.stock).label}
+                  </p>
+                ))}
+              </div>
             </div>
           )}
 
