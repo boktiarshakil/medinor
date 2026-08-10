@@ -475,7 +475,7 @@ export const api = {
     try {
       const { data, error } = await supabase
         .from('invoices')
-        .select(`${baseSelect}, creator:user_profiles!invoices_created_by_fkey(full_name)`)
+        .select(`${baseSelect}, creator:user_profiles!invoices_created_by_fkey(full_name), processedBy:user_profiles!invoices_processed_by_fkey(full_name)`)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data || []
@@ -789,6 +789,41 @@ export const api = {
       .single()
     if (error) throw error
     return data
+  },
+
+  // Update an invoice and, if the update makes it fully paid, run all
+  // side effects in one place:
+  //   - set processed_by to the user who made it paid
+  //   - auto-complete the linked order (paid → completed)
+  // Returns { invoice, orderCompleted }.
+  async updateInvoiceAndHandlePaid(id, updates, paidByUserId = null) {
+    const payload = { ...updates }
+    if (paidByUserId && payload.status === 'paid') {
+      payload.processed_by = paidByUserId
+    }
+    const invoice = await this.updateInvoice(id, payload)
+
+    let orderCompleted = false
+    if (invoice.status === 'paid' && invoice.order_id) {
+      // Auto-complete the linked order now that payment is fully received
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id, status')
+        .eq('id', invoice.order_id)
+        .single()
+      if (order && order.status !== 'completed' && order.status !== 'cancelled') {
+        const { data: updatedOrder } = await supabase
+          .from('orders')
+          .update({ status: 'completed', updated_at: new Date().toISOString() })
+          .eq('id', order.id)
+          .select()
+          .single()
+        // Deduct reserved stock for the order (same as delivered/completed flow)
+        await this.deductReservedStockForOrder(updatedOrder).catch(() => {})
+        orderCompleted = true
+      }
+    }
+    return { invoice, orderCompleted }
   },
 
   // ---- Payments ----

@@ -89,6 +89,7 @@ export default function Invoices() {
     date: inv.invoice_date || inv.date || inv.created_at,
     dueDate: inv.due_date || inv.dueDate,
     createdBy: inv.creator?.full_name || inv.created_by_name || inv.createdBy || '-',
+    processedBy: inv.processedBy?.full_name || inv.processed_by_name || inv.processedBy || '-',
     area: inv.dealer?.area?.name || inv.area_name || inv.area || '-',
   })
 
@@ -254,12 +255,22 @@ export default function Invoices() {
         } catch (ledgerErr) {
           console.warn('Dealer ledger write failed:', ledgerErr)
         }
-        await api.updateInvoice(selectedInvoice.id, {
-          paid_amount: newPaid,
-          due_amount: newDue < 0 ? 0 : newDue,
-          status: newDue <= 0 ? 'paid' : 'partial',
-        })
-        toast.success('Payment recorded')
+        const { orderCompleted } = await api.updateInvoiceAndHandlePaid(
+          selectedInvoice.id,
+          {
+            paid_amount: newPaid,
+            due_amount: newDue < 0 ? 0 : newDue,
+            status: newDue <= 0 ? 'paid' : 'partial',
+          },
+          user?.id
+        )
+        toast.success(
+          orderCompleted
+            ? 'Payment recorded — order auto-completed'
+            : newDue <= 0
+              ? 'Payment recorded — invoice fully paid'
+              : 'Payment recorded'
+        )
       } else {
         toast.success('Payment submitted for approval')
       }
@@ -399,20 +410,32 @@ export default function Invoices() {
                       onClick={async () => {
                         try {
                           await api.confirmPayment(p.id, 'approved', user?.id)
-                          // Update the linked invoice paid/due/status
+                          // Update the linked invoice paid/due/status and auto-complete order
                           if (p.invoice_id) {
                             const inv = normalizedInvoice(
                               invoices.find(i => i.id === p.invoice_id) || {}
                             )
                             const newPaid = (inv.paid || 0) + Number(p.amount || 0)
                             const newDue = Math.max((inv.total_amount || inv.amount || 0) - newPaid, 0)
-                            await api.updateInvoice(p.invoice_id, {
-                              paid_amount: newPaid,
-                              due_amount: newDue,
-                              status: newDue <= 0 ? 'paid' : 'partial',
-                            })
+                            const { orderCompleted } = await api.updateInvoiceAndHandlePaid(
+                              p.invoice_id,
+                              {
+                                paid_amount: newPaid,
+                                due_amount: newDue,
+                                status: newDue <= 0 ? 'paid' : 'partial',
+                              },
+                              user?.id
+                            )
+                            toast.success(
+                              orderCompleted
+                                ? 'Payment approved — order auto-completed'
+                                : newDue <= 0
+                                  ? 'Payment approved — invoice fully paid'
+                                  : 'Payment approved'
+                            )
+                          } else {
+                            toast.success('Payment approved')
                           }
-                          toast.success('Payment approved')
                           fetchAll()
                         } catch (err) {
                           toast.error('Failed: ' + err.message)
@@ -464,7 +487,7 @@ export default function Invoices() {
         </div>
       )}
 
-      {/* Invoices Table */}
+                  {/* Invoices Table */}
       {filteredInvoices.length > 0 && (
         <div className="table-container">
           <table className="data-table">
@@ -478,6 +501,7 @@ export default function Invoices() {
                 <th>Status</th>
                 <th>Date</th>
                 <th>Created By</th>
+                <th>Processed By</th>
                 <th>Area</th>
                 <th></th>
               </tr>
@@ -495,6 +519,7 @@ export default function Invoices() {
                     <td><span className={statusColor(n.status)}>{statusLabel(n.status)}</span></td>
                     <td className="text-gray-500">{formatDate(n.date)}</td>
                     <td className="text-gray-500 text-xs">{n.createdBy}</td>
+                    <td className="text-gray-500 text-xs">{n.processedBy}</td>
                     <td className="text-gray-500 text-xs">{n.area}</td>
                     <td>
                       <button
@@ -548,6 +573,10 @@ export default function Invoices() {
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase">Created By</p>
                     <p className="text-sm font-semibold text-gray-800">{n.createdBy}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Processed By</p>
+                    <p className="text-sm font-semibold text-gray-800">{n.processedBy}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase">Area</p>
