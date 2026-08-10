@@ -77,6 +77,12 @@ export default function OrderTracker() {
   const [newComment, setNewComment] = useState('')
   const [viewFilter, setViewFilter] = useState('active') // 'active' | 'inactive'
 
+  const visibleOrders = orders.filter(o =>
+    viewFilter === 'active'
+      ? !['completed', 'cancelled'].includes(o.status)
+      : ['completed', 'cancelled'].includes(o.status)
+  )
+
   const fetchOrders = async () => {
     setLoading(true)
     setError(null)
@@ -183,12 +189,6 @@ export default function OrderTracker() {
       </div>
     )
   }
-
-  const visibleOrders = orders.filter(o =>
-    viewFilter === 'active'
-      ? !['completed', 'cancelled'].includes(o.status)
-      : ['completed', 'cancelled'].includes(o.status)
-  )
 
   // Empty state
   if (visibleOrders.length === 0) {
