@@ -228,10 +228,12 @@ export const api = {
     if (error) throw error
 
     let invoice = null
-    // Reserve stock at approval, generate invoice at dispatch, deduct at delivery
+    // Reserve stock and generate invoice at approval, deduct stock at delivery
     if (status === 'approved') {
       await this.reserveStockForOrder(data)
+      invoice = await this.createInvoiceForOrder(id, createdBy)
     } else if (status === 'dispatched') {
+      // Invoice already generated at approval; fall back for legacy orders
       invoice = await this.createInvoiceForOrder(id, createdBy)
     } else if (status === 'delivered' || status === 'completed') {
       await this.deductReservedStockForOrder(data)

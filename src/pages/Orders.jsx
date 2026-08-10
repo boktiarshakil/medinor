@@ -6,9 +6,9 @@ import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 
 const NEXT_ACTIONS = {
-  submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'], note: 'Stock reserved' },
+  submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'], note: 'Stock reserved, invoice generated' },
   approved: { status: 'packed', label: 'Pack', icon: MdInventory, roles: ['super_admin', 'admin', 'warehouse'] },
-  packed: { status: 'dispatched', label: 'Dispatch', icon: MdLocalShipping, roles: ['super_admin', 'admin', 'warehouse'], note: 'Invoice generated' },
+  packed: { status: 'dispatched', label: 'Dispatch', icon: MdLocalShipping, roles: ['super_admin', 'admin', 'warehouse'] },
   dispatched: { status: 'delivered', label: 'Deliver', icon: MdHandshake, roles: ['super_admin', 'admin', 'warehouse'], note: 'Stock deducted' },
   delivered: { status: 'completed', label: 'Complete', icon: MdCheck, roles: ['super_admin', 'admin'] },
 }
