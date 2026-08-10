@@ -157,7 +157,7 @@ export default function PlaceOrder() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-56 lg:pb-40">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -221,8 +221,21 @@ export default function PlaceOrder() {
 
           return (
             <div key={product.id} className={`card p-4 flex flex-col ${product.stock === 0 ? 'opacity-70' : ''}`}>
-              <div className="aspect-square bg-gray-50 rounded-lg flex items-center justify-center text-4xl mb-3 relative">
-                {product.image || '📦'}
+              <div className="aspect-square bg-gray-50 rounded-lg flex items-center justify-center overflow-hidden mb-3 relative">
+                {product.image || product.image_url ? (
+                  <>
+                    <span className="text-4xl">📦</span>
+                    <img
+                      src={product.image || product.image_url}
+                      alt={product.name}
+                      className="w-full h-full object-cover absolute inset-0"
+                      loading="lazy"
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                  </>
+                ) : (
+                  <span className="text-4xl">📦</span>
+                )}
                 <span className={`absolute top-2 right-2 ${status.badge} text-[9px] px-1.5 py-0.5 rounded-full`}>
                   {product.stock === 0 ? 'Out' : product.stock === null ? 'In stock' : `${product.stock} units`}
                 </span>
