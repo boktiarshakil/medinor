@@ -75,6 +75,7 @@ export default function OrderTracker() {
   const [error, setError] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [newComment, setNewComment] = useState('')
+  const [viewFilter, setViewFilter] = useState('active') // 'active' | 'inactive'
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -98,13 +99,12 @@ export default function OrderTracker() {
       }
       const mapped = data.map(order => mapOrder(order, invoices, payments))
       setOrders(mapped)
-      setSelectedOrder(prev => {
-        if (prev) {
-          const updated = mapped.find(o => o.dbId === prev.dbId)
-          return updated || mapped[0] || null
-        }
-        return mapped[0] || null
-      })
+      const firstVisible = mapped.find(o =>
+        viewFilter === 'active'
+          ? !['completed', 'cancelled'].includes(o.status)
+          : ['completed', 'cancelled'].includes(o.status)
+      )
+      setSelectedOrder(firstVisible || null)
     } catch (err) {
       console.error('Failed to fetch orders:', err)
       setError(err.message || 'Failed to load orders')
@@ -116,6 +116,14 @@ export default function OrderTracker() {
   useEffect(() => {
     fetchOrders()
   }, [user?.role, user?.email])
+
+  // Keep the selected order within the currently visible tab
+  useEffect(() => {
+    setSelectedOrder(prev => {
+      if (prev && visibleOrders.some(o => o.dbId === prev.dbId)) return prev
+      return visibleOrders[0] || null
+    })
+  }, [viewFilter])
 
   const handleAddComment = (e) => {
     e.preventDefault()
@@ -176,8 +184,14 @@ export default function OrderTracker() {
     )
   }
 
+  const visibleOrders = orders.filter(o =>
+    viewFilter === 'active'
+      ? !['completed', 'cancelled'].includes(o.status)
+      : ['completed', 'cancelled'].includes(o.status)
+  )
+
   // Empty state
-  if (orders.length === 0) {
+  if (visibleOrders.length === 0) {
     return (
       <div className="space-y-4">
         <div>
@@ -207,11 +221,28 @@ export default function OrderTracker() {
         <p className="text-xs text-gray-400 mt-0.5">Track order status step-by-step with comments</p>
       </div>
 
+      {/* Active / Inactive toggle */}
+      <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+        {['active', 'inactive'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setViewFilter(tab)}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold capitalize transition-colors ${
+              viewFilter === tab ? 'bg-brand-600 text-white shadow' : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {tab === 'active' ? 'Active' : 'Completed / Cancelled'}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Order List */}
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase">Active Orders</p>
-          {orders.map(order => (
+          <p className="text-[10px] font-semibold text-gray-500 uppercase">
+            {viewFilter === 'active' ? 'Active Orders' : 'Completed / Cancelled Orders'}
+          </p>
+          {visibleOrders.map(order => (
             <button
               key={order.dbId}
               onClick={() => setSelectedOrder(order)}
