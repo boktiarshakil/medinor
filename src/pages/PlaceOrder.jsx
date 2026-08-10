@@ -51,16 +51,6 @@ export default function PlaceOrder() {
 
   useEffect(() => { fetchProducts() }, [])
 
-  useEffect(() => {
-    if (!cartRef.current) return
-    const el = cartRef.current
-    const measure = () => setCartHeight(el.offsetHeight)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [cartCount > 0])
-
   const getPrice = (product) => {
     if (!role) return product.mrp
     return getPriceForRole(product, role) || product.mrp
@@ -93,6 +83,16 @@ export default function PlaceOrder() {
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.total, 0)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
+
+  useEffect(() => {
+    if (!cartRef.current) return
+    const el = cartRef.current
+    const measure = () => setCartHeight(el.offsetHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [cartCount > 0])
 
   const stockIssues = cartItems.filter(item => {
     const status = getStockStatus(item.stock)
