@@ -153,10 +153,14 @@ export default function GPSTracking() {
   const tileModeRef = useRef('map') // map | satellite
   const mapProviderRef = useRef('osm') // when in map mode: osm | carto
   const switchLayerRef = useRef(null)
+  const userMovedRef = useRef(false)
 
-  // Init map once
+  // Init map once the map container is actually rendered (after the first
+  // data load completes and the loading branch is no longer shown).
+  const showMap = !(loading && users.length === 0)
+
   useEffect(() => {
-    if (!mapRef.current || mapInstance.current) return
+    if (!showMap || mapInstance.current) return
     const map = L.map(mapRef.current, {
       center: DEFAULT_CENTER,
       zoom: 12,
@@ -165,6 +169,7 @@ export default function GPSTracking() {
     })
     markerLayer.current = L.layerGroup().addTo(map)
     mapInstance.current = map
+    map.on('dragstart zoomstart', () => { userMovedRef.current = true })
 
     const swap = () => {
       if (tileLayer.current) map.removeLayer(tileLayer.current)
@@ -206,14 +211,14 @@ export default function GPSTracking() {
       mapProviderRef.current = 'osm'
       switchLayerRef.current = null
     }
-  }, [])
+  }, [showMap])
 
   const switchLayer = (mode) => {
     setLayerMode(mode)
     switchLayerRef.current && switchLayerRef.current(mode)
   }
 
-  // Render markers when data changes
+  // Render markers when data changes (re-run once the map initializes)
   useEffect(() => {
     const map = mapInstance.current
     if (!map || !markerLayer.current) return
@@ -244,12 +249,12 @@ export default function GPSTracking() {
         `)
     })
 
-    if (located.length > 0) {
+    if (located.length > 0 && !userMovedRef.current) {
       map.fitBounds(L.latLngBounds(located.map(u => [u.lat, u.lng])), { padding: [40, 40], maxZoom: 15 })
-    } else {
+    } else if (located.length === 0) {
       map.setView(DEFAULT_CENTER, 12)
     }
-  }, [users])
+  }, [users, showMap])
 
   const filteredUsers = filter === 'all'
     ? users
