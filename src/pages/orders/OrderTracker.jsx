@@ -3,6 +3,7 @@ import { MdCheckCircle, MdRadioButtonUnchecked, MdLocalShipping, MdReceipt, MdIn
 import { formatDateTime } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import toast from 'react-hot-toast'
 
 const ORDER_STEPS = [
   { key: 'placed', label: 'Order Placed', icon: MdOutlinePlace, description: 'Order submitted by dealer/SR' },
@@ -131,21 +132,56 @@ export default function OrderTracker() {
     })
   }, [viewFilter])
 
-  const handleAddComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault()
     if (!newComment.trim() || !selectedOrder) return
     const stepKey = ORDER_STEPS[Math.min(selectedOrder.currentStep, ORDER_STEPS.length - 1)]?.key || 'placed'
-    setSelectedOrder({
-      ...selectedOrder,
-      comments: [...selectedOrder.comments, {
-        step: stepKey,
-        user: user?.full_name || 'You',
-        text: newComment,
-        time: new Date().toISOString(),
-      }]
-    })
+    const text = newComment.trim()
     setNewComment('')
+    try {
+      await api.addOrderComment(selectedOrder.dbId, {
+        userId: user?.id,
+        step: stepKey,
+        message: text,
+      })
+      setSelectedOrder(prev => prev ? {
+        ...prev,
+        comments: [...prev.comments, {
+          step: stepKey,
+          user: user?.full_name || 'You',
+          text,
+          time: new Date().toISOString(),
+        }]
+      } : prev)
+    } catch (err) {
+      console.error('Failed to save comment:', err)
+      toast.error('Failed to save comment — try again')
+      setNewComment(text)
+    }
   }
+
+  // Load persisted comments whenever the selected order changes.
+  useEffect(() => {
+    if (!selectedOrder?.dbId) return
+    let cancelled = false
+    api.getOrderComments(selectedOrder.dbId)
+      .then(list => {
+        if (cancelled) return
+        setSelectedOrder(prev => {
+          if (!prev || prev.dbId !== selectedOrder.dbId) return prev
+          const comments = (list || []).map(c => ({
+            id: c.id,
+            step: c.step || 'update',
+            user: c.author?.full_name || 'Unknown',
+            text: c.message,
+            time: c.created_at,
+          }))
+          return { ...prev, comments }
+        })
+      })
+      .catch(err => console.error('Failed to load comments:', err))
+    return () => { cancelled = true }
+  }, [selectedOrder?.dbId])
 
   // Loading state
   if (loading) {
@@ -340,7 +376,7 @@ export default function OrderTracker() {
                 <p className="text-xs text-gray-400 italic">No comments yet. Add one below.</p>
               ) : (
                 selectedOrder.comments.map((c, i) => (
-                  <div key={i} className="flex gap-3">
+                  <div key={c.id || i} className="flex gap-3">
                     <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-gray-600">
                       {c.user.charAt(0)}
                     </div>

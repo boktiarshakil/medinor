@@ -816,6 +816,69 @@ export const api = {
     return data
   },
 
+  // ---- Order Comments ----
+
+  async getOrderComments(orderId) {
+    const { data, error } = await supabase
+      .from('order_comments')
+      .select('*, author:user_profiles(full_name, role)')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return data || []
+  },
+
+  // Persist a comment and notify the people involved with the order
+  // (the SR who owns it, management, and the dealer), excluding the author.
+  async addOrderComment(orderId, { userId, step = null, message }) {
+    const { data, error } = await supabase
+      .from('order_comments')
+      .insert({ order_id: orderId, user_id: userId, step, message })
+      .select()
+      .single()
+    if (error) throw error
+
+    try {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('order_number, sr_id, dealer_id')
+        .eq('id', orderId)
+        .maybeSingle()
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('id, role, email')
+        .eq('is_active', true)
+
+      const targets = []
+      if (order?.sr_id) targets.push(order.sr_id)
+      ;(profiles || [])
+        .filter(p => ['super_admin', 'admin', 'sales_manager', 'area_manager'].includes(p.role))
+        .forEach(p => targets.push(p.id))
+      if (order?.dealer_id) {
+        const { data: dealer } = await supabase
+          .from('dealers')
+          .select('email')
+          .eq('id', order.dealer_id)
+          .maybeSingle()
+        const dealerUser = (profiles || []).find(p =>
+          p.email && dealer?.email && p.email.toLowerCase() === String(dealer.email).toLowerCase()
+        )
+        if (dealerUser) targets.push(dealerUser.id)
+      }
+      const dedup = [...new Set(targets.filter(id => id && id !== userId))]
+      await this.notifyUsers(dedup, {
+        title: `Order update: ${order?.order_number || '—'}`,
+        message,
+        type: 'info',
+        referenceType: 'order_comment',
+        url: '/order-tracker',
+      })
+    } catch (notifyErr) {
+      console.warn('Order comment notification failed:', notifyErr)
+    }
+    return data
+  },
+
   // ---- GPS Tracking ----
 
   async getGPSHistory(userId) {
@@ -971,6 +1034,27 @@ export const api = {
 
   // ---- Notifications / Announcements ----
 
+  // Insert one notification row per recipient (bell + marquee) and fire real
+  // browser push to each of them. Used by announcements, messages, order
+  // comments, etc.
+  async notifyUsers(userIds, { title, message, type = 'info', referenceType = null, url = null }) {
+    const ids = [...new Set((userIds || []).filter(Boolean))]
+    if (ids.length === 0) return { notified: 0 }
+    const rows = ids.map(uid => ({
+      user_id: uid,
+      title,
+      message,
+      type,
+      reference_type: referenceType,
+    }))
+    const { error } = await supabase.from('notifications').insert(rows)
+    if (error) throw error
+    supabase.functions.invoke('send-push', {
+      body: { userIds: ids, title, body: message, url },
+    }).catch(err => console.warn('Push send failed:', err))
+    return { notified: ids.length }
+  },
+
   async createNotification(notification) {
     const { data, error } = await supabase
       .from('notifications')
@@ -1008,18 +1092,13 @@ export const api = {
       reference_type: 'announcement',
     }))
     if (rows.length > 0) {
-      const { error } = await supabase.from('notifications').insert(rows)
-      if (error) throw error
-
-      // Best-effort real browser push to the targeted users.
-      supabase.functions.invoke('send-push', {
-        body: {
-          userIds: rows.map(r => r.user_id),
-          title,
-          body: message,
-          url: '/announcements',
-        },
-      }).catch(err => console.warn('Push send failed:', err))
+      await this.notifyUsers(rows.map(r => r.user_id), {
+        title,
+        message,
+        type: typeMap[priority] || 'info',
+        referenceType: 'announcement',
+        url: '/announcements',
+      })
     }
     return { broadcastTo: rows.length }
   },
@@ -1391,6 +1470,34 @@ export const api = {
       .select()
       .single()
     if (error) throw error
+
+    // Fire notifications (+ web push) for the new message.
+    try {
+      let targetIds = []
+      if (channel === 'direct' && recipient_id) {
+        targetIds = [recipient_id]
+      } else {
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, area_id')
+          .eq('is_active', true)
+        if (channel === 'common') {
+          targetIds = (profiles || []).map(p => p.id)
+        } else if (channel === 'group' && area_id) {
+          targetIds = (profiles || []).filter(p => p.area_id === area_id).map(p => p.id)
+        }
+      }
+      targetIds = targetIds.filter(id => id !== sender_id)
+      await this.notifyUsers(targetIds, {
+        title: channel === 'direct' ? 'Direct message' : channel === 'common' ? 'Common box' : 'Territory group',
+        message,
+        type: 'info',
+        referenceType: channel === 'direct' ? 'direct_message' : 'message',
+        url: '/messages',
+      })
+    } catch (notifyErr) {
+      console.warn('Message notification failed:', notifyErr)
+    }
     return data
   },
 

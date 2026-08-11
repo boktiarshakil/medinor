@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../lib/api'
-import { MdSend, MdChat, MdGroup, MdPerson, MdOutlineCommentsDisabled } from 'react-icons/md'
+import { MdSend, MdChat, MdGroup, MdPerson, MdOutlineCommentsDisabled, MdSearch, MdClose } from 'react-icons/md'
 import { HiOutlineChatBubbleLeftRight } from 'react-icons/hi2'
 import { formatDateTime } from '../../lib/utils'
 import toast from 'react-hot-toast'
@@ -16,6 +16,7 @@ export default function Messages() {
   const [commonComments, setCommonComments] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -130,6 +131,14 @@ export default function Messages() {
 
   const myArea = areas.find(a => a.id === user?.area_id)
   const myAreaName = myArea ? myArea.name : ''
+
+  const query = search.trim().toLowerCase()
+  const filteredUsers = users.filter(u =>
+    !query ||
+    (u.full_name || '').toLowerCase().includes(query) ||
+    (u.role || '').toLowerCase().includes(query) ||
+    (u.area?.name || '').toLowerCase().includes(query)
+  )
 
   if (loading) {
     return (
@@ -267,62 +276,109 @@ export default function Messages() {
 
       {/* Direct Messages */}
       {activeTab === 'direct' && (
-        <div className="card">
-          <div className="p-3 border-b border-gray-100 flex gap-2 overflow-x-auto">
-            {users.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2">No other users found. Create users to message them.</p>
-            ) : (
-              users.map(u => (
-                <button
-                  key={u.id}
-                  onClick={() => setSelectedUser(u)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
-                    selectedUser?.id === u.id
-                      ? 'bg-brand-50 text-brand-700 border border-brand-200'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
-                  }`}
-                >
-                  <MdPerson size={13} />
-                  {u.full_name}
+        <div className="card overflow-hidden">
+          <div className="grid lg:grid-cols-[300px_1fr]">
+            {/* Inbox sidebar */}
+            <div className={`${selectedUser ? 'hidden lg:block' : 'block'} border-b lg:border-b-0 lg:border-r border-gray-100`}>
+              <div className="p-3 border-b border-gray-100">
+                <div className="relative">
+                  <MdSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    className="input pl-9 text-xs"
+                    placeholder="Search people..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="max-h-[300px] lg:max-h-[420px] overflow-y-auto divide-y divide-gray-50">
+                {users.length === 0 ? (
+                  <p className="text-xs text-gray-400 p-4">No other users found. Create users to message them.</p>
+                ) : filteredUsers.length === 0 ? (
+                  <p className="text-xs text-gray-400 p-4">No one matches “{search}”.</p>
+                ) : (
+                  filteredUsers.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => setSelectedUser(u)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                        selectedUser?.id === u.id ? 'bg-brand-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                        selectedUser?.id === u.id ? 'bg-brand-600 text-white' : 'bg-brand-100 text-brand-700'
+                      }`}>
+                        {(u.full_name || '?').charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">{u.full_name}</p>
+                        <p className="text-[10px] text-gray-400 truncate">
+                          {u.role}
+                          {u.area?.name ? ` · ${u.area.name}` : ''}
+                        </p>
+                      </div>
+                      <MdChat size={13} className="text-gray-300 flex-shrink-0" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Chat panel */}
+            <div className={`${selectedUser ? 'flex' : 'hidden lg:flex'} flex-col min-h-[380px]`}>
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100">
+                <button onClick={() => setSelectedUser(null)} className="lg:hidden text-gray-400 hover:text-gray-600">
+                  <MdClose size={18} />
                 </button>
-              ))
-            )}
+                <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center flex-shrink-0 text-xs font-bold">
+                  {(selectedUser?.full_name || '?').charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-900 truncate">
+                    {selectedUser?.full_name || 'Select a person'}
+                  </p>
+                  <p className="text-[10px] text-gray-400 truncate">{selectedUser?.role || 'Choose someone from the list to start chatting'}</p>
+                </div>
+              </div>
+              <div className="flex-1 p-4 space-y-3 max-h-[320px] lg:max-h-[360px] overflow-y-auto">
+                {!selectedUser ? (
+                  <p className="text-sm text-gray-400 text-center py-10">Select a person to start messaging.</p>
+                ) : directMessages.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-10">
+                    No messages with {selectedUser.full_name} yet. Say hi!
+                  </p>
+                ) : (
+                  directMessages.map(m => {
+                    const isMe = m.sender_id === user?.id
+                    return (
+                      <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+                        <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${
+                          isMe ? 'bg-brand-500 text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+                        }`}>
+                          <p>{m.message}</p>
+                          <p className={`text-[9px] mt-1 ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
+                            {formatDateTime(m.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              <form onSubmit={handleSendDirect} className="p-3 border-t border-gray-100 flex gap-2">
+                <input
+                  className="input flex-1"
+                  placeholder={selectedUser ? `Message ${selectedUser.full_name}...` : 'Select a user first...'}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  disabled={!selectedUser}
+                />
+                <button type="submit" className="btn-primary px-3" disabled={!selectedUser}>
+                  <MdSend size={16} />
+                </button>
+              </form>
+            </div>
           </div>
-          <div className="p-4 space-y-3 max-h-[350px] overflow-y-auto">
-            {directMessages.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">
-                {selectedUser ? `No messages with ${selectedUser.full_name} yet.` : 'Select a user to start messaging.'}
-              </p>
-            ) : (
-              directMessages.map(m => {
-                const isMe = m.sender_id === user?.id
-                return (
-                  <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                    <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${
-                      isMe ? 'bg-brand-500 text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'
-                    }`}>
-                      <p>{m.message}</p>
-                      <p className={`text-[9px] mt-1 ${isMe ? 'text-white/60' : 'text-gray-400'}`}>
-                        {formatDateTime(m.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-          <form onSubmit={handleSendDirect} className="p-3 border-t border-gray-100 flex gap-2">
-            <input
-              className="input flex-1"
-              placeholder={selectedUser ? `Message ${selectedUser.full_name}...` : 'Select a user first...'}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              disabled={!selectedUser}
-            />
-            <button type="submit" className="btn-primary px-3" disabled={!selectedUser}>
-              <MdSend size={16} />
-            </button>
-          </form>
         </div>
       )}
     </div>
