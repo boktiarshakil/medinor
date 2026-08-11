@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { MdSettings, MdPeople, MdSecurity, MdNotifications, MdPalette, MdCheck, MdChevronRight } from 'react-icons/md'
+import { isPushSupported, initPush, disablePush } from '../lib/push'
+import { MdSettings, MdPeople, MdSecurity, MdNotifications, MdPalette, MdCheck, MdChevronRight, MdNotificationsActive, MdNotificationsOff, MdSmartphone } from 'react-icons/md'
 import toast from 'react-hot-toast'
 
 const DEFAULT_PREFS = {
@@ -23,6 +24,54 @@ export default function Settings() {
     }
   })
   const [saved, setSaved] = useState(false)
+  const [pushState, setPushState] = useState('checking')
+  const [busy, setBusy] = useState(false)
+
+  const checkPush = useCallback(() => {
+    if (!isPushSupported()) {
+      setPushState('unsupported')
+      return
+    }
+    if (Notification.permission === 'granted') setPushState('enabled')
+    else if (Notification.permission === 'denied') setPushState('denied')
+    else setPushState('off')
+  }, [])
+
+  useEffect(() => {
+    checkPush()
+  }, [checkPush])
+
+  const handleEnablePush = async () => {
+    setBusy(true)
+    try {
+      const result = await initPush(user)
+      if (result?.enabled) {
+        setPushState('enabled')
+        toast.success('Push notifications enabled')
+      } else {
+        checkPush()
+        toast.error(result?.reason === 'denied' ? 'Permission blocked in browser settings' : 'Could not enable push notifications')
+      }
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+      checkPush()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDisablePush = async () => {
+    setBusy(true)
+    try {
+      await disablePush(user)
+      setPushState('off')
+      toast.success('Push notifications disabled')
+    } catch (err) {
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const togglePref = (key) => {
     setPrefs(prev => ({ ...prev, [key]: !prev[key] }))
@@ -126,6 +175,55 @@ export default function Settings() {
               'Save Preferences'
             )}
           </button>
+        </div>
+
+        {/* Push Notifications */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <MdSmartphone size={16} className="text-brand-500" /> Push Notifications
+          </h3>
+          <div className="space-y-3">
+            {pushState === 'checking' && (
+              <p className="text-sm text-gray-500">Checking browser support…</p>
+            )}
+            {pushState === 'unsupported' && (
+              <p className="text-sm text-gray-500">
+                Browser or device does not support web push notifications.
+              </p>
+            )}
+            {pushState === 'denied' && (
+              <p className="text-sm text-amber-600">
+                Notifications are blocked in your browser. Enable them in the site permissions.
+              </p>
+            )}
+            {pushState === 'enabled' && (
+              <p className="text-sm text-emerald-600 inline-flex items-center gap-1.5">
+                <MdNotificationsActive size={16} /> Receiving browser notifications
+              </p>
+            )}
+            {pushState === 'off' && (
+              <p className="text-sm text-gray-500">Browser notifications are turned off.</p>
+            )}
+            <div className="pt-1">
+              {pushState === 'enabled' ? (
+                <button onClick={handleDisablePush} disabled={busy} className="btn-secondary w-full text-xs disabled:opacity-50">
+                  <MdNotificationsOff size={14} /> Disable Push Notifications
+                </button>
+              ) : (
+                <button onClick={handleEnablePush} disabled={busy || !['off'].includes(pushState)} className="btn-primary w-full text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                  {busy ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                  ) : pushState === 'denied' ? (
+                    'Permission Blocked'
+                  ) : pushState === 'unsupported' ? (
+                    'Not Supported'
+                  ) : (
+                    <><MdNotificationsActive size={14} /> Enable Push Notifications</>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Preferences */}

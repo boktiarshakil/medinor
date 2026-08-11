@@ -619,6 +619,56 @@ export const api = {
     return data
   },
 
+  // ---- Web push subscriptions ----
+
+  async savePushSubscription({ user_id, endpoint, p256dh, auth }) {
+    const { data: existing } = await supabase
+      .from('push_subscriptions')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('endpoint', endpoint)
+      .maybeSingle()
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from('push_subscriptions')
+        .update({ p256dh, auth, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .insert({ user_id, endpoint, p256dh, auth })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async deletePushSubscription(userId, endpoint) {
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('endpoint', endpoint)
+    if (error) throw error
+  },
+
+  // Send a real browser push to one or more users via the send-push edge function.
+  async sendPush({ userIds, title, body, url = '/' }) {
+    const { data, error } = await supabase.functions.invoke('send-push', {
+      body: { userIds, title, body, url },
+    })
+    if (error) {
+      const message = error.context?.error || error.message || 'Failed to send push'
+      throw new Error(message)
+    }
+    if (data?.error) throw new Error(data.error)
+    return data
+  },
+
   async markNotificationRead(id) {
     const { error } = await supabase
       .from('notifications')
@@ -949,6 +999,16 @@ export const api = {
     if (rows.length > 0) {
       const { error } = await supabase.from('notifications').insert(rows)
       if (error) throw error
+
+      // Best-effort real browser push to the targeted users.
+      supabase.functions.invoke('send-push', {
+        body: {
+          userIds: rows.map(r => r.user_id),
+          title,
+          body: message,
+          url: '/announcements',
+        },
+      }).catch(err => console.warn('Push send failed:', err))
     }
     return { broadcastTo: rows.length }
   },

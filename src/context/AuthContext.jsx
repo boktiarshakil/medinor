@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, getCurrentUser } from '../lib/supabase'
+import { registerServiceWorker, initPush } from '../lib/push'
 
 const AuthContext = createContext(null)
 
@@ -27,6 +28,11 @@ export function AuthProvider({ children }) {
           setUser(null)
         } else {
           setUser(profile)
+          // Enable web push (browser shows the permission prompt on first login)
+          if (profile) {
+            registerServiceWorker()
+            setTimeout(() => initPush(profile), 1500)
+          }
         }
       } catch (err) {
         console.error('Auth init error:', err)
@@ -46,6 +52,10 @@ export function AuthProvider({ children }) {
             setUser(null)
           } else {
             setUser(profile)
+            if (profile) {
+              registerServiceWorker()
+              setTimeout(() => initPush(profile), 1500)
+            }
           }
         } catch (err) {
           console.error('Auth state error:', err)
