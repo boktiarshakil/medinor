@@ -57,6 +57,9 @@ export default function GPSTracking() {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markerLayer = useRef(null)
+  const tileLayer = useRef(null)
+  const tileErrorCount = useRef(0)
+  const [layerMode, setLayerMode] = useState('map') // map | satellite
 
   const fetchStaffData = async () => {
     setLoading(true)
@@ -143,6 +146,14 @@ export default function GPSTracking() {
     }
   }, [])
 
+  const PRIMARY_OSM = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+  const FALLBACK_CARTO = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+  const SATELLITE_ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+
+  const tileModeRef = useRef('map') // map | satellite
+  const mapProviderRef = useRef('osm') // when in map mode: osm | carto
+  const switchLayerRef = useRef(null)
+
   // Init map once
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return
@@ -152,18 +163,55 @@ export default function GPSTracking() {
       zoomControl: true,
       attributionControl: true,
     })
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map)
     markerLayer.current = L.layerGroup().addTo(map)
     mapInstance.current = map
+
+    const swap = () => {
+      if (tileLayer.current) map.removeLayer(tileLayer.current)
+      let url
+      if (tileModeRef.current === 'satellite') {
+        url = SATELLITE_ESRI
+      } else {
+        url = mapProviderRef.current === 'carto' ? FALLBACK_CARTO : PRIMARY_OSM
+      }
+      tileLayer.current = L.tileLayer(url, { maxZoom: 19, crossOrigin: true })
+        .on('tileerror', () => {
+          if (tileModeRef.current !== 'map' || mapProviderRef.current === 'carto') return
+          tileErrorCount.current += 1
+          // Primary OSM tiles blocked? auto-swap to the Carto map tiles.
+          if (tileErrorCount.current >= 3) {
+            tileErrorCount.current = 0
+            mapProviderRef.current = 'carto'
+            swap()
+          }
+        })
+        .addTo(map)
+    }
+    swap()
+
+    switchLayerRef.current = (mode) => {
+      tileModeRef.current = mode
+      if (mode === 'map') mapProviderRef.current = 'osm' // retry OSM on manual switch
+      tileErrorCount.current = 0
+      swap()
+    }
+
     return () => {
       map.remove()
       mapInstance.current = null
       markerLayer.current = null
+      tileLayer.current = null
+      tileErrorCount.current = 0
+      tileModeRef.current = 'map'
+      mapProviderRef.current = 'osm'
+      switchLayerRef.current = null
     }
   }, [])
+
+  const switchLayer = (mode) => {
+    setLayerMode(mode)
+    switchLayerRef.current && switchLayerRef.current(mode)
+  }
 
   // Render markers when data changes
   useEffect(() => {
@@ -282,8 +330,24 @@ export default function GPSTracking() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Real Map */}
         <div className="lg:col-span-2">
-          <div className="card p-0 overflow-hidden">
+          <div className="card p-0 overflow-hidden relative">
             <div ref={mapRef} className="h-[440px] w-full" />
+            <div className="absolute top-3 right-3 z-[1000] flex gap-1 p-1 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm">
+              {[
+                { key: 'map', label: 'Map' },
+                { key: 'satellite', label: 'Satellite' },
+              ].map(m => (
+                <button
+                  key={m.key}
+                  onClick={() => switchLayer(m.key)}
+                  className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-colors ${
+                    layerMode === m.key ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-500">
             <span className="flex items-center gap-1.5">
