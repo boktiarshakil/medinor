@@ -1,25 +1,19 @@
-import { useState, useEffect } from 'react'
-import { MdLocationOn, MdMyLocation, MdRefresh, MdPeople, MdCheckCircle, MdCancel } from 'react-icons/md'
+import { useState, useEffect, useRef } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { MdLocationOn, MdMyLocation, MdRefresh, MdCheckCircle, MdCancel, MdStore } from 'react-icons/md'
 import { HiLocationMarker } from 'react-icons/hi'
 import { api } from '../../lib/api'
+import { supabase } from '../../lib/supabase'
 
-// Sales roles eligible for GPS tracking (matches user_profiles.role values)
-const SALES_ROLES = ['sales_executive', 'area_manager', 'sales_manager', 'admin', 'super_admin']
+// Roles shown on the live map (sales roles + dealers who share location)
+const TRACKED_ROLES = ['sales_executive', 'area_manager', 'sales_manager', 'admin', 'super_admin', 'dealer']
 
 // Consider online if last GPS record within 30 minutes
 const ONLINE_THRESHOLD_MS = 30 * 60 * 1000
 
-// Project lat/lng onto the placeholder map (Dhaka bounding box)
-const projectCoords = (lat, lng) => {
-  if (lat == null || lng == null) return null
-  const minLat = 23.4, maxLat = 24.0, minLng = 90.2, maxLng = 90.6
-  const left = ((lng - minLng) / (maxLng - minLng)) * 100
-  const top = ((maxLat - lat) / (maxLat - minLat)) * 100
-  return {
-    left: Math.max(5, Math.min(95, left)),
-    top: Math.max(5, Math.min(95, top)),
-  }
-}
+// Dhaka fallback center
+const DEFAULT_CENTER = [23.8103, 90.4125]
 
 function timeAgo(dateString) {
   if (!dateString) return 'Never'
@@ -33,30 +27,51 @@ function timeAgo(dateString) {
   return `${days} days ago`
 }
 
+function buildIcon(s, isDealer) {
+  const online = s.status === 'online'
+  const color = isDealer ? '#3b82f6' : online ? '#10b981' : '#9ca3af'
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="position:relative;width:34px;height:34px;">
+        <div style="width:34px;height:34px;border-radius:9999px;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.25);border:2px solid #fff;">${s.name.charAt(0).toUpperCase()}</div>
+        ${online || isDealer
+          ? `<div style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:9999px;background:${online ? '#34d399' : '#60a5fa'};border:2px solid #fff;"><div style="width:100%;height:100%;border-radius:9999px;animation:gpspulse 1.6s ease-out infinite;"></div></div>`
+          : ''}
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18],
+  })
+}
+
 export default function GPSTracking() {
-  const [staff, setStaff] = useState([])
-  const [selectedStaff, setSelectedStaff] = useState(null)
+  const [users, setUsers] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
   const [filter, setFilter] = useState('all') // all, online, offline
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [lastSync, setLastSync] = useState(null)
+
+  const mapRef = useRef(null)
+  const mapInstance = useRef(null)
+  const markerLayer = useRef(null)
 
   const fetchStaffData = async () => {
     setLoading(true)
     setError(null)
     try {
-      const users = await api.getUsers()
-      // Filter for sales roles only
-      const salesUsers = users.filter(u =>
-        SALES_ROLES.includes(u.role) || u.role?.toLowerCase().includes('sales')
+      const allUsers = await api.getUsers()
+      const tracked = allUsers.filter(u =>
+        TRACKED_ROLES.includes(u.role) || String(u.role || '').toLowerCase().includes('sales')
       )
 
-      // Fetch latest GPS record for each user
-      const staffWithLocation = await Promise.all(
-        salesUsers.map(async (user) => {
+      const withLocation = await Promise.all(
+        tracked.map(async (user) => {
           try {
             const gpsHistory = await api.getGPSHistory(user.id)
             const latest = gpsHistory?.[0]
-
             if (latest) {
               const lastSeen = new Date(latest.recorded_at).getTime()
               const isOnline = Date.now() - lastSeen < ONLINE_THRESHOLD_MS
@@ -66,52 +81,40 @@ export default function GPSTracking() {
                 id: user.id,
                 name: user.full_name || user.email || 'Unknown',
                 role: user.role || 'N/A',
-                status: isOnline ? 'online' : 'offline',
-                location: lat && lng
-                  ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-                  : 'No coordinates',
-                lat,
-                lng,
+                isDealer: user.role === 'dealer',
+                status: lat && lng && isOnline ? 'online' : lat && lng ? 'offline' : 'no-location',
+                lat: lat || null,
+                lng: lng || null,
                 lastUpdate: timeAgo(latest.recorded_at),
-                orders: '—',
-                visits: '—',
-                battery: '—',
               }
             }
-
-            // User exists but has no GPS data
             return {
               id: user.id,
               name: user.full_name || user.email || 'Unknown',
               role: user.role || 'N/A',
-              status: 'offline',
-              location: 'No location data',
+              isDealer: user.role === 'dealer',
+              status: 'no-location',
               lat: null,
               lng: null,
               lastUpdate: 'Never',
-              orders: '—',
-              visits: '—',
-              battery: '—',
             }
           } catch {
             return {
               id: user.id,
               name: user.full_name || user.email || 'Unknown',
               role: user.role || 'N/A',
-              status: 'offline',
-              location: 'Unknown',
+              isDealer: user.role === 'dealer',
+              status: 'no-location',
               lat: null,
               lng: null,
               lastUpdate: 'Error',
-              orders: '—',
-              visits: '—',
-              battery: '—',
             }
           }
         })
       )
 
-      setStaff(staffWithLocation)
+      setUsers(withLocation)
+      setLastSync(new Date())
     } catch (err) {
       console.error('Failed to fetch staff data:', err)
       setError(err.message || 'Failed to load staff data')
@@ -120,15 +123,95 @@ export default function GPSTracking() {
     }
   }
 
+  // Initial fetch + 60s poll fallback + realtime updates
   useEffect(() => {
     fetchStaffData()
+    const poll = setInterval(() => fetchStaffData(), 60000)
+
+    const channel = supabase
+      .channel('gps-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gps_tracking' },
+        () => fetchStaffData()
+      )
+      .subscribe()
+
+    return () => {
+      clearInterval(poll)
+      supabase.removeChannel(channel)
+    }
   }, [])
 
-  const filteredStaff = filter === 'all' ? staff : staff.filter(s => s.status === filter)
-  const onlineCount = staff.filter(s => s.status === 'online').length
+  // Init map once
+  useEffect(() => {
+    if (!mapRef.current || mapInstance.current) return
+    const map = L.map(mapRef.current, {
+      center: DEFAULT_CENTER,
+      zoom: 12,
+      zoomControl: true,
+      attributionControl: true,
+    })
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map)
+    markerLayer.current = L.layerGroup().addTo(map)
+    mapInstance.current = map
+    return () => {
+      map.remove()
+      mapInstance.current = null
+      markerLayer.current = null
+    }
+  }, [])
 
-  // Loading state
-  if (loading) {
+  // Render markers when data changes
+  useEffect(() => {
+    const map = mapInstance.current
+    if (!map || !markerLayer.current) return
+    markerLayer.current.clearLayers()
+
+    const located = users.filter(u => u.lat && u.lng)
+    located.forEach((u) => {
+      L.marker([u.lat, u.lng], {
+        icon: buildIcon(u, u.isDealer),
+        title: u.name,
+      })
+        .addTo(markerLayer.current)
+        .bindPopup(`
+          <div style="min-width:160px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <div style="width:28px;height:28px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;background:${u.status === 'online' ? '#10b981' : u.isDealer ? '#3b82f6' : '#9ca3af'};">${u.name.charAt(0).toUpperCase()}</div>
+              <div>
+                <div style="font-weight:700;font-size:12px;color:#111827;">${u.name}</div>
+                <div style="font-size:10px;color:#6b7280;">${u.role}</div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:#374151;line-height:1.6;">
+              <div><b>Status:</b> ${u.status === 'online' ? 'Online' : u.isDealer ? 'Dealer' : 'Offline'}</div>
+              <div><b>Last seen:</b> ${u.lastUpdate}</div>
+              <div><b>Coords:</b> ${u.lat.toFixed(5)}, ${u.lng.toFixed(5)}</div>
+            </div>
+          </div>
+        `)
+    })
+
+    if (located.length > 0) {
+      map.fitBounds(L.latLngBounds(located.map(u => [u.lat, u.lng])), { padding: [40, 40], maxZoom: 15 })
+    } else {
+      map.setView(DEFAULT_CENTER, 12)
+    }
+  }, [users])
+
+  const filteredUsers = filter === 'all'
+    ? users
+    : users.filter(u => filter === 'online'
+        ? u.status === 'online'
+        : u.status === 'offline' || u.status === 'no-location')
+  const onlineCount = users.filter(u => u.status === 'online').length
+  const locatedCount = users.filter(u => u.lat && u.lng).length
+
+  if (loading && users.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
@@ -137,8 +220,7 @@ export default function GPSTracking() {
     )
   }
 
-  // Error state
-  if (error) {
+  if (error && users.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
@@ -153,21 +235,6 @@ export default function GPSTracking() {
     )
   }
 
-  // Empty state
-  if (staff.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-          <MdLocationOn className="text-gray-400" size={28} />
-        </div>
-        <p className="text-sm font-semibold text-gray-900 mb-1">No GPS data available</p>
-        <p className="text-xs text-gray-500 max-w-sm text-center">
-          Staff location tracking will appear here once team members start sharing location.
-        </p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -177,13 +244,16 @@ export default function GPSTracking() {
             <MdMyLocation className="text-brand-600" size={22} />
             Live GPS Tracking
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">Monitor field sales team location</p>
+          <p className="text-xs text-gray-400 mt-0.5">Real-time map of field sales team &amp; dealers</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-xs font-semibold text-emerald-700">{onlineCount} Online</span>
           </div>
+          <span className="text-[10px] text-gray-400">
+            {lastSync ? `Synced ${lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+          </span>
           <button onClick={fetchStaffData} className="btn-secondary text-xs">
             <MdRefresh size={14} /> Refresh
           </button>
@@ -193,9 +263,9 @@ export default function GPSTracking() {
       {/* Filter */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
         {[
-          { key: 'all', label: `All (${staff.length})` },
+          { key: 'all', label: `All (${users.length})` },
           { key: 'online', label: `Online (${onlineCount})` },
-          { key: 'offline', label: `Offline (${staff.length - onlineCount})` },
+          { key: 'offline', label: `Offline (${users.length - onlineCount})` },
         ].map(f => (
           <button
             key={f.key}
@@ -210,75 +280,33 @@ export default function GPSTracking() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Map Placeholder */}
+        {/* Real Map */}
         <div className="lg:col-span-2">
           <div className="card p-0 overflow-hidden">
-            {/* Map area */}
-            <div className="relative h-[400px] bg-gradient-to-br from-blue-50 via-emerald-50 to-blue-50 flex items-center justify-center">
-              {/* Mock map with dots */}
-              <div className="absolute inset-0 opacity-20">
-                <svg viewBox="0 0 400 400" className="w-full h-full">
-                  <path d="M50,200 Q100,100 200,150 T350,200" fill="none" stroke="#94a3b8" strokeWidth="1"/>
-                  <path d="M80,300 Q150,250 250,280 T380,320" fill="none" stroke="#94a3b8" strokeWidth="1"/>
-                  <path d="M30,100 Q100,80 180,120" fill="none" stroke="#94a3b8" strokeWidth="0.5"/>
-                  <path d="M200,300 Q280,320 350,300" fill="none" stroke="#94a3b8" strokeWidth="0.5"/>
-                </svg>
-              </div>
-              {/* Staff pins */}
-              {filteredStaff.map((s, i) => {
-                const pos = projectCoords(s.lat, s.lng)
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedStaff(s)}
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all ${
-                      selectedStaff?.id === s.id ? 'z-20 scale-125' : 'z-10 hover:scale-110'
-                    }`}
-                    style={{
-                      left: pos ? `${pos.left}%` : `${20 + (i * 12) % 60}%`,
-                      top: pos ? `${pos.top}%` : `${25 + (i * 17) % 50}%`,
-                    }}
-                  >
-                    <div className={`relative ${s.status === 'online' ? '' : 'opacity-50'}`}>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${
-                        s.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400'
-                      }`}>
-                        {s.name.charAt(0)}
-                      </div>
-                      {s.status === 'online' && (
-                        <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-              {/* Legend */}
-              <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg p-2 text-[10px]">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
-                  <span className="text-gray-600">Online</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 bg-gray-400 rounded-full" />
-                  <span className="text-gray-600">Offline</span>
-                </div>
-              </div>
-              {/* Dhaka label */}
-              <div className="absolute top-3 right-3 bg-white/80 backdrop-blur-sm rounded px-2 py-1 text-[10px] font-semibold text-gray-600">
-                Dhaka, Bangladesh
-              </div>
-            </div>
+            <div ref={mapRef} className="h-[440px] w-full" />
+          </div>
+          <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block" /> Online
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-gray-400 rounded-full inline-block" /> Offline
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-blue-500 rounded-full inline-block" /> Dealer
+            </span>
+            <span className="ml-auto">{locatedCount} with a location fix</span>
           </div>
         </div>
 
-        {/* Staff List */}
+        {/* User List */}
         <div className="space-y-2 max-h-[500px] overflow-y-auto">
-          {filteredStaff.map(s => (
+          {filteredUsers.map(u => (
             <button
-              key={s.id}
-              onClick={() => setSelectedStaff(s)}
+              key={u.id}
+              onClick={() => setSelectedId(u.id)}
               className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                selectedStaff?.id === s.id
+                selectedId === u.id
                   ? 'border-brand-300 bg-brand-50'
                   : 'border-gray-100 bg-white hover:border-gray-200'
               }`}
@@ -286,73 +314,55 @@ export default function GPSTracking() {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                    s.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400'
+                    u.status === 'online' ? 'bg-emerald-500' : u.isDealer ? 'bg-blue-500' : 'bg-gray-400'
                   }`}>
-                    {s.name.charAt(0)}
+                    {u.name.charAt(0)}
                   </div>
-                  {s.status === 'online' && (
+                  {u.status === 'online' && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-900">{s.name}</p>
-                  <p className="text-[10px] text-gray-400">{s.role}</p>
+                  <p className="text-xs font-bold text-gray-900">{u.name}</p>
+                  <p className="text-[10px] text-gray-400">{u.isDealer && <MdStore size={10} className="inline -mt-0.5" />} {u.role}</p>
                   <p className="text-[10px] text-gray-500 flex items-center gap-0.5 mt-0.5">
                     <HiLocationMarker size={10} />
-                    <span className="truncate">{s.location}</span>
+                    <span className="truncate">{u.lat && u.lng ? `${u.lat.toFixed(4)}, ${u.lng.toFixed(4)}` : 'No location data'}</span>
                   </p>
                 </div>
+                <span className={`badge ${u.status === 'online' ? 'badge-success' : u.isDealer ? 'badge-info' : u.status === 'no-location' ? 'badge-gray' : 'badge-gray'}`}>
+                  {u.status === 'online' ? 'Online' : u.isDealer ? 'Dealer' : u.status === 'no-location' ? 'No data' : 'Offline'}
+                </span>
               </div>
-              {/* Stats */}
               <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-50">
                 <span className="text-[10px] text-gray-500">
-                  <MdLocationOn size={10} className="inline" /> {s.lastUpdate}
+                  <MdLocationOn size={10} className="inline" /> {u.lastUpdate}
                 </span>
-                <span className="text-[10px] text-gray-500">{s.orders} orders</span>
-                <span className="text-[10px] text-gray-500">{s.visits} visits</span>
               </div>
             </button>
           ))}
+          {filteredUsers.length === 0 && (
+            <div className="p-6 text-center">
+              <p className="text-xs text-gray-500">No matching users</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Selected Staff Detail */}
-      {selectedStaff && (
-        <div className="card p-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                selectedStaff.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400'
-              }`}>
-                {selectedStaff.name.charAt(0)}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-900">{selectedStaff.name}</p>
-                <p className="text-xs text-gray-500">{selectedStaff.role} · {selectedStaff.location}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-xs">
-              <div className="text-center">
-                <p className="font-bold text-gray-900">{selectedStaff.orders}</p>
-                <p className="text-[10px] text-gray-400">Orders</p>
-              </div>
-              <div className="text-center">
-                <p className="font-bold text-gray-900">{selectedStaff.visits}</p>
-                <p className="text-[10px] text-gray-400">Visits</p>
-              </div>
-              <div className="text-center">
-                <p className="font-bold text-gray-900">
-                  {typeof selectedStaff.battery === 'number' ? `${selectedStaff.battery}%` : selectedStaff.battery}
-                </p>
-                <p className="text-[10px] text-gray-400">Battery</p>
-              </div>
-              <span className={`badge ${selectedStaff.status === 'online' ? 'badge-success' : 'badge-gray'}`}>
-                {selectedStaff.status}
-              </span>
-            </div>
+      {/* How to enable */}
+      <div className="card p-4 bg-gradient-to-r from-brand-50 to-emerald-50 border-0">
+        <div className="flex items-start gap-3">
+          <MdLocationOn size={20} className="text-brand-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-gray-900">How staff appear on the map</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Field team and dealers turn on <b>“Live location sharing”</b> from their dashboard. Their position is then
+              streamed roughly every 20 seconds and shows here instantly over OpenStreetMap. Anyone with no recent GPS
+              record within 30 minutes is marked offline.
+            </p>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

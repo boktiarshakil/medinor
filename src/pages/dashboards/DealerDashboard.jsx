@@ -4,6 +4,7 @@ import { paymentMethodLabel } from '../../lib/upload'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { MdShoppingCart, MdReceipt, MdAssessment, MdPayment, MdFileDownload } from 'react-icons/md'
+import LocationShare from '../../components/LocationShare'
 
 export default function DealerDashboard() {
   const { user } = useAuth()
@@ -100,6 +101,9 @@ export default function DealerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Live Location Sharing */}
+      <LocationShare />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

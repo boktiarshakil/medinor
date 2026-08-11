@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { MdLocationOn, MdShoppingCart, MdReceipt, MdCheckCircle, MdMyLocation, MdRefresh } from 'react-icons/md'
 import { HiLocationMarker } from 'react-icons/hi'
 import toast from 'react-hot-toast'
+import LocationShare from '../../components/LocationShare'
 
 export default function SalesExecDashboard() {
   const { user } = useAuth()
@@ -129,6 +130,9 @@ export default function SalesExecDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Live Location Sharing */}
+      <LocationShare />
 
       {/* Check In Button */}
       <div className="card p-5">

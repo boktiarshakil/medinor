@@ -829,6 +829,16 @@ export const api = {
     return data || []
   },
 
+  async saveLocation(userId, { lat, lng, accuracy = null }) {
+    const { data, error } = await supabase
+      .from('gps_tracking')
+      .insert({ user_id: userId, latitude: lat, longitude: lng, accuracy })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- Campaigns ----
 
   async getCampaigns() {

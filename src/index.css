@@ -223,3 +223,26 @@
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
+
+/* ============================================================
+   Live GPS map (Leaflet)
+============================================================ */
+.leaflet-container {
+  z-index: 0;
+  isolation: isolate;
+  font-family: inherit;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+}
+.leaflet-popup-content {
+  margin: 12px 14px;
+  line-height: 1.4;
+}
+@keyframes gpspulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
