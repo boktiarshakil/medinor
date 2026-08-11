@@ -4,6 +4,7 @@ import { MdMenu, MdNotifications, MdSearch, MdClose } from 'react-icons/md'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { supabase } from '../../lib/supabase'
 
 export default function TopBar({ onMenuClick }) {
   const { user } = useAuth()
@@ -35,9 +36,44 @@ export default function TopBar({ onMenuClick }) {
   }
 
   useEffect(() => {
+    if (!user?.id) return
     loadNotifications()
-    const timer = setInterval(loadNotifications, 30000)
-    return () => clearInterval(timer)
+
+    // Keep the 60s poll as a fallback in case the realtime socket drops.
+    const timer = setInterval(loadNotifications, 60000)
+
+    // Real-time updates for the notification bell.
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user?.id}`,
+        },
+        (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload
+          setNotifications(prev => {
+            let next = prev
+            if (eventType === 'INSERT') {
+              next = [newRow, ...prev.filter(n => n.id !== newRow.id)]
+            } else if (eventType === 'UPDATE') {
+              next = prev.map(n => (n.id === newRow.id ? { ...n, ...newRow } : n))
+            } else if (eventType === 'DELETE') {
+              next = prev.filter(n => n.id !== oldRow?.id)
+            }
+            return next.slice(0, 50)
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      clearInterval(timer)
+      supabase.removeChannel(channel)
+    }
   }, [user?.id])
 
   // Close dropdowns on outside click
