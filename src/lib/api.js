@@ -578,6 +578,47 @@ export const api = {
     return data || []
   },
 
+  // Active announcements for the scrolling news marquee — the current
+  // user's own last 5 active announcements/offers (dealer rows are
+  // dealer-targeted, SR rows are SR-targeted, etc.)
+  async getActiveAnnouncements(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, title, message, type, created_at')
+        .eq('user_id', userId)
+        .eq('reference_type', 'announcement')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      // Migration 009 (is_active) may not be applied yet — fall back
+      // to the last 5 announcements without the active filter.
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, title, message, type, created_at')
+        .eq('user_id', userId)
+        .eq('reference_type', 'announcement')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (error) throw error
+      return data || []
+    }
+  },
+
+  async setNotificationActive(id, isActive) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ is_active: isActive })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   async markNotificationRead(id) {
     const { error } = await supabase
       .from('notifications')

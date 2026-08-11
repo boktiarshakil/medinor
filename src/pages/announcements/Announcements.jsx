@@ -41,6 +41,7 @@ export default function Announcements() {
         message: n.message,
         timestamp: n.created_at,
         priority: n.type === 'warning' ? 'high' : n.type === 'error' ? 'high' : 'medium',
+        isActive: n.is_active !== false,
       }))
       setAnnouncements(mapped)
     } catch (err) {
@@ -76,6 +77,17 @@ export default function Announcements() {
     } catch (err) {
       console.error('Announcement send failed:', err)
       toast.error('Failed to send announcement')
+    }
+  }
+
+  const handleToggleActive = async (a) => {
+    try {
+      await api.setNotificationActive(a.id, !a.isActive)
+      toast.success(a.isActive ? 'Announcement deactivated' : 'Announcement activated')
+      fetchAnnouncements()
+    } catch (err) {
+      console.error('Toggle active failed:', err)
+      toast.error('Failed to update announcement')
     }
   }
 
@@ -216,7 +228,24 @@ export default function Announcements() {
                 <div className="flex items-center gap-2 mt-2">
                   <MdSchedule size={11} className="text-gray-400" />
                   <span className="text-[10px] text-gray-400">{formatDateTime(a.timestamp)}</span>
+                  <span className={`text-[10px] font-semibold ${
+                    a.isActive ? 'text-emerald-600' : 'text-gray-400'
+                  }`}>
+                    {a.isActive ? '● Active' : '○ Inactive'}
+                  </span>
                 </div>
+                {canCreate && (
+                  <button
+                    onClick={() => handleToggleActive(a)}
+                    className={`mt-2 text-[10px] font-semibold rounded-md px-2 py-1 transition-colors ${
+                      a.isActive
+                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {a.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                )}
               </div>
               <span className={`badge text-[9px] flex-shrink-0 ${
                 a.priority === 'high' ? 'badge-danger' : a.priority === 'medium' ? 'badge-warning' : 'badge-info'

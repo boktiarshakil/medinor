@@ -120,3 +120,106 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ============================================================
+   Scrolling news marquee
+   ============================================================ */
+.news-marquee {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+  height: 36px;
+  background: linear-gradient(90deg, #146c2e, #188038 40%, #1b8a41);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+.news-marquee-label {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  z-index: 1;
+}
+.marquee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform;
+}
+.marquee-track.marquee-left {
+  animation: marquee-scroll-left 30s linear infinite;
+}
+.marquee-track.marquee-right {
+  animation: marquee-scroll-right 30s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+.marquee-content {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 32px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.95);
+}
+.marquee-item-icon {
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+.marquee-item-title {
+  font-weight: 700;
+  color: #fff;
+}
+.marquee-item-text {
+  color: rgba(255, 255, 255, 0.92);
+}
+.marquee-item-date {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+.news-marquee-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background-color 0.15s;
+}
+.news-marquee-close:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+@keyframes marquee-scroll-right {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+@keyframes marquee-scroll-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
