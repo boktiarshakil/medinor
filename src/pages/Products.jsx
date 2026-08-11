@@ -4,21 +4,8 @@ import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canS
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock, MdClose, MdImage, MdCloudUpload } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
+import { uploadToImgBB } from '../lib/upload'
 import toast from 'react-hot-toast'
-
-const IMGBB_API_KEY = '31c88cd7ccdb5aab5559f6438b59709d'
-
-async function uploadToImgBB(file) {
-  const formData = new FormData()
-  formData.append('image', file)
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-    method: 'POST',
-    body: formData,
-  })
-  const result = await res.json()
-  if (!result.success) throw new Error(result.error?.message || 'Upload failed')
-  return result.data.url
-}
 
 export default function Products() {
   const { user, role } = useAuth()

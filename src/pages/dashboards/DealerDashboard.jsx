@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../../lib/utils'
+import { paymentMethodLabel } from '../../lib/upload'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { MdShoppingCart, MdReceipt, MdAssessment, MdPayment, MdFileDownload } from 'react-icons/md'
@@ -190,7 +191,7 @@ export default function DealerDashboard() {
                  {recentPayments.map(p => (
                   <tr key={p.id}>
                     <td className="font-semibold text-emerald-600">{formatCurrency(p.amount || 0)}</td>
-                    <td><span className="badge-info">{p.payment_method || '—'}</span></td>
+                    <td><span className="badge-info">{paymentMethodLabel(p.payment_method)}</span></td>
                     <td className="hidden sm:table-cell text-gray-500">{formatDate(p.payment_date || p.created_at)}</td>
                   </tr>
                 ))}

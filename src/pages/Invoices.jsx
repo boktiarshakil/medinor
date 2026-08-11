@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import {
   formatCurrency, formatDate, statusColor, statusLabel, generateInvoiceNo
 } from '../lib/utils'
+import { PAYMENT_METHODS, paymentMethodLabel, uploadToImgBB } from '../lib/upload'
 import {
   MdSearch, MdFileDownload, MdReceipt, MdAdd, MdSend, MdVisibility,
   MdPerson, MdLocationOn, MdPhone, MdClose, MdCheckCircle, MdDelete,
-  MdRefresh, MdErrorOutline, MdPayments
+  MdRefresh, MdErrorOutline, MdPayments, MdImage, MdCloudUpload
 } from 'react-icons/md'
 import toast from 'react-hot-toast'
 
@@ -25,6 +26,9 @@ export default function Invoices() {
   const [showPayment, setShowPayment] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentProofUrl, setPaymentProofUrl] = useState('')
+  const [uploadingProof, setUploadingProof] = useState(false)
+  const proofInputRef = useRef(null)
   const [savingPayment, setSavingPayment] = useState(false)
   const [creating, setCreating] = useState(false)
   const [payments, setPayments] = useState([])
@@ -211,6 +215,30 @@ export default function Invoices() {
     }
   }
 
+  const handleProofSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (slip photo or screenshot)')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB')
+      return
+    }
+    setUploadingProof(true)
+    try {
+      const url = await uploadToImgBB(file)
+      setPaymentProofUrl(url)
+      toast.success('Payment proof uploaded')
+    } catch (err) {
+      toast.error('Upload failed: ' + err.message)
+    } finally {
+      setUploadingProof(false)
+      if (proofInputRef.current) proofInputRef.current.value = ''
+    }
+  }
+
   const handleRecordPayment = async () => {
     const inv = normalizedInvoice(selectedInvoice)
     const amount = Number(paymentAmount)
@@ -220,6 +248,10 @@ export default function Invoices() {
     }
     if (amount > inv.due) {
       toast.error(`Amount exceeds due (${formatCurrency(inv.due)})`)
+      return
+    }
+    if (!paymentProofUrl) {
+      toast.error('Payment proof is required — upload the slip photo or transaction screenshot')
       return
     }
     setSavingPayment(true)
@@ -234,6 +266,9 @@ export default function Invoices() {
         collected_by: user?.id || null,
         amount,
         payment_method: paymentMethod,
+        payment_proof_url: paymentProofUrl,
+        payment_proof_uploaded_by: user?.id || null,
+        payment_proof_uploaded_at: new Date().toISOString(),
         payment_date: new Date().toISOString().split('T')[0],
         notes: null,
         status: isManagement ? 'approved' : 'pending',
@@ -276,6 +311,7 @@ export default function Invoices() {
       }
       setShowPayment(false)
       setPaymentAmount('')
+      setPaymentProofUrl('')
       setSelectedInvoice(null)
       fetchAll()
     } catch (err) {
@@ -403,8 +439,28 @@ export default function Invoices() {
                         </span>
                       </p>
                       <p className="text-[10px] text-gray-500">
-                        {p.dealer?.name || 'Dealer'} · via {p.payment_method} · {formatDate(p.payment_date)}
+                        {p.dealer?.name || 'Dealer'} · via {paymentMethodLabel(p.payment_method)} · {formatDate(p.payment_date)}
                       </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {p.payment_proof_url ? (
+                          <a
+                            href={p.payment_proof_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600 hover:text-brand-700"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MdImage size={13} /> View payment proof
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600">
+                            <MdErrorOutline size={13} /> No proof uploaded
+                          </span>
+                        )}
+                        {p.reference_number && (
+                          <span className="text-[10px] text-gray-500">Ref: {p.reference_number}</span>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={async () => {
@@ -606,7 +662,7 @@ export default function Invoices() {
                   </div>
                 </div>
                 {n.status !== 'paid' && n.status !== 'cancelled' && (
-                  <button onClick={() => { setPaymentAmount(''); setPaymentMethod('cash'); setShowPayment(true) }} className="btn-primary w-full">
+                  <button onClick={() => { setPaymentAmount(''); setPaymentMethod('cash'); setPaymentProofUrl(''); setShowPayment(true) }} className="btn-primary w-full">
                     <MdPayments size={15} /> Record Payment
                   </button>
                 )}
@@ -639,13 +695,60 @@ export default function Invoices() {
                 <div>
                   <label className="label">Payment Method</label>
                   <select className="input" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                    {['cash', 'bank', 'cheque', 'bkash', 'nagad', 'rocket', 'card', 'other'].map(m => (
-                      <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                    {PAYMENT_METHODS.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="label">Payment Proof (slip photo / screenshot) *</label>
+                  {paymentProofUrl ? (
+                    <div className="relative rounded-lg overflow-hidden border border-emerald-200">
+                      <img src={paymentProofUrl} alt="Payment proof" className="w-full h-32 object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-white flex items-center gap-1">
+                          <MdCheckCircle size={13} /> Proof uploaded
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentProofUrl('')}
+                          className="text-[10px] font-semibold text-white bg-black/40 hover:bg-black/60 rounded px-2 py-0.5"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => proofInputRef.current?.click()}
+                      disabled={uploadingProof}
+                      className="w-full border-2 border-dashed border-gray-200 rounded-lg py-6 flex flex-col items-center gap-1.5 hover:border-brand-300 hover:bg-brand-50/40 transition-colors disabled:opacity-50"
+                    >
+                      {uploadingProof ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+                          <span className="text-xs text-gray-500">Uploading proof…</span>
+                        </>
+                      ) : (
+                        <>
+                          <MdCloudUpload size={22} className="text-gray-400" />
+                          <span className="text-xs font-semibold text-gray-600">Tap to upload slip photo / screenshot</span>
+                          <span className="text-[10px] text-gray-400">Required — JPG, PNG (max 5MB)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <input
+                    ref={proofInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleProofSelect}
+                  />
+                </div>
                 <div className="flex gap-2 pt-1">
-                  <button onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
+                  <button onClick={() => { setShowPayment(false); setPaymentProofUrl('') }} className="btn-secondary flex-1">Cancel</button>
                   <button onClick={handleRecordPayment} disabled={savingPayment || !paymentAmount} className="btn-primary flex-1 disabled:opacity-50">
                     {savingPayment ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdPayments size={15} /> Confirm Payment</>}
                   </button>
