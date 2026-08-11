@@ -28,6 +28,7 @@ export default function Invoices() {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [paymentProofUrl, setPaymentProofUrl] = useState('')
   const [uploadingProof, setUploadingProof] = useState(false)
+  const [proofView, setProofView] = useState(null)
   const proofInputRef = useRef(null)
   const [savingPayment, setSavingPayment] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -443,15 +444,13 @@ export default function Invoices() {
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
                         {p.payment_proof_url ? (
-                          <a
-                            href={p.payment_proof_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600 hover:text-brand-700"
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setProofView({ url: p.payment_proof_url, title: `Payment proof · ${p.dealer?.name || 'Dealer'} · ${formatCurrency(p.amount)}` }) }}
+                            className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-brand-600 hover:text-brand-700"
                           >
-                            <MdImage size={13} /> View payment proof
-                          </a>
+                            <img src={p.payment_proof_url} alt="Payment proof" className="w-11 h-8 object-cover rounded border border-gray-200" />
+                            View payment proof
+                          </button>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600">
                             <MdErrorOutline size={13} /> No proof uploaded
@@ -596,6 +595,7 @@ export default function Invoices() {
       {/* Invoice Detail Modal */}
       {selectedInvoice && (() => {
         const n = normalizedInvoice(selectedInvoice)
+        const invoicePayments = payments.filter(p => p.invoice_id === selectedInvoice.id)
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -660,6 +660,38 @@ export default function Invoices() {
                       </div>
                     ))}
                   </div>
+                </div>
+                {/* Payment history with proof */}
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">
+                    Payments ({invoicePayments.length})
+                  </p>
+                  {invoicePayments.length === 0 ? (
+                    <p className="text-[10px] text-gray-400">No payments recorded yet.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {invoicePayments.map(p => (
+                        <div key={p.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-gray-800">{formatCurrency(p.amount)}</p>
+                            <p className="text-[9px] text-gray-500">
+                              {paymentMethodLabel(p.payment_method)} · {formatDate(p.payment_date)} · {p.status}
+                            </p>
+                          </div>
+                          {p.payment_proof_url ? (
+                            <button
+                              onClick={() => setProofView({ url: p.payment_proof_url, title: `Payment proof · ${formatCurrency(p.amount)}` })}
+                              className="p-1 text-brand-600 hover:bg-brand-50 rounded-lg"
+                            >
+                              <img src={p.payment_proof_url} alt="Payment proof" className="w-12 h-9 object-cover rounded border border-gray-200" />
+                            </button>
+                          ) : (
+                            <span className="text-[9px] text-amber-600 font-semibold">No proof</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {n.status !== 'paid' && n.status !== 'cancelled' && (
                   <button onClick={() => { setPaymentAmount(''); setPaymentMethod('cash'); setPaymentProofUrl(''); setShowPayment(true) }} className="btn-primary w-full">
@@ -965,6 +997,34 @@ export default function Invoices() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Proof Lightbox */}
+        {proofView && (
+          <div
+            className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
+            onClick={() => setProofView(null)}
+          >
+            <div className="relative max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-white truncate">{proofView.title}</p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <a
+                    href={proofView.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-semibold text-white bg-white/20 hover:bg-white/30 rounded px-2 py-1"
+                  >
+                    Open original
+                  </a>
+                  <button onClick={() => setProofView(null)} className="p-1 text-white bg-white/20 hover:bg-white/30 rounded-lg">
+                    <MdClose size={16} />
+                  </button>
+                </div>
+              </div>
+              <img src={proofView.url} alt="Payment proof" className="w-full max-h-[80vh] object-contain rounded-lg bg-white" />
             </div>
           </div>
         )}

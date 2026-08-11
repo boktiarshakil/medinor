@@ -926,7 +926,8 @@ export const api = {
         *,
         dealer:dealers(name),
         invoice:invoices(invoice_number),
-        collector:user_profiles(full_name)
+        collector:user_profiles!payments_collected_by_fkey(full_name),
+        confirmedBy:user_profiles!payments_confirmed_by_fkey(full_name)
       `)
       .order('payment_date', { ascending: false })
     if (error) throw error
