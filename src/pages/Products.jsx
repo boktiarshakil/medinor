@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { uploadToImgBB } from '../lib/upload'
 import toast from 'react-hot-toast'
+import BlurredValue from '../components/BlurredValue'
 
 export default function Products() {
   const { user, role } = useAuth()
@@ -266,7 +267,9 @@ export default function Products() {
                 {canSeePrice(role, 'purchase_price') && (
                   <div>
                     <span className="text-gray-400 flex items-center gap-0.5">Cost <MdLock size={9} /></span>
-                    <p className="font-medium text-red-600">{formatCurrency(product.purchase)}</p>
+                    <p className="font-medium text-red-600">
+                      <BlurredValue value={formatCurrency(product.purchase)} />
+                    </p>
                   </div>
                 )}
 

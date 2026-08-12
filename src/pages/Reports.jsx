@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { formatCurrency, formatNumber } from '../lib/utils'
 import { MdFileDownload, MdAssessment, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
+import BlurredValue from '../components/BlurredValue'
 
 const REPORT_CARDS = [
   { title: 'Sales Report', description: 'Detailed sales by period, area, product, and executive', icon: '📊', color: 'bg-blue-50 text-blue-600' },
@@ -228,7 +229,13 @@ export default function Reports() {
                 <tbody>
                   {rows.map((row, i) => (
                     <tr key={i}>
-                      {row.map((cell, j) => <td key={j} className="text-xs">{cell}</td>)}
+                      {row.map((cell, j) => (
+                        <td key={j} className="text-xs">
+                          {viewReport.title === 'Profit Report' && headers[j] === 'Cost'
+                            ? <BlurredValue value={formatCurrency(cell)} />
+                            : cell}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
