@@ -23,6 +23,7 @@ const STATUS_INDEX = {
   dispatched: 4,
   delivered: 5,
   completed: 6,
+  cancelled: -1,
 }
 
 const STEP_KEYS = ['placed', 'approved', 'accounts', 'warehouse', 'dispatched', 'delivered', 'payment']
@@ -36,21 +37,22 @@ function mapOrder(order, invoices, payments) {
   const confirmedPayments = orderPayments.filter(p => (p.status || 'approved') === 'approved')
   const hasPayment = confirmedPayments.length > 0
 
+  const cancelled = order.status === 'cancelled'
   const si = STATUS_INDEX[order.status] ?? 0
-  // An order marked "completed" always had payment — the Complete action is
-  // blocked server-side unless the invoice is fully paid.
-  const invoiceFullyPaid = invoice ? (Number(invoice.due_amount || 0) <= 0) : false
+  // A legacy invoice with no due_amount is not proof of payment — only a
+  // status of 'paid' (or an explicit zero due) means fully paid.
+  const invoiceFullyPaid = invoice ? (invoice.status === 'paid' || (invoice.due_amount != null && Number(invoice.due_amount) <= 0)) : false
   const stepComplete = {
     placed: true,
-    approved: si >= 2,        // approved by management or beyond
-    accounts: hasInvoice,     // invoice generated for this order
-    warehouse: si >= 3,       // packed or beyond
-    dispatched: si >= 4,      // dispatched or beyond
-    delivered: si >= 5,       // delivered or beyond
-    payment: invoiceFullyPaid || si >= 6, // payment confirmed and invoice fully paid
+    approved: cancelled ? false : si >= 2,        // approved by management or beyond
+    accounts: cancelled ? false : hasInvoice,     // invoice generated for this order
+    warehouse: cancelled ? false : si >= 3,       // packed or beyond
+    dispatched: cancelled ? false : si >= 4,      // dispatched or beyond
+    delivered: cancelled ? false : si >= 5,       // delivered or beyond
+    payment: cancelled ? false : (invoiceFullyPaid || si >= 6), // payment confirmed and invoice fully paid
   }
-  let currentStep = STEP_KEYS.findIndex(k => !stepComplete[k])
-  if (currentStep === -1) currentStep = STEP_KEYS.length
+  let currentStep = cancelled ? -1 : STEP_KEYS.findIndex(k => !stepComplete[k])
+  if (currentStep === -1 && !cancelled) currentStep = STEP_KEYS.length
 
   return {
     id: order.order_number || order.order_no || order.id,
@@ -62,6 +64,7 @@ function mapOrder(order, invoices, payments) {
     currentStep,
     placedAt: order.created_at,
     status: order.status,
+    cancelled,
     hasInvoice,
     hasPayment,
     invoiceNumber: invoice?.invoice_number || null,
@@ -295,9 +298,15 @@ export default function OrderTracker() {
               <p className="text-[11px] text-gray-500 mt-0.5">{order.dealer} · {order.items} items</p>
               <div className="mt-1.5">
                 <span className={`badge text-[9px] ${
-                  order.currentStep >= 6 ? 'badge-success' : order.currentStep >= 4 ? 'badge-info' : 'badge-warning'
+                  order.cancelled ? 'badge-gray' :
+                  order.currentStep >= STEP_KEYS.length ? 'badge-success' :
+                  order.currentStep >= 4 ? 'badge-info' : 'badge-warning'
                 }`}>
-                  {ORDER_STEPS[Math.min(order.currentStep, ORDER_STEPS.length - 1)]?.label || 'Processing'}
+                  {order.cancelled
+                    ? 'Cancelled'
+                    : order.currentStep >= STEP_KEYS.length
+                      ? 'Completed'
+                      : ORDER_STEPS[Math.min(order.currentStep, ORDER_STEPS.length - 1)]?.label || 'Processing'}
                 </span>
               </div>
             </button>
@@ -334,6 +343,19 @@ export default function OrderTracker() {
 
           {/* Step Tracker */}
           <div className="card p-5">
+            {selectedOrder.cancelled ? (
+              <>
+                <h3 className="text-sm font-bold text-gray-900 mb-4">Order Progress</h3>
+                <div className="p-4 bg-gray-50 rounded-lg flex items-center gap-3">
+                  <MdCheckCircle size={20} className="text-gray-400" />
+                  <div>
+                    <p className="text-sm font-bold text-gray-700">This order was cancelled</p>
+                    <p className="text-[10px] text-gray-500">No further steps apply. Stock reserved for this order was released.</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
             <h3 className="text-sm font-bold text-gray-900 mb-4">Order Progress</h3>
             <div className="space-y-0">
               {ORDER_STEPS.map((step, i) => {
@@ -366,6 +388,8 @@ export default function OrderTracker() {
                 )
               })}
             </div>
+              </>
+            )}
           </div>
 
           {/* Comments Timeline */}

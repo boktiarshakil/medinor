@@ -37,8 +37,15 @@ export default function PlaceOrder() {
     try {
       const data = await api.getProductsWithStock()
       setProducts(data)
-      if (role === 'dealer' || role === 'sales_executive') {
-        setDealers(await api.getDealers().catch(() => []))
+      const allDealers = await api.getDealers().catch(() => [])
+      if (role === 'dealer') {
+        setDealers(allDealers)
+      } else if (role === 'sales_executive') {
+        // Only dealers assigned to this SR — matching the Collections scope.
+        // Orders placed for unassigned dealers would otherwise create invoices
+        // the SR can never see in their Collections page.
+        const mine = allDealers.filter(d => d.assigned_sr_id === user.id)
+        setDealers(mine.length > 0 ? mine : allDealers)
       }
     } catch (err) {
       console.error('Products fetch failed:', err)
@@ -53,6 +60,11 @@ export default function PlaceOrder() {
 
   const getPrice = (product) => {
     if (!role) return product.mrp
+    // When an SR orders FOR a specific dealer, invoice at the dealer price
+    // (the price the dealer actually pays). Otherwise use the caller's tier.
+    if (role === 'sales_executive' && selectedDealerId) {
+      return product.dealer_price || getPriceForRole(product, role) || product.mrp
+    }
     return getPriceForRole(product, role) || product.mrp
   }
 
@@ -146,7 +158,7 @@ export default function PlaceOrder() {
       }, 3000)
     } catch (err) {
       console.error('Order placement failed:', err)
-      toast.error('Failed to place order')
+      toast.error(err.message || 'Failed to place order')
     }
   }
 

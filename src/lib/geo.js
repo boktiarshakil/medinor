@@ -68,11 +68,20 @@ export const locationSharing = {
   },
 
   stop() {
+    const userId = activeUserId
     activeUserId = null
     lastReportAt = 0
     if (timer) {
       clearInterval(timer)
       timer = null
+    }
+    if (userId) {
+      try {
+        // The flag is the only persistent record of "sharing was on". If we
+        // leave it set, LocationShare auto-restarts sharing on the next page
+        // mount even after the user explicitly disabled it.
+        localStorage.removeItem(storageKey(userId))
+      } catch (_) { /* ignore */ }
     }
   },
 

@@ -34,6 +34,8 @@ export default function Reports() {
     URL.revokeObjectURL(url)
   }
 
+  const activeOrders = orders.filter(o => o.status !== 'cancelled' && o.status !== 'draft')
+
   const getReportRows = (report) => {
     const { orders, invoices, dealers, inventory, products, users, visits } = dataCache
     const userMap = {}
@@ -42,7 +44,7 @@ export default function Reports() {
       case 'Sales Report':
         return {
           headers: ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
-          rows: orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]),
+          rows: activeOrders.map(o => [o.order_number, o.dealer?.name || '', o.net_amount ?? o.total_amount ?? 0, o.status, o.created_at]),
         }
       case 'Dealer Report':
         return {
@@ -51,7 +53,7 @@ export default function Reports() {
         }
       case 'Executive Report': {
         const bySr = {}
-        orders.filter(o => o.status !== 'cancelled').forEach(o => {
+        activeOrders.forEach(o => {
           const key = o.sr_id || 'unassigned'
           bySr[key] = bySr[key] || { count: 0, revenue: 0 }
           bySr[key].count += 1
@@ -83,7 +85,7 @@ export default function Reports() {
         }
       case 'Product Performance': {
         const prodMap = {}
-        orders.forEach(o => (o.items || []).forEach(it => {
+        activeOrders.forEach(o => (o.items || []).forEach(it => {
           const pid = it.product_id
           prodMap[pid] = prodMap[pid] || { units: 0, revenue: 0 }
           prodMap[pid].units += it.quantity || 0
@@ -103,10 +105,13 @@ export default function Reports() {
           rows: visits.map(v => [userMap[v.sr_id] || v.sr_id, v.contact?.name || v.contact_name || '—', v.visit_date, v.purpose || '—', v.outcome || '—']),
         }
       case 'Profit Report': {
+        // Company profit = (trade_price − purchase_price) × units. The dealer's
+        // margin (dealer_price − trade_price) is not company profit — treating
+        // full invoiced revenue as profit overstated it on every dealer order.
         const prodCost = {}
         products.forEach(p => { prodCost[p.id] = p.purchase_price || 0 })
         const itemMap = {}
-        orders.forEach(o => (o.items || []).forEach(it => {
+        activeOrders.forEach(o => (o.items || []).forEach(it => {
           const pid = it.product_id
           itemMap[pid] = itemMap[pid] || { units: 0, revenue: 0 }
           itemMap[pid].units += it.quantity || 0
@@ -124,42 +129,15 @@ export default function Reports() {
       default:
         return {
           headers: ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
-          rows: orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]),
+          rows: activeOrders.map(o => [o.order_number, o.dealer?.name || '', o.net_amount ?? o.total_amount ?? 0, o.status, o.created_at]),
         }
     }
   }
 
   const handleExport = (report) => {
-    const { orders, invoices, dealers, inventory } = dataCache
     const date = new Date().toISOString().split('T')[0]
-    switch (report.title) {
-      case 'Sales Report':
-        return downloadCSV(`sales-report-${date}.csv`,
-          ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
-          orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]))
-      case 'Dealer Report':
-        return downloadCSV(`dealer-report-${date}.csv`,
-          ['Name', 'Mobile', 'District', 'Area', 'Credit Limit', 'Current Due', 'Status'],
-          dealers.map(d => [d.name, d.mobile, d.district, d.area, d.credit_limit, d.current_due, d.status]))
-      case 'Collection Report':
-        return downloadCSV(`collection-report-${date}.csv`,
-          ['Invoice #', 'Dealer', 'Paid', 'Status'],
-          invoices.map(i => [i.invoice_number, i.dealer?.name || '', i.paid_amount || 0, i.status]))
-      case 'Outstanding Report':
-        return downloadCSV(`outstanding-report-${date}.csv`,
-          ['Invoice #', 'Dealer', 'Amount', 'Paid', 'Due', 'Status'],
-          invoices
-            .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
-            .map(i => [i.invoice_number, i.dealer?.name || '', i.total_amount || 0, i.paid_amount || 0, (i.due_amount ?? i.total_amount) || 0, i.status]))
-      case 'Stock Report':
-        return downloadCSV(`stock-report-${date}.csv`,
-          ['Product', 'Quantity', 'Low Stock Threshold', 'Expiry'],
-          inventory.map(i => [i.product?.name || '', i.quantity || 0, i.low_stock_threshold || 0, i.expiry_date]))
-      default:
-        return downloadCSV(`${report.title.toLowerCase().replace(/\s+/g, '-')}-${date}.csv`,
-          ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
-          orders.map(o => [o.order_number, o.dealer?.name || '', o.total_amount || 0, o.status, o.created_at]))
-    }
+    const { headers, rows } = getReportRows(report)
+    downloadCSV(`${report.title.toLowerCase().replace(/\s+/g, '-')}-${date}.csv`, headers, rows)
   }
 
   useEffect(() => {
@@ -180,7 +158,10 @@ export default function Reports() {
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-        const mtdOrders = orders.filter(o => new Date(o.created_at) >= monthStart)
+        const mtdOrders = orders.filter(o =>
+          o.status !== 'cancelled' && o.status !== 'draft' &&
+          new Date(o.created_at) >= monthStart
+        )
         const totalRevenue = mtdOrders.reduce((s, o) => s + (o.net_amount || o.total_amount || 0), 0)
         // True month-to-date collection: approved payments received this month.
         const totalPaid = (payments || [])
