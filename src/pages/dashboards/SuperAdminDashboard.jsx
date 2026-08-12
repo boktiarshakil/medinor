@@ -144,15 +144,16 @@ export default function SuperAdminDashboard() {
      areaMap[area].dealers++
    })
    orders.forEach(o => {
-     if (o.status === 'cancelled') return
+     if (['cancelled', 'draft', 'submitted'].includes(o.status)) return
      const dName = o.dealer?.name || o.dealer_name
      const dealer = dealers.find(dd => (dd.name === dName) || (dd.id === o.dealer_id))
      const area = dealer?.area || dealer?.area_name || dealer?.territory || 'Unassigned'
      if (!areaMap[area]) areaMap[area] = { area, dealers: 0, actual: 0 }
      areaMap[area].actual += (o.total_amount || o.amount || 0)
    })
+  const topAreaActual = Math.max(...Object.values(areaMap).map(a => a.actual), 0) || 1
   const AREA_PERFORMANCE = Object.values(areaMap)
-    .map(a => ({ ...a, target: a.actual > 0 ? Math.round(a.actual * 1.2) : 500000, percent: a.actual > 0 ? Math.min(Math.round((a.actual / Math.max(a.actual * 1.2, 1)) * 100), 100) : 0 }))
+    .map(a => ({ ...a, percent: a.actual > 0 ? Math.min(Math.round((a.actual / topAreaActual) * 100), 100) : 0 }))
     .sort((a, b) => b.actual - a.actual)
     .slice(0, 6)
 
@@ -275,7 +276,7 @@ export default function SuperAdminDashboard() {
                       <span className="text-[10px] text-gray-400">({a.dealers} dealers)</span>
                     </div>
                     <span className="text-xs text-gray-500">
-                      {formatCurrency(a.actual)} / {formatCurrency(a.target)}
+                      {formatCurrency(a.actual)}
                     </span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -290,7 +291,7 @@ export default function SuperAdminDashboard() {
                     <span className="text-[10px] text-gray-400">{a.dealers} dealers</span>
                     <span className={`text-[10px] font-semibold ${
                       a.percent >= 90 ? 'text-emerald-600' : a.percent >= 70 ? 'text-amber-600' : 'text-red-500'
-                    }`}>{a.percent}%</span>
+                    }`}>Top area: {a.percent}%</span>
                   </div>
                 </div>
               ))}

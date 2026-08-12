@@ -67,7 +67,7 @@ export default function SalesExecDashboard() {
   const ordersTaken = todayOrders.length
   const myDealers = dealers.filter(d => d.assigned_sr_id === user?.id)
   const todayCollected = payments
-    .filter(p => p.collected_by === user?.id && (p.payment_date || String(p.created_at).slice(0, 10)) >= todayStartISO.slice(0, 10))
+    .filter(p => p.status === 'approved' && p.collected_by === user?.id && (p.payment_date || String(p.created_at).slice(0, 10)) >= todayStartISO.slice(0, 10))
     .reduce((sum, p) => sum + (p.amount || 0), 0)
   const collections = todayCollected
   const dbMonthTarget = targets

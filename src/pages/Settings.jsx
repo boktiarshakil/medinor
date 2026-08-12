@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { isPushSupported, initPush, disablePush } from '../lib/push'
-import { MdSettings, MdPeople, MdSecurity, MdNotifications, MdPalette, MdCheck, MdChevronRight, MdNotificationsActive, MdNotificationsOff, MdSmartphone } from 'react-icons/md'
+import { MdSettings, MdPeople, MdNotifications, MdPalette, MdCheck, MdChevronRight, MdNotificationsActive, MdNotificationsOff, MdSmartphone } from 'react-icons/md'
 import toast from 'react-hot-toast'
 
 const DEFAULT_PREFS = {
@@ -99,8 +99,6 @@ export default function Settings() {
     { label: 'Manage Users & Roles', path: '/users', icon: MdPeople, roles: ['super_admin', 'admin'] },
     { label: 'Area Assignments', path: '/areas', icon: MdPeople, roles: ['super_admin', 'admin'] },
     { label: 'Dealer-SR Mapping', path: '/dealers', icon: MdPeople, roles: ['super_admin', 'admin', 'sales_manager', 'area_manager'] },
-    { label: 'Change Password', path: '#password', icon: MdSecurity, roles: ['super_admin', 'admin', 'sales_manager', 'area_manager', 'sales_executive', 'warehouse', 'dealer'] },
-    { label: 'Audit Logs', path: '#audit', icon: MdSecurity, roles: ['super_admin', 'admin'] },
   ]
 
   const visibleNav = navItems.filter(item => item.roles.includes(user?.role))

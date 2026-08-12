@@ -1524,7 +1524,9 @@ export const api = {
     ])
     const stockMap = {}
     inventory.forEach(i => {
-      stockMap[i.product_id] = (stockMap[i.product_id] || 0) + (i.quantity || 0)
+      const qty = Number(i.quantity) || 0
+      const reserved = Number(i.quantity_reserved) || 0
+      stockMap[i.product_id] = (stockMap[i.product_id] || 0) + (qty - reserved)
     })
     return products.map(p => ({ ...p, stock: stockMap[p.id] ?? null }))
   },
