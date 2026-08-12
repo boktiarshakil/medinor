@@ -14,24 +14,27 @@ export default function AreaManagerDashboard() {
   const [users, setUsers] = useState([])
   const [attendance, setAttendance] = useState([])
   const [targets, setTargets] = useState([])
+  const [visits, setVisits] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, usersData, attendanceData, targetsData] = await Promise.all([
+        const [ordersData, invoicesData, usersData, attendanceData, targetsData, visitsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getUsers().catch(() => []),
           api.getTodayAttendanceList().catch(() => []),
           api.getTargets({ areaId: user?.area_id }).catch(() => []),
+          api.getCRMVisits().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
         setUsers(usersData)
         setAttendance(attendanceData)
         setTargets(targetsData)
+        setVisits(visitsData)
       } catch (err) {
         console.error('AreaManager dashboard fetch failed:', err)
       } finally {
@@ -83,6 +86,15 @@ export default function AreaManagerDashboard() {
   ]
 
   // SR live status — compute from orders and GPS history
+  const todayISOFull = new Date().toISOString().split('T')[0]
+  const todayVisitsBySr = {}
+  ;(visits || []).forEach(v => {
+    const visitDate = v.visit_date ? v.visit_date.split('T')[0] : ''
+    if (v.sr_id && visitDate === todayISOFull) {
+      todayVisitsBySr[v.sr_id] = (todayVisitsBySr[v.sr_id] || 0) + 1
+    }
+  })
+
   const SR_STATUS = mySRs.map(sr => {
     const srOrders = areaOrders.filter(o => o.sr_id === sr.id || o.created_by === sr.id)
     const todayOrders_sr = srOrders.filter(o => o.created_at >= new Date().toISOString().split('T')[0])
@@ -91,7 +103,7 @@ export default function AreaManagerDashboard() {
       name: sr.full_name || sr.email || 'Unknown',
       checkedIn: attendedIds.has(sr.id),
       orders: todayOrders_sr.filter(o => o.status !== 'cancelled').length,
-      visits: todayOrders_sr.length,
+      visits: todayVisitsBySr[sr.id] || 0,
       lastLocation: sr.area?.name || 'Unknown',
     }
   })

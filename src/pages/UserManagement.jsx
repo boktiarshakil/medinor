@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { formatDate, generatePersonalId } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 import { api } from '../lib/api'
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdCheckCircle, MdPersonAdd, MdClose, MdBadge } from 'react-icons/md'
 import toast from 'react-hot-toast'

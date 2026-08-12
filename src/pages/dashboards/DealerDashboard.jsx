@@ -58,6 +58,37 @@ export default function DealerDashboard() {
     .sort((a, b) => String(b.payment_date || b.created_at).localeCompare(String(a.payment_date || a.created_at)))
     .slice(0, 10)
 
+  const exportStatement = () => {
+    const header = ['Date', 'Type', 'Reference', 'Amount (BDT)']
+    const rows = [
+      ...myInvoices.map(inv => [
+        formatDate(inv.created_at),
+        'Invoice',
+        inv.invoice_number || inv.id,
+        (inv.total_amount ?? inv.amount ?? 0) * -1,
+      ]),
+      ...payments
+        .filter(p => dealerId && p.dealer_id === dealerId)
+        .map(p => [
+          formatDate(p.payment_date || p.created_at),
+          'Payment',
+          p.id,
+          p.amount || 0,
+        ]),
+    ]
+
+    const csv = [header, ...rows]
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `statement-${(dealerRecord?.name || 'dealer').toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="card p-12 text-center">
@@ -77,7 +108,7 @@ export default function DealerDashboard() {
             <h2 className="text-xl font-bold mt-0.5">{dealerRecord?.name || user?.full_name || user?.name || 'Dealer'}</h2>
             <p className="text-xs text-brand-200 mt-1">{user?.email || ''}</p>
           </div>
-          <button className="btn bg-white/15 text-white hover:bg-white/25 text-xs backdrop-blur-sm">
+          <button onClick={exportStatement} className="btn bg-white/15 text-white hover:bg-white/25 text-xs backdrop-blur-sm">
             <MdFileDownload size={14} /> Statement
           </button>
         </div>

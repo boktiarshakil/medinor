@@ -14,24 +14,30 @@ export default function SalesManagerDashboard() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
+  const [payments, setPayments] = useState([])
   const [users, setUsers] = useState([])
   const [targets, setTargets] = useState([])
+  const [visits, setVisits] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, usersData, targetsData] = await Promise.all([
+        const [ordersData, invoicesData, paymentsData, usersData, targetsData, visitsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
+          api.getPayments().catch(() => []),
           api.getUsers().catch(() => []),
           api.getTargets({ areaId: user?.area_id }).catch(() => []),
+          api.getCRMVisits().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
+        setPayments(paymentsData)
         setUsers(usersData)
         setTargets(targetsData)
+        setVisits(visitsData)
       } catch (err) {
         console.error('SalesManager dashboard fetch failed:', err)
       } finally {
@@ -47,9 +53,9 @@ export default function SalesManagerDashboard() {
   const pendingApproval = orders
     .filter(o => o.status === 'submitted')
     .reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
-  const teamCollections = invoices
-    .filter(inv => inv.status === 'paid')
-    .reduce((sum, inv) => sum + ((inv.paid_amount ?? inv.total_amount) || inv.amount || 0), 0)
+  const teamCollections = (payments || [])
+    .filter(p => p.status === 'approved')
+    .reduce((sum, p) => sum + (p.amount || 0), 0)
   const overdueAccounts = invoices
     .filter(inv => {
       if (inv.status === 'paid' || inv.status === 'cancelled') return false
@@ -75,6 +81,13 @@ export default function SalesManagerDashboard() {
   monthStart.setDate(1)
   monthStart.setHours(0, 0, 0, 0)
 
+  const visitCountBySr = {}
+  ;(visits || []).forEach(v => {
+    if (v.sr_id && new Date(v.visit_date) >= monthStart) {
+      visitCountBySr[v.sr_id] = (visitCountBySr[v.sr_id] || 0) + 1
+    }
+  })
+
   const TEAM_PERFORMANCE = salesUsers.map(sr => {
     const srOrders = orders.filter(o => o.sr_id === sr.id || o.created_by === sr.id)
     // Achieved = real, fulfilled monthly business: same month, and only orders
@@ -94,7 +107,7 @@ export default function SalesManagerDashboard() {
       target: targetMap[sr.id] || 300000,
       achieved,
       orders: srOrders.filter(o => o.status !== 'cancelled').length,
-      visits: srOrders.length,
+      visits: visitCountBySr[sr.id] || 0,
     }
   }).sort((a, b) => b.achieved - a.achieved)
 
