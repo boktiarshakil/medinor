@@ -969,13 +969,20 @@ export const api = {
 
     let orderCompleted = false
     if (invoice.status === 'paid' && invoice.order_id) {
-      // Auto-complete the linked order now that payment is fully received
+      // Auto-complete the linked order now that payment is fully received.
+      // Only orders that have already progressed through the pipeline
+      // (approved → … → delivered) may be auto-completed. An order that was
+      // never approved (draft/submitted) must NOT jump to "completed" — doing
+      // so would skip stock reservation/deduction and mark a never-shipped
+      // order as fulfilled. Such orders stay in the normal workflow and are
+      // completed through updateOrderStatus once they actually ship.
+      const COMPLETEABLE = ['approved', 'packed', 'dispatched', 'delivered']
       const { data: order } = await supabase
         .from('orders')
         .select('id, status')
         .eq('id', invoice.order_id)
         .single()
-      if (order && order.status !== 'completed' && order.status !== 'cancelled') {
+      if (order && COMPLETEABLE.includes(order.status)) {
         const { data: updatedOrder } = await supabase
           .from('orders')
           .update({ status: 'completed', updated_at: new Date().toISOString() })
