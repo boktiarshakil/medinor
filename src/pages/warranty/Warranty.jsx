@@ -9,16 +9,16 @@ import { api } from '../../lib/api'
 
 const normalizeWarranty = (w) => ({
   id: w.id,
-  code: w.code || w.warranty_code || `CUST-${String(w.id || '').slice(0, 4).toUpperCase()}`,
+  code: w.code || w.warranty_code || '',
   product: w.product || w.product_name || 'Unknown Product',
   customer: w.customer || w.name || w.full_name || 'Unknown',
-  phone: w.phone || '',
+  phone: w.phone || w.mobile || '',
   address: w.address || '',
   purchaseDate: w.purchase_date || w.purchaseDate || w.created_at,
   warrantyTill: w.warranty_till || w.warranty_end || '',
-  status: w.status || (w.warranty_till && new Date(w.warranty_till) > new Date() ? 'active' : 'expired'),
-  registeredVia: w.registered_via || w.source || 'Direct',
-  stickerNo: w.sticker_no || w.sticker || `STK-${Date.now()}`,
+  status: w.status || (w.warranty_till && new Date(w.warranty_till) > new Date() ? 'active' : ''),
+  registeredVia: w.registered_via || w.source || '',
+  stickerNo: w.sticker_no || w.sticker || w.code || '',
 })
 
 export default function Warranty() {
@@ -102,7 +102,13 @@ export default function Warranty() {
 
   const handleSearch = (e) => {
     e.preventDefault()
-    const found = warranties.find(w => w.code?.toLowerCase() === searchCode.toLowerCase().trim())
+    const q = searchCode.trim().toLowerCase()
+    if (!q) return
+    const found = warranties.find(w =>
+      w.code?.toLowerCase() === q ||
+      w.stickerNo?.toLowerCase() === q ||
+      w.warranty_code?.toLowerCase() === q
+    )
     setSearchResult(found || { notFound: true })
   }
 
@@ -193,15 +199,61 @@ export default function Warranty() {
   }
 
   const handleMissedCallAction = async (call) => {
-    setMissedCalls(prev => prev.map(c => c.id === call.id ? { ...c, handled: true } : c))
     try {
       await api.updateMissedCall(call.id, { handled: true })
+      setMissedCalls(prev => prev.map(c => c.id === call.id ? { ...c, handled: true } : c))
     } catch (err) {
       console.error('Failed to mark missed call handled:', err)
+      toast.error('Could not mark this lead as handled')
     }
     setShowRegister(true)
     setRegisterForm(prev => ({ ...prev, phone: call.phone }))
   }
+
+  const pendingMissedCalls = missedCalls.filter(c => !c.handled)
+  const missedCallLeadsPanel = pendingMissedCalls.length > 0 && (
+    <div className="card p-4 border-l-4 border-l-amber-400">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <MdPhone className="text-amber-500" size={18} />
+          Missed Call Leads
+          <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+            {pendingMissedCalls.length}
+          </span>
+        </h3>
+      </div>
+      <div className="space-y-2">
+        {pendingMissedCalls.map(call => (
+          <div key={call.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                <MdLocalPhone size={16} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">{call.phone}</p>
+                <p className="text-[10px] text-gray-500">Missed at {formatDate(call.time, 'hh:mm a')} · Needs registration</p>
+              </div>
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => handleMissedCallAction(call)}
+                className="px-2.5 py-1.5 bg-brand-500 text-white text-[10px] font-bold rounded-md hover:bg-brand-600"
+              >
+                Register Now
+              </button>
+              <a
+                href={`tel:${call.phone}`}
+                className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md hover:bg-emerald-200"
+                title="Call back"
+              >
+                <MdCall size={14} />
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   // Loading state
   if (loading) {
@@ -278,6 +330,9 @@ export default function Warranty() {
           </button>
         </div>
 
+        {/* Missed Call Leads */}
+        {missedCallLeadsPanel}
+
         {/* Registration Modal */}
         {showRegister && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -339,13 +394,20 @@ export default function Warranty() {
                       onChange={(e) => setRegisterForm({ ...registerForm, product: e.target.value })}
                     >
                       <option value="">Select product</option>
-                      <option>Mediron Excellent Blood Glucose Meter</option>
-                      <option>Mediron Prime BP Monitor (MEDI 712)</option>
-                      <option>Mediron Automatic BP Monitor (MEDI 589)</option>
-                      <option>Mediron Advance BP Monitor (MEDI 447)</option>
-                      <option>Mediron Blood Glucose Test Strip (50 pcs)</option>
-                      <option>Mediron Blood Glucose Test Strip (25 pcs)</option>
-                    </select>
+                    {products.map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                    {products.length === 0 && (
+                      <>
+                        <option>Mediron Excellent Blood Glucose Meter</option>
+                        <option>Mediron Prime BP Monitor (MEDI 712)</option>
+                        <option>Mediron Automatic BP Monitor (MEDI 589)</option>
+                        <option>Mediron Advance BP Monitor (MEDI 447)</option>
+                        <option>Mediron Blood Glucose Test Strip (50 pcs)</option>
+                        <option>Mediron Blood Glucose Test Strip (25 pcs)</option>
+                      </>
+                    )}
+                  </select>
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1 block">Sticker Number</label>
@@ -409,49 +471,7 @@ export default function Warranty() {
       </div>
 
       {/* Missed Call Leads */}
-      {missedCalls.filter(c => !c.handled).length > 0 && (
-        <div className="card p-4 border-l-4 border-l-amber-400">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <MdPhone className="text-amber-500" size={18} />
-              Missed Call Leads
-              <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {missedCalls.filter(c => !c.handled).length}
-              </span>
-            </h3>
-          </div>
-          <div className="space-y-2">
-            {missedCalls.filter(c => !c.handled).map(call => (
-              <div key={call.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
-                    <MdLocalPhone size={16} className="text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{call.phone}</p>
-                    <p className="text-[10px] text-gray-500">Missed at {formatDate(call.time, 'hh:mm a')} · Needs registration</p>
-                  </div>
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => handleMissedCallAction(call)}
-                    className="px-2.5 py-1.5 bg-brand-500 text-white text-[10px] font-bold rounded-md hover:bg-brand-600"
-                  >
-                    Register Now
-                  </button>
-                  <a
-                    href={`tel:${call.phone}`}
-                    className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md hover:bg-emerald-200"
-                    title="Call back"
-                  >
-                    <MdCall size={14} />
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {missedCallLeadsPanel}
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">

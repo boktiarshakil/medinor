@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../lib/utils'
 import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh, MdClose, MdDelete, MdCheck, MdLocalShipping, MdInventory, MdHandshake, MdReceipt } from 'react-icons/md'
 import { api } from '../lib/api'
@@ -20,6 +21,8 @@ const ALLOWED_ROLES = ['super_admin', 'admin', 'sales_manager', 'area_manager', 
 
 export default function Orders() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
 
   if (!user || !ALLOWED_ROLES.includes(user.role)) {
     return (
@@ -32,7 +35,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialQuery)
   const [statusFilter, setStatusFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)

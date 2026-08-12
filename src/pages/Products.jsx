@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canSeePrice } from '../lib/utils'
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock, MdClose, MdImage, MdCloudUpload } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
@@ -9,9 +10,11 @@ import toast from 'react-hot-toast'
 
 export default function Products() {
   const { user, role } = useAuth()
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialQuery)
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)

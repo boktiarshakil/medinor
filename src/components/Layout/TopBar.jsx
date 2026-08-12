@@ -15,11 +15,10 @@ export default function TopBar({ onMenuClick }) {
   const [searchLoading, setSearchLoading] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [notifLoading, setNotifLoading] = useState(false)
   const notifRef = useRef(null)
   const searchRef = useRef(null)
-
-  const unreadCount = notifications.filter(n => !n.is_read).length
 
   // Load notifications on mount + poll
   const loadNotifications = async () => {
@@ -28,6 +27,11 @@ export default function TopBar({ onMenuClick }) {
       setNotifLoading(true)
       const data = await api.getNotifications(user.id)
       setNotifications(data)
+      // The badge must reflect ALL unread rows, not just the 20 newest shown
+      // in the dropdown, so query the true count separately.
+      api.getUnreadNotificationCount(user.id)
+        .then(setUnreadCount)
+        .catch(() => {})
     } catch (err) {
       console.error('Failed to load notifications:', err)
     } finally {
@@ -66,6 +70,9 @@ export default function TopBar({ onMenuClick }) {
             }
             return next.slice(0, 50)
           })
+          api.getUnreadNotificationCount(user.id)
+            .then(setUnreadCount)
+            .catch(() => {})
         }
       )
       .subscribe()
@@ -131,10 +138,11 @@ export default function TopBar({ onMenuClick }) {
   }, [query, searchOpen])
 
   const goTo = (path) => {
+    const q = encodeURIComponent(query.trim())
     setSearchOpen(false)
     setSearchResults(null)
     setQuery('')
-    navigate(path)
+    navigate(q ? `${path}?q=${q}` : path)
   }
 
   const handleNotifClick = async (n) => {
@@ -142,6 +150,7 @@ export default function TopBar({ onMenuClick }) {
       try {
         await api.markNotificationRead(n.id)
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+        setUnreadCount(c => Math.max(0, c - 1))
       } catch (err) {
         console.error('Failed to mark read:', err)
       }
@@ -291,6 +300,7 @@ export default function TopBar({ onMenuClick }) {
                     try {
                       await Promise.all(notifications.filter(n => !n.is_read).map(n => api.markNotificationRead(n.id)))
                       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+                      setUnreadCount(0)
                     } catch (err) {
                       console.error('Failed to mark all read:', err)
                     }

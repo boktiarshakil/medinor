@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -14,13 +15,15 @@ import toast from 'react-hot-toast'
 
 export default function Invoices() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [invoices, setInvoices] = useState([])
   const [products, setProducts] = useState([])
   const [dealers, setDealers] = useState([])
   const [allOrders, setAllOrders] = useState([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialQuery)
   const [showCreate, setShowCreate] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [showPayment, setShowPayment] = useState(false)

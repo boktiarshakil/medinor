@@ -674,6 +674,16 @@ export const api = {
     return data || []
   },
 
+  async getUnreadNotificationCount(userId) {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+    if (error) throw error
+    return count || 0
+  },
+
   // Active announcements for the scrolling news marquee — the current
   // user's own last 5 active announcements/offers (dealer rows are
   // dealer-targeted, SR rows are SR-targeted, etc.)
@@ -1236,7 +1246,7 @@ export const api = {
   },
 
   async broadcastAnnouncement({ title, message, priority = 'medium', audience = 'all', senderId }) {
-    const typeMap = { high: 'warning', medium: 'info', low: 'info' }
+    const typeMap = { high: 'warning', medium: 'info', low: 'success' }
     const { data: users, error: usersError } = await supabase
       .from('user_profiles')
       .select('id, role')

@@ -37,16 +37,23 @@ export default function Campaigns() {
       toast.error('Campaign name is required')
       return
     }
+    if (!newCampaign.start_date || !newCampaign.end_date) {
+      toast.error('Start and end date are both required')
+      return
+    }
+    if (newCampaign.end_date < newCampaign.start_date) {
+      toast.error('End date cannot be before start date')
+      return
+    }
     setCreating(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
       await api.createCampaign({
         name: newCampaign.name,
         type: newCampaign.type,
         discount_percent: Number(newCampaign.discount_percent) || 0,
         budget: Number(newCampaign.budget) || null,
-        start_date: newCampaign.start_date || today,
-        end_date: newCampaign.end_date || today,
+        start_date: newCampaign.start_date,
+        end_date: newCampaign.end_date,
         description: newCampaign.description || null,
         status: newCampaign.status,
       })
@@ -110,7 +117,9 @@ export default function Campaigns() {
             <div className="grid grid-cols-3 gap-3 text-xs">
               <div>
                 <span className="text-gray-400">Discount</span>
-                <p className="font-semibold text-gray-800">{c.discount_percent ?? c.discount ?? 0}%</p>
+                <p className="font-semibold text-gray-800">
+                  {c.type === 'discount' ? `${c.discount_percent ?? c.discount ?? 0}%` : '—'}
+                </p>
               </div>
               <div>
                 <span className="text-gray-400">Budget</span>

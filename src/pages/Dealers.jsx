@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatCurrency, statusColor } from '../lib/utils'
 import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore, MdClose } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
 export default function Dealers() {
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const [dealers, setDealers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialQuery)
   const [districtFilter, setDistrictFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)

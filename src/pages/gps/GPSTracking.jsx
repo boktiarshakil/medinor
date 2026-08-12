@@ -163,12 +163,12 @@ export default function GPSTracking() {
   const switchLayerRef = useRef(null)
   const userMovedRef = useRef(false)
 
-  // Init map once the map container is actually rendered (after the first
-  // data load completes and the loading branch is no longer shown).
-  const showMap = !(loading && users.length === 0)
+  // Init map only when the map container is actually rendered (i.e. neither the
+  // loading branch nor the fatal-error branch is being shown).
+  const showMap = !((loading || error) && users.length === 0)
 
   useEffect(() => {
-    if (!showMap || mapInstance.current) return
+    if (!showMap || mapInstance.current || !mapRef.current) return
     const map = L.map(mapRef.current, {
       center: DEFAULT_CENTER,
       zoom: 12,
@@ -268,8 +268,9 @@ export default function GPSTracking() {
     ? users
     : users.filter(u => filter === 'online'
         ? u.status === 'online'
-        : u.status === 'offline' || u.status === 'no-location')
+        : u.status === 'offline')
   const onlineCount = users.filter(u => u.status === 'online').length
+  const offlineCount = users.filter(u => u.status === 'offline').length
   const locatedCount = users.filter(u => u.lat && u.lng).length
 
   if (loading && users.length === 0) {
@@ -326,7 +327,7 @@ export default function GPSTracking() {
         {[
           { key: 'all', label: `All (${users.length})` },
           { key: 'online', label: `Online (${onlineCount})` },
-          { key: 'offline', label: `Offline (${users.length - onlineCount})` },
+          { key: 'offline', label: `Offline (${offlineCount})` },
         ].map(f => (
           <button
             key={f.key}

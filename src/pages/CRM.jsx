@@ -88,7 +88,12 @@ export default function CRM() {
 
   const types = ['all', ...new Set(contacts.map(c => c.type || 'other'))]
   const filtered = contacts.filter(c => {
-    const matchSearch = (c.name || '').toLowerCase().includes(search.toLowerCase())
+    const q = search.toLowerCase().trim()
+    const matchSearch = !q ||
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.phone || c.mobile || '').toLowerCase().includes(q) ||
+      (c.specialty || '').toLowerCase().includes(q) ||
+      (c.type || '').toLowerCase().includes(q)
     const matchType = typeFilter === 'all' || (c.type || 'other') === typeFilter
     return matchSearch && matchType
   })
@@ -148,7 +153,7 @@ export default function CRM() {
                 </div>
               </div>
               <div className="space-y-1.5 text-xs text-gray-600">
-                {contact.notes && <p>📍 {contact.notes}</p>}
+                {contact.notes && <p>🏥 {contact.notes}</p>}
                 {contact.phone && <p>📞 {contact.phone}</p>}
                 {lastVisitMap[contact.id] && <p>🗓 Last visit: {formatDate(lastVisitMap[contact.id])}</p>}
               </div>

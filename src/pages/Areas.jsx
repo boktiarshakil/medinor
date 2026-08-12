@@ -13,6 +13,7 @@ export default function Areas() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [managers, setManagers] = useState([])
+  const [allUsers, setAllUsers] = useState([])
   const [newArea, setNewArea] = useState({ name: '', code: '', district: '', division: '', manager_id: '' })
 
   const fetchAreas = async () => {
@@ -30,7 +31,10 @@ export default function Areas() {
   useEffect(() => {
     fetchAreas()
     api.getUsers()
-      .then(users => setManagers(users.filter(u => ['sales_manager', 'area_manager'].includes(u.role) && u.is_active)))
+      .then(users => {
+        setAllUsers(users)
+        setManagers(users.filter(u => ['sales_manager', 'area_manager'].includes(u.role) && u.is_active))
+      })
       .catch(() => {})
   }, [])
 
@@ -111,7 +115,12 @@ export default function Areas() {
     return !q || a.name.toLowerCase().includes(q) || (a.code || '').toLowerCase().includes(q) || (a.district || '').toLowerCase().includes(q)
   })
 
-  const managerName = (id) => managers.find(m => m.id === id)?.full_name || null
+  // Resolve the assigned manager from ALL users (not just active managers) so a
+  // set manager_id is never displayed as "not assigned".
+  const managerName = (id) => {
+    if (!id) return null
+    return allUsers.find(m => m.id === id)?.full_name || managers.find(m => m.id === id)?.full_name || 'Unknown manager'
+  }
 
   return (
     <div className="space-y-5">
@@ -207,8 +216,10 @@ export default function Areas() {
           {filtered.length === 0 && (
             <div className="card p-12 text-center">
               <MdLocationOn size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500">No areas found</p>
-              <p className="text-xs text-gray-400 mt-1">Add an area to start assigning territories</p>
+              <p className="text-sm text-gray-500">
+                {search ? 'No areas match your search' : 'No areas found'}
+              </p>
+              {!search && <p className="text-xs text-gray-400 mt-1">Add an area to start assigning territories</p>}
             </div>
           )}
         </>

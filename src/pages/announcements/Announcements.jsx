@@ -34,16 +34,18 @@ export default function Announcements() {
       setError(null)
       const data = await api.getNotifications(user.id)
       const mapped = data
-        // Only show actual announcements (and legacy rows without a type).
-        .filter(n => !n.reference_type || n.reference_type === 'announcement')
+        // Only show rows that are actually announcements — order/system
+        // notification rows have a different reference_type and must not leak
+        // into the feed mislabeled as coming from "Management".
+        .filter(n => n.reference_type === 'announcement')
         .map(n => ({
           id: n.id,
           from: 'Management',
-          fromRole: n.reference_type === 'announcement' ? 'Management' : undefined,
+          fromRole: 'Management',
           to: n.title || 'All',
           message: n.message,
           timestamp: n.created_at,
-          priority: n.type === 'warning' ? 'high' : n.type === 'error' ? 'high' : 'medium',
+          priority: n.type === 'warning' ? 'high' : n.type === 'error' ? 'high' : n.type === 'success' ? 'low' : 'medium',
           isActive: n.is_active !== false,
         }))
       setAnnouncements(mapped)

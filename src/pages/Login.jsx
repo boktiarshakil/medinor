@@ -14,7 +14,8 @@ export default function Login() {
   const location = useLocation()
 
   if (user) {
-    return <Navigate to="/dashboard" replace />
+    const from = location.state?.from?.pathname || '/dashboard'
+    return <Navigate to={from} replace />
   }
 
   const handleSubmit = async (e) => {
