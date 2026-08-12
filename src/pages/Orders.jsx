@@ -57,9 +57,22 @@ export default function Orders() {
         api.getOrders(),
         api.getUsers().catch(() => []),
       ])
+      // Area managers only see orders from dealers inside their own area.
+      let scoped = data || []
+      if (user?.role === 'area_manager') {
+        const areaIds = new Set(
+          users.filter(u => u.area_id === user.area_id).map(u => u.id)
+        )
+        areaIds.add(user.area_id)
+        scoped = scoped.filter(o =>
+          o.area_id === user.area_id ||
+          areaIds.has(o.sr_id) ||
+          areaIds.has(o.created_by)
+        )
+      }
       const userMap = {}
       users.forEach(u => { userMap[u.id] = u.full_name || u.email })
-      const mapped = (data || []).map(order => ({
+      const mapped = (scoped || []).map(order => ({
         id: order.id,
         number: order.order_number || order.order_no || order.id,
         dealer: order.dealer?.name || order.dealer_name || 'Unknown',

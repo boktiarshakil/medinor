@@ -464,33 +464,15 @@ export default function Invoices() {
                     <button
                       onClick={async () => {
                         try {
-                          await api.confirmPayment(p.id, 'approved', user?.id)
-                          // Update the linked invoice paid/due/status and auto-complete order
-                          if (p.invoice_id) {
-                            const inv = normalizedInvoice(
-                              invoices.find(i => i.id === p.invoice_id) || {}
-                            )
-                            const newPaid = (inv.paid || 0) + Number(p.amount || 0)
-                            const newDue = Math.max((inv.total_amount || inv.amount || 0) - newPaid, 0)
-                            const { orderCompleted } = await api.updateInvoiceAndHandlePaid(
-                              p.invoice_id,
-                              {
-                                paid_amount: newPaid,
-                                due_amount: newDue,
-                                status: newDue <= 0 ? 'paid' : 'partial',
-                              },
-                              user?.id
-                            )
-                            toast.success(
-                              orderCompleted
-                                ? 'Payment approved — order auto-completed'
-                                : newDue <= 0
-                                  ? 'Payment approved — invoice fully paid'
-                                  : 'Payment approved'
-                            )
-                          } else {
-                            toast.success('Payment approved')
-                          }
+                          const { orderCompleted } = await api.approvePayment({
+                            paymentId: p.id,
+                            confirmedBy: user?.id,
+                          })
+                          toast.success(
+                            orderCompleted
+                              ? 'Payment approved — order auto-completed'
+                              : 'Payment approved'
+                          )
                           fetchAll()
                         } catch (err) {
                           toast.error('Failed: ' + err.message)

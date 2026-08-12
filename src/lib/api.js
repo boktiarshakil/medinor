@@ -8,11 +8,14 @@ import { generateInvoiceNo, generateTicketNo } from './utils'
 export const api = {
   // ---- Users / Profiles ----
 
-  async getUsers() {
-    const { data, error } = await supabase
+  async getUsers({ includeInactive = false } = {}) {
+    let query = supabase
       .from('user_profiles')
       .select(`*, area:areas!fk_user_area(name)`)
-      .order('created_at', { ascending: false })
+    if (!includeInactive) {
+      query = query.eq('is_active', true)
+    }
+    const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error
     return data || []
   },
@@ -166,6 +169,7 @@ export const api = {
       .select(`
         *,
         dealer:dealers(name),
+        sr:user_profiles!orders_sr_id_fkey(full_name),
         items:order_items(*, product:products(name, sku))
       `)
       .order('created_at', { ascending: false })
@@ -187,11 +191,15 @@ export const api = {
         .eq('id', payload.dealer_id)
         .single()
       if (dealer) {
-        const limit = Number(dealer.credit_limit) || 0
         const due = Number(dealer.current_due) || 0
-        const available = limit - due
-        if (limit > 0 && orderAmount > available) {
-          throw new Error(`Order exceeds available credit (${available} BDT available, ${limit} limit, ${due} due)`)
+        // A credit_limit that is null/undefined means "no limit configured".
+        // An explicit value (including 0 = cash-only, no credit) is enforced.
+        if (dealer.credit_limit != null) {
+          const limit = Number(dealer.credit_limit) || 0
+          const available = limit - due
+          if (orderAmount > available) {
+            throw new Error(`Order exceeds available credit (${available} BDT available, ${limit} limit, ${due} due)`)
+          }
         }
       }
     }
@@ -219,6 +227,31 @@ export const api = {
   },
 
   async updateOrderStatus(id, status, createdBy = null) {
+    // Only allow legitimate forward (or cancel) transitions so we never
+    // double-reserve stock on re-approval or jump draft→delivered.
+    const ORDER_FLOW = {
+      draft: ['submitted', 'cancelled'],
+      submitted: ['approved', 'cancelled'],
+      approved: ['packed', 'cancelled'],
+      packed: ['dispatched', 'cancelled'],
+      dispatched: ['delivered', 'cancelled'],
+      delivered: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: [],
+    }
+
+    const { data: current } = await supabase
+      .from('orders')
+      .select('id, status, order_number, stock_reservations')
+      .eq('id', id)
+      .single()
+    if (!current) throw new Error('Order not found')
+    if (current.status === status) throw new Error(`Order is already ${status}`)
+    const allowed = ORDER_FLOW[current.status] || []
+    if (!allowed.includes(status)) {
+      throw new Error(`Cannot move order from ${current.status} to ${status}`)
+    }
+
     // Validate stock sufficiency BEFORE changing status, so we never mark
     // an order approved when stock cannot cover it.
     if (status === 'approved') {
@@ -240,6 +273,20 @@ export const api = {
       }
     }
 
+    // Run the stock side-effects BEFORE committing the new status so a
+    // failure never leaves the order marked as if the stock already moved
+    // (approved with no reservation, delivered with no deduction).
+    if (status === 'approved') {
+      await this.reserveStockForOrder(current)
+    } else if (status === 'delivered' || status === 'completed') {
+      await this.deductReservedStockForOrder(current)
+    } else if (status === 'cancelled') {
+      await this.releaseReservedStockForOrder(current)
+      // Cancel any linked unpaid invoice and reverse the ledger debit so the
+      // dealer's current_due is no longer inflated by a dead order.
+      await this.cancelOrderInvoice(id)
+    }
+
     const { data, error } = await supabase
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
@@ -250,16 +297,9 @@ export const api = {
 
     let invoice = null
     // Reserve stock and generate invoice at approval, deduct stock at delivery
-    if (status === 'approved') {
-      await this.reserveStockForOrder(data)
-      invoice = await this.createInvoiceForOrder(id, createdBy)
-    } else if (status === 'dispatched') {
+    if (status === 'approved' || status === 'dispatched') {
       // Invoice already generated at approval; fall back for legacy orders
       invoice = await this.createInvoiceForOrder(id, createdBy)
-    } else if (status === 'delivered' || status === 'completed') {
-      await this.deductReservedStockForOrder(data)
-    } else if (status === 'cancelled') {
-      await this.releaseReservedStockForOrder(data)
     }
     return { order: data, invoice }
   },
@@ -284,18 +324,28 @@ export const api = {
     if (existingError) throw existingError
     if (existing) return existing
 
-    const totalAmount = (order.items || []).reduce(
+    const subtotal = (order.items || []).reduce(
       (sum, item) => sum + (item.total_price ?? item.quantity * item.unit_price),
       0
     )
+    // Respect the order's discount + VAT (the DB trigger keeps net_amount =
+    // subtotal − discount_amount + vat_amount in sync). Fall back to subtotal
+    // for legacy rows that predate the trigger.
+    const discount = Number(order.discount_amount) || 0
+    const vat = Number(order.vat_amount) || 0
+    const netAmount =
+      order.net_amount != null && Number(order.net_amount) > 0
+        ? Number(order.net_amount)
+        : Math.max(subtotal - discount + vat, 0)
+    const totalAmount = netAmount
 
     const invoicePayload = {
       invoice_number: generateInvoiceNo(),
       order_id: order.id,
       dealer_id: order.dealer_id,
       created_by: createdBy || null,
-      amount: totalAmount,
-      vat_amount: 0,
+      amount: subtotal,
+      vat_amount: vat,
       total_amount: totalAmount,
       paid_amount: 0,
       due_amount: totalAmount,
@@ -327,6 +377,37 @@ export const api = {
     }
 
     return invData
+  },
+
+  // When an order is cancelled, cancel its linked invoice (if not already
+  // paid/cancelled) and reverse the ledger debit recorded at invoice time so
+  // the dealer's current_due no longer includes the dead order.
+  async cancelOrderInvoice(orderId) {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, dealer_id, total_amount, status, due_amount')
+      .eq('order_id', orderId)
+      .maybeSingle()
+    if (!inv || inv.status === 'paid' || inv.status === 'cancelled') return
+
+    await supabase
+      .from('invoices')
+      .update({ status: 'cancelled', due_amount: 0 })
+      .eq('id', inv.id)
+
+    try {
+      await this.recordDealerLedger({
+        dealer_id: inv.dealer_id,
+        transaction_type: 'adjustment',
+        reference_id: inv.id,
+        debit: 0,
+        credit: Number(inv.total_amount || inv.amount || 0),
+        description: `Invoice ${inv.invoice_number} cancelled (order cancelled)`,
+        transaction_date: new Date().toISOString().split('T')[0],
+      })
+    } catch (ledgerErr) {
+      console.warn('Dealer ledger reversal failed:', ledgerErr)
+    }
   },
 
   async checkStockForOrder(orderId) {
@@ -451,12 +532,27 @@ export const api = {
   },
 
   async releaseReservedStockForOrder(order) {
-    const reservations = order.stock_reservations || []
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('stock_reservations')
+      .eq('id', order.id)
+      .single()
+    const reservations = orderData?.stock_reservations || order.stock_reservations || []
     for (const r of reservations) {
-      await supabase
+      if (!r.inventory_id) continue
+      const { data: inv } = await supabase
         .from('inventory')
-        .update({ quantity_reserved: Math.max((Number(r.quantity_reserved) || 0) - (Number(r.quantity) || 0), 0) })
+        .select('id, quantity_reserved')
         .eq('id', r.inventory_id)
+        .single()
+      if (inv) {
+        await supabase
+          .from('inventory')
+          .update({
+            quantity_reserved: Math.max((Number(inv.quantity_reserved) || 0) - (Number(r.quantity) || 0), 0),
+          })
+          .eq('id', r.inventory_id)
+      }
     }
     await supabase
       .from('orders')
@@ -841,18 +937,24 @@ export const api = {
     try {
       const { data: order } = await supabase
         .from('orders')
-        .select('order_number, sr_id, dealer_id')
+        .select('order_number, sr_id, dealer_id, area_id')
         .eq('id', orderId)
         .maybeSingle()
       const { data: profiles } = await supabase
         .from('user_profiles')
-        .select('id, role, email')
+        .select('id, role, email, area_id')
         .eq('is_active', true)
 
       const targets = []
       if (order?.sr_id) targets.push(order.sr_id)
       ;(profiles || [])
-        .filter(p => ['super_admin', 'admin', 'sales_manager', 'area_manager'].includes(p.role))
+        .filter(p => {
+          if (p.role === 'area_manager') {
+            // Area managers only see updates for orders inside their area.
+            return p.area_id === order?.area_id
+          }
+          return ['super_admin', 'admin', 'sales_manager'].includes(p.role)
+        })
         .forEach(p => targets.push(p.id))
       if (order?.dealer_id) {
         const { data: dealer } = await supabase
@@ -955,14 +1057,42 @@ export const api = {
     return data
   },
 
-  // Update an invoice and, if the update makes it fully paid, run all
-  // side effects in one place:
+  // Update an invoice and, if it is (now) fully paid, run all side effects
+  // in one place:
   //   - set processed_by to the user who made it paid
   //   - auto-complete the linked order (paid → completed)
+  // paid/due/status are recomputed from the sum of APPROVED payments in the
+  // DB (single source of truth), so stale client state or a double-approval
+  // can never corrupt the invoice balance.
   // Returns { invoice, orderCompleted }.
-  async updateInvoiceAndHandlePaid(id, updates, paidByUserId = null) {
+  async updateInvoiceAndHandlePaid(id, updates = {}, paidByUserId = null) {
+    const { data: sums, error: sumsErr } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('invoice_id', id)
+      .eq('status', 'approved')
+    if (sumsErr) throw sumsErr
+    const paid = (sums || []).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+
+    const { data: invRow } = await supabase
+      .from('invoices')
+      .select('id, total_amount, amount, order_id')
+      .eq('id', id)
+      .single()
+    const total = invRow
+      ? Number(invRow.total_amount ?? invRow.amount ?? 0)
+      : 0
+    const due = Math.max(total - paid, 0)
+    const status = due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid'
+
     const payload = { ...updates }
-    if (paidByUserId && payload.status === 'paid') {
+    delete payload.paid_amount
+    delete payload.due_amount
+    delete payload.status
+    payload.paid_amount = paid
+    payload.due_amount = due
+    payload.status = status
+    if (paidByUserId && status === 'paid') {
       payload.processed_by = paidByUserId
     }
     const invoice = await this.updateInvoice(id, payload)
@@ -1037,6 +1167,39 @@ export const api = {
       .single()
     if (error) throw error
     return data
+  },
+
+  // Approve a pending payment and reconcile the linked invoice against all
+  // approved payments (DB-authoritative, race-safe). Credits the dealer
+  // ledger so current_due drops. Returns { invoice, orderCompleted }.
+  async approvePayment({ paymentId, confirmedBy = null }) {
+    const { data: payment, error: payErr } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', paymentId)
+      .single()
+    if (payErr) throw payErr
+
+    await this.confirmPayment(payment.id, 'approved', confirmedBy)
+
+    // Credit the dealer ledger so current_due drops when a payment is approved.
+    if (payment.invoice_id) {
+      try {
+        await this.recordDealerLedger({
+          dealer_id: payment.dealer_id,
+          transaction_type: 'payment',
+          reference_id: payment.invoice_id,
+          debit: 0,
+          credit: Number(payment.amount) || 0,
+          description: `Payment approved via ${payment.payment_method || 'unknown method'}`,
+          transaction_date: payment.payment_date || new Date().toISOString().split('T')[0],
+        })
+      } catch (ledgerErr) {
+        console.warn('Dealer ledger write failed:', ledgerErr)
+      }
+    }
+
+    return this.updateInvoiceAndHandlePaid(payment.invoice_id, {}, confirmedBy)
   },
 
   // ---- Notifications / Announcements ----
@@ -1486,12 +1649,17 @@ export const api = {
       } else {
         const { data: profiles } = await supabase
           .from('user_profiles')
-          .select('id, area_id')
+          .select('id, role, area_id')
           .eq('is_active', true)
         if (channel === 'common') {
-          targetIds = (profiles || []).map(p => p.id)
+          // Dealers can't open /messages, so don't push them common-box posts.
+          targetIds = (profiles || [])
+            .filter(p => p.role !== 'dealer')
+            .map(p => p.id)
         } else if (channel === 'group' && area_id) {
-          targetIds = (profiles || []).filter(p => p.area_id === area_id).map(p => p.id)
+          targetIds = (profiles || [])
+            .filter(p => p.area_id === area_id && p.role !== 'dealer')
+            .map(p => p.id)
         }
       }
       targetIds = targetIds.filter(id => id !== sender_id)

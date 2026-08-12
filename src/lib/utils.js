@@ -227,7 +227,10 @@ export const calculateDealerMargin = (product) => {
 // When SR collects payment, auto-split between company and dealer
 // ============================================================
 
-// Calculate settlement breakdown for an order
+// Calculate settlement breakdown for an order.
+// Uses the ACTUAL prices on the order line (item.unit_price, item.total_price)
+// rather than the current product catalogue price, so the split reflects what
+// was actually invoiced — not today's (possibly changed) product price.
 export const calculateSettlement = (orderItems, products) => {
   let companyTotal = 0
   let dealerMarginTotal = 0
@@ -238,11 +241,12 @@ export const calculateSettlement = (orderItems, products) => {
     if (!product) return null
 
     const qty = item.quantity
-    const dealerPrice = product.dealer_price || 0
     const tradePrice = product.trade_price || 0
     const purchasePrice = product.purchase_price || 0
+    // The price the dealer actually paid on this order line.
+    const orderUnitPrice = item.unit_price ?? product.dealer_price ?? 0
 
-    const itemDealerMargin = (dealerPrice - tradePrice) * qty  // dealer earns this
+    const itemDealerMargin = (orderUnitPrice - tradePrice) * qty  // dealer earns this
     const itemCompanyShare = tradePrice * qty                  // company gets this
     const itemProfit = (tradePrice - purchasePrice) * qty      // company profit
 
@@ -253,11 +257,11 @@ export const calculateSettlement = (orderItems, products) => {
       product_id: item.product_id,
       product_name: product.name,
       quantity: qty,
-      dealer_price: dealerPrice,
+      dealer_price: orderUnitPrice,
       trade_price: tradePrice,
       dealer_margin: itemDealerMargin,
       company_share: itemCompanyShare,
-      unit_margin: dealerPrice - tradePrice,
+      unit_margin: orderUnitPrice - tradePrice,
     }
   }).filter(Boolean)
 

@@ -33,16 +33,19 @@ export default function Announcements() {
       setLoading(true)
       setError(null)
       const data = await api.getNotifications(user.id)
-      const mapped = data.map(n => ({
-        id: n.id,
-        from: 'Management',
-        fromRole: n.reference_type === 'announcement' ? 'Management' : undefined,
-        to: n.title || 'All',
-        message: n.message,
-        timestamp: n.created_at,
-        priority: n.type === 'warning' ? 'high' : n.type === 'error' ? 'high' : 'medium',
-        isActive: n.is_active !== false,
-      }))
+      const mapped = data
+        // Only show actual announcements (and legacy rows without a type).
+        .filter(n => !n.reference_type || n.reference_type === 'announcement')
+        .map(n => ({
+          id: n.id,
+          from: 'Management',
+          fromRole: n.reference_type === 'announcement' ? 'Management' : undefined,
+          to: n.title || 'All',
+          message: n.message,
+          timestamp: n.created_at,
+          priority: n.type === 'warning' ? 'high' : n.type === 'error' ? 'high' : 'medium',
+          isActive: n.is_active !== false,
+        }))
       setAnnouncements(mapped)
     } catch (err) {
       console.error('Announcements fetch failed:', err)

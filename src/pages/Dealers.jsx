@@ -233,7 +233,7 @@ export default function Dealers() {
                             address: dealer.address || '',
                             district: dealer.district || '',
                             area_id: dealer.area_id || '',
-                            credit_limit: dealer.creditLimit || 50000,
+                            credit_limit: dealer.creditLimit != null ? dealer.creditLimit : 50000,
                           })
                           setMenuOpen(null)
                         }}

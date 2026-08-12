@@ -5,6 +5,7 @@ import { MdLocationOn, MdMyLocation, MdRefresh, MdCheckCircle, MdCancel, MdStore
 import { HiLocationMarker } from 'react-icons/hi'
 import { api } from '../../lib/api'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 
 // Roles shown on the live map (sales roles + dealers who share location)
 const TRACKED_ROLES = ['sales_executive', 'area_manager', 'sales_manager', 'admin', 'super_admin', 'dealer']
@@ -47,6 +48,7 @@ function buildIcon(s, isDealer) {
 }
 
 export default function GPSTracking() {
+  const { user } = useAuth()
   const [users, setUsers] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [filter, setFilter] = useState('all') // all, online, offline
@@ -66,7 +68,13 @@ export default function GPSTracking() {
     setError(null)
     try {
       const allUsers = await api.getUsers()
-      const tracked = allUsers.filter(u =>
+      // Area managers only see the people inside their own area (more
+      // granular than the nationwide view sales_manager/admin get).
+      const isAreaManager = user?.role === 'area_manager'
+      const scoped = isAreaManager
+        ? allUsers.filter(u => u.area_id === user?.area_id || u.id === user?.id)
+        : allUsers
+      const tracked = scoped.filter(u =>
         TRACKED_ROLES.includes(u.role) || String(u.role || '').toLowerCase().includes('sales')
       )
 

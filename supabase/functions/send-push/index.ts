@@ -25,6 +25,29 @@ Deno.serve(async (req) => {
       })
     }
 
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+
+    // Require an authenticated caller — this function only pushes on behalf
+    // of a logged-in app user, so an unauthenticated (anon-key) caller must
+    // be rejected to prevent pushing spam to arbitrary users.
+    const authHeader = req.headers.get('Authorization') || ''
+    const token = authHeader.replace('Bearer ', '')
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const { data: caller, error: callerError } = await admin.auth.getUser(token)
+    if (callerError || !caller.user) {
+      return new Response(JSON.stringify({ error: 'Invalid session' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     webpush.setVapidDetails(
       'mailto:' + (Deno.env.get('ADMIN_EMAIL') || 'boktiarshakil2003@gmail.com'),
       vapidPublicKey,
@@ -39,10 +62,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
 
     const { data: subs, error } = await admin
       .from('push_subscriptions')

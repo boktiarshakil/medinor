@@ -46,9 +46,9 @@ export default function DealerDashboard() {
   const myInvoices = invoices.filter(inv => dealerId && inv.dealer_id === dealerId)
 
   // Compute credit info
-  const creditLimit = dealerRecord?.credit_limit || 50000
+  const creditLimit = dealerRecord?.credit_limit != null ? Number(dealerRecord.credit_limit) : 50000
   const totalDue = myInvoices
-    .filter(inv => inv.status === 'pending' || inv.status === 'unpaid' || inv.status === 'partial')
+    .filter(inv => ['pending', 'unpaid', 'partial', 'overdue'].includes(inv.status))
     .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
   const available = Math.max(0, creditLimit - totalDue)
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, getCurrentUser } from '../lib/supabase'
 import { registerServiceWorker, initPush } from '../lib/push'
+import { locationSharing } from '../lib/geo'
 
 const AuthContext = createContext(null)
 
@@ -62,6 +63,7 @@ export function AuthProvider({ children }) {
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
+        locationSharing.stop()
       }
     })
 
@@ -76,6 +78,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    locationSharing.stop()
     await supabase.auth.signOut()
     setUser(null)
   }, [])

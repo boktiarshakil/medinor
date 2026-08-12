@@ -40,7 +40,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const data = await api.getUsers()
+      const data = await api.getUsers({ includeInactive: true })
       setUsers(data)
     } catch (err) {
       toast.error('Failed to load users: ' + err.message)

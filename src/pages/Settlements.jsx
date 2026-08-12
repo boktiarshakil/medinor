@@ -61,7 +61,9 @@ export default function Settlements() {
   const getSettlement = (order) => {
     const items = (order.items || []).map(item => ({
       product_id: item.product_id,
-      quantity: item.quantity
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
     }))
     return calculateSettlement(items, products)
   }

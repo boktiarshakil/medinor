@@ -56,7 +56,7 @@ function mapOrder(order, invoices, payments) {
     id: order.order_number || order.order_no || order.id,
     dbId: order.id,
     dealer: order.dealer?.name || order.dealer_name || 'Unknown Dealer',
-    sr: order.sr_name || null,
+    sr: order.sr?.full_name || order.sr_name || null,
     amount: order.net_amount ?? order.total_amount ?? order.amount ?? 0,
     items: order.items?.length || order.order_items?.length || 0,
     currentStep,

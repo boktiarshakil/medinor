@@ -165,7 +165,7 @@ export default function Reports() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [orders, invoices, dealers, inventory, products, users, visits] = await Promise.all([
+        const [orders, invoices, dealers, inventory, products, users, visits, payments] = await Promise.all([
           api.getOrders(),
           api.getInvoices(),
           api.getDealers(),
@@ -173,6 +173,7 @@ export default function Reports() {
           api.getProducts().catch(() => []),
           api.getUsers().catch(() => []),
           api.getCRMVisits().catch(() => []),
+          api.getPayments().catch(() => []),
         ])
         setDataCache({ orders, invoices, dealers, inventory, products, users, visits })
 
@@ -181,7 +182,13 @@ export default function Reports() {
 
         const mtdOrders = orders.filter(o => new Date(o.created_at) >= monthStart)
         const totalRevenue = mtdOrders.reduce((s, o) => s + (o.net_amount || o.total_amount || 0), 0)
-        const totalPaid = invoices.reduce((s, i) => s + (i.paid_amount || 0), 0)
+        // True month-to-date collection: approved payments received this month.
+        const totalPaid = (payments || [])
+          .filter(p =>
+            p.status === 'approved' &&
+            new Date(p.payment_date || p.confirmed_at || p.created_at) >= monthStart
+          )
+          .reduce((s, p) => s + (p.amount || 0), 0)
         const outstanding = invoices
           .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
           .reduce((s, i) => s + (i.due_amount || i.total_amount || 0), 0)

@@ -152,6 +152,9 @@ export default function TopBar({ onMenuClick }) {
       invoice: '/invoices',
       return: '/returns',
       announcement: '/announcements',
+      order_comment: '/order-tracker',
+      message: '/messages',
+      direct_message: '/messages',
     }[n.reference_type] || '/dashboard'
     navigate(path)
   }

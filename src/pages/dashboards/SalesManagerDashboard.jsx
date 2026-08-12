@@ -71,11 +71,22 @@ export default function SalesManagerDashboard() {
     if (t.user_id) targetMap[t.user_id] = (targetMap[t.user_id] || 0) + t.target_value
   })
 
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
   const TEAM_PERFORMANCE = salesUsers.map(sr => {
     const srOrders = orders.filter(o => o.sr_id === sr.id || o.created_by === sr.id)
+    // Achieved = real, fulfilled monthly business: same month, and only orders
+    // that actually moved through the pipeline (approved+). Draft/submitted
+    // (not yet approved) and cancelled orders must NOT count toward the target.
     const achieved = srOrders
-      .filter(o => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
+      .filter(o =>
+        new Date(o.created_at) >= monthStart &&
+        o.status !== 'cancelled' &&
+        !['draft', 'submitted'].includes(o.status)
+      )
+      .reduce((sum, o) => sum + (o.net_amount || o.total_amount || o.amount || 0), 0)
     return {
       id: sr.id,
       name: sr.full_name || sr.email || 'Unknown',
