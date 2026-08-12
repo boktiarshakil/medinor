@@ -11,6 +11,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [modal, setModal] = useState(null)
   const [qty, setQty] = useState('')
   const [reason, setReason] = useState('')
@@ -46,10 +47,17 @@ export default function Inventory() {
     return { product: p, invRows, stock, reserved, available, min }
   })
 
-  const filtered = rows.filter(r =>
-    r.product.name.toLowerCase().includes(search.toLowerCase()) ||
-    (r.product.sku || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = rows.filter(r => {
+    const matchSearch =
+      r.product.name.toLowerCase().includes(search.toLowerCase()) ||
+      (r.product.sku || '').toLowerCase().includes(search.toLowerCase())
+    if (!matchSearch) return false
+    if (statusFilter === 'all') return true
+    if (statusFilter === 'out') return r.available <= 0
+    if (statusFilter === 'low') return r.available > 0 && r.min > 0 && r.available < r.min
+    if (statusFilter === 'ok') return r.available > 0 && !(r.min > 0 && r.available < r.min)
+    return true
+  })
 
   const openModal = (type, row) => {
     setModal({ type, row })
@@ -183,8 +191,8 @@ export default function Inventory() {
     }
   }
 
-  const lowStock = rows.filter(r => r.min > 0 && r.stock > 0 && r.stock < r.min)
-  const outOfStock = rows.filter(r => r.stock === 0)
+  const lowStock = rows.filter(r => r.min > 0 && r.available > 0 && r.available < r.min)
+  const outOfStock = rows.filter(r => r.available <= 0)
 
   const statusBadge = (stock, min) => {
     if (stock === 0) return <span className="badge-danger">Out</span>
@@ -259,8 +267,8 @@ export default function Inventory() {
         </div>
         <select
           className="input w-full sm:w-48"
-          value={modal?.filterStatus || 'all'}
-          onChange={(e) => setModal(m => m ? { ...m, filterStatus: e.target.value } : { filterStatus: e.target.value })}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="all">All Status</option>
           <option value="out">Out of Stock</option>

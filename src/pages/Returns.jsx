@@ -224,7 +224,10 @@ export default function Returns() {
                 <select className="input" value={newReturn.order_id} onChange={(e) => handleOrderChange(e.target.value)}>
                   <option value="">Select order...</option>
                   {orders
-                    .filter(o => !newReturn.dealer_id || o.dealer_id === newReturn.dealer_id)
+                    .filter(o =>
+                      (!newReturn.dealer_id || o.dealer_id === newReturn.dealer_id) &&
+                      ['delivered', 'completed'].includes(o.status)
+                    )
                     .map(o => (
                       <option key={o.id} value={o.id}>
                         {o.order_number || o.order_no || o.id} — {o.dealer?.name || o.dealer_name || ''} ({o.status})

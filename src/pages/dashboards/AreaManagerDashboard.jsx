@@ -51,10 +51,14 @@ export default function AreaManagerDashboard() {
   const srIds = mySRs.map(sr => sr.id)
   const attendedIds = new Set(attendance.filter(a => a.check_in).map(a => a.user_id))
 
-  // Orders from this area's SRs
-  const areaOrders = orders.filter(o => srIds.includes(o.sr_id) || srIds.includes(o.created_by))
+  // Orders from this area's SRs or directly from dealers assigned to this area
+  const areaOrders = orders.filter(o =>
+    srIds.includes(o.sr_id) ||
+    srIds.includes(o.created_by) ||
+    o.area_id === user?.area_id
+  )
   const todayOrders = areaOrders.filter(o => o.created_at >= todayISO && o.status !== 'cancelled')
-  const monthOrders = areaOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled')
+  const monthOrders = areaOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled' && o.status !== 'draft' && o.status !== 'submitted')
 
   const todayOrdersTotal = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const monthAchieved = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)

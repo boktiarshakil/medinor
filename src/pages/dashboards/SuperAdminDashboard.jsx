@@ -58,8 +58,8 @@ export default function SuperAdminDashboard() {
   const monthStartISO = monthStart.toISOString()
   const monthEndISO = monthEnd.toISOString()
 
-  const todayOrders = orders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled')
-  const monthOrders = orders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled')
+  const todayOrders = orders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled' && o.status !== 'draft' && o.status !== 'submitted')
+  const monthOrders = orders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled' && o.status !== 'draft' && o.status !== 'submitted')
 
   const todaySales = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
   const monthlySales = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
@@ -72,7 +72,10 @@ export default function SuperAdminDashboard() {
     .filter(inv => inv.status === 'unpaid' || inv.status === 'partial' || inv.status === 'overdue')
     .reduce((sum, inv) => sum + ((inv.due_amount ?? inv.total_amount) || inv.amount || 0), 0)
   const collectionsToday = payments
-    .filter(p => p.payment_date === todayStartISO.split('T')[0] || (p.created_at >= todayStartISO && p.created_at <= todayEndISO))
+    .filter(p =>
+      p.status === 'approved' &&
+      (p.payment_date === todayStartISO.split('T')[0] || (p.created_at >= todayStartISO && p.created_at <= todayEndISO))
+    )
     .reduce((sum, p) => sum + (p.amount || 0), 0)
   const activeDealers = dealers.filter(d => d.status === 'active').length
   const salesTeam = users.filter(u => u.role === 'sales_executive' || u.role === 'area_manager' || u.role === 'sales_manager').length

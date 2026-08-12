@@ -60,7 +60,7 @@ export default function SalesExecDashboard() {
   // Filter orders for current SR
   const myOrders = orders.filter(o => o.sr_id === user?.id)
   const todayOrders = myOrders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled')
-  const monthOrders = myOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEnd.toISOString() && o.status !== 'cancelled')
+  const monthOrders = myOrders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEnd.toISOString() && o.status !== 'cancelled' && o.status !== 'draft' && o.status !== 'submitted')
 
   const todayKey = todayStartISO.slice(0, 10)
   const visitsDone = visits.filter(v => v.sr_id === user?.id && String(v.visit_date || '').slice(0, 10) === todayKey).length
