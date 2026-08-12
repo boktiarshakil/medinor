@@ -177,7 +177,7 @@ export default function Products() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Products</h1>
-          <p className="text-sm text-gray-500">Mediron product catalog ({products.length} items)</p>
+          <p className="text-sm text-gray-500">Product catalog ({products.length} items)</p>
         </div>
         <button className="btn-primary" onClick={() => setShowCreate(true)}>
           <MdAdd size={16} /> Add Product

@@ -45,8 +45,8 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-500 rounded-2xl mb-4 shadow-lg shadow-brand-500/20">
             <span className="text-2xl font-bold text-white">M</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Mediron SDMS</h1>
-          <p className="text-sm text-gray-500 mt-1">KGSM Group · Sales & Distribution</p>
+          <h1 className="text-2xl font-bold text-gray-900">MMS Prime Ltd</h1>
+          <p className="text-sm text-gray-500 mt-1">Delivering Value Every Day</p>
         </div>
 
         {/* Form */}
@@ -104,7 +104,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © 2025 KGSM Group. All rights reserved.
+          © 2025 MMS Prime Ltd. All rights reserved.
         </p>
       </div>
     </div>

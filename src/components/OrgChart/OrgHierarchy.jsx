@@ -174,7 +174,7 @@ export default function OrgHierarchy() {
 
         setTree({
           id: 'root',
-          name: 'Mediron SDMS',
+          name: 'MMS Prime Ltd',
           role: 'group',
           color: 'bg-slate-700',
           meta: `${active.length} active users`,

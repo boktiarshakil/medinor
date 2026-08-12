@@ -139,8 +139,8 @@ export default function Sidebar({ open, onClose }) {
               <span className="text-sm font-bold text-white">M</span>
             </div>
             <div>
-              <span className="text-sm font-bold text-gray-900">Mediron</span>
-              <span className="text-[10px] text-gray-400 block -mt-0.5">SDMS</span>
+              <span className="text-sm font-bold text-gray-900">MMS Prime</span>
+              <span className="text-[10px] text-gray-400 block -mt-0.5">Delivering Value Every Day</span>
             </div>
           </div>
           <button onClick={onClose} className="lg:hidden p-1 text-gray-400 hover:text-gray-600">
