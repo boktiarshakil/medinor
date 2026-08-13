@@ -23,7 +23,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               fontWeight: '500',
             },
             success: {
-              iconTheme: { primary: '#188038', secondary: '#fff' },
+              iconTheme: { primary: '#ff551f', secondary: '#fff' },
             },
             error: {
               iconTheme: { primary: '#ef4444', secondary: '#fff' },
