@@ -76,7 +76,7 @@ export default function Home() {
       <section id="home" className="relative bg-brand-500 overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 py-20 md:py-28 text-center relative z-10">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-2xl mb-6 shadow-xl shadow-brand-900/20">
-            <span className="font-logo text-4xl leading-none text-brand-500 select-none tracking-[-0.09em]">mms.</span>
+            <span className="font-logo text-5xl leading-none text-brand-500 select-none tracking-[-0.09em]">mms.</span>
           </div>
           <h1 className="font-brandname text-4xl md:text-5xl font-bold text-white uppercase tracking-wide">MMS Prime Ltd</h1>
           <p className="font-tagline text-xl md:text-2xl text-white italic mt-3 uppercase">Delivering Value Every Day</p>
@@ -210,7 +210,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           <div>
             <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-500 rounded-2xl mb-5 shadow-lg shadow-brand-500/20">
-              <span className="font-logo text-2xl leading-none text-white select-none tracking-[-0.09em]">mms.</span>
+              <span className="font-logo text-[32px] leading-none text-white select-none tracking-[-0.09em]">mms.</span>
             </div>
             <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">About MMS Prime</h2>
             <p className="text-sm text-gray-500 uppercase font-tagline mt-1 italic">Delivering Value Every Day</p>
@@ -290,7 +290,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <span className="font-logo text-sm leading-none text-white select-none tracking-[-0.09em]">mms.</span>
+              <span className="font-logo text-base leading-none text-white select-none tracking-[-0.09em]">mms.</span>
             </div>
             <span className="font-brandname text-sm font-bold text-white uppercase tracking-wide">MMS Prime Ltd</span>
           </div>
