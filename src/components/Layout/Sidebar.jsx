@@ -136,7 +136,7 @@ export default function Sidebar({ open, onClose }) {
         <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <span className="font-logo text-sm leading-none text-white select-none tracking-[-0.03em]">mms.</span>
+              <span className="font-logo text-sm leading-none text-white select-none tracking-[-0.045em]">mms.</span>
             </div>
             <div>
               <span className="text-sm font-bold text-gray-900">MMS Prime</span>
