@@ -96,7 +96,7 @@ export default function Home() {
                 className="bg-brand-600/40 hover:bg-brand-600/50 border border-white/30 text-white font-semibold rounded-xl px-7 py-3 text-sm transition-colors"
                 onClick={() => navigate('/login')}
               >
-                Partner Login
+                Login
               </button>
             )}
           </div>
@@ -235,7 +235,7 @@ export default function Home() {
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-5">Why partner with us</h3>
+            <h3 className="text-sm font-bold text-gray-900 mb-5">Why work with us</h3>
             <div className="space-y-4">
               {[
                 { icon: <MdVerified size={18} />, title: 'Multi-category catalog', desc: 'A wide range of products for diverse business needs.' },
@@ -264,7 +264,7 @@ export default function Home() {
           <span className="font-logo text-3xl text-white select-none tracking-[-0.09em]">mms.</span>
           <h2 className="font-brandname text-2xl md:text-3xl font-bold text-white uppercase tracking-wide mt-3">Delivering Value Every Day</h2>
           <p className="text-white/80 text-sm mt-3 max-w-xl mx-auto">
-            Become a partner or browse our catalog. Our team is ready to help.
+            Become a dealer or browse our catalog. Our team is ready to help.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6 text-white">
             <div className="flex items-center gap-2 text-sm">
