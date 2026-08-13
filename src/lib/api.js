@@ -1678,19 +1678,156 @@ export const api = {
   },
 
   async updateCodOrderStatus(id, status, processedBy = null) {
+    const { data: current, error: fetchErr } = await supabase
+      .from('cod_orders')
+      .select('*, items, stock_reservations')
+      .eq('id', id)
+      .single()
+    if (fetchErr) throw fetchErr
+    if (!current) throw new Error('COD request not found')
+
+    const items = current.items || []
+    const customer = `${current.customer_name} (${current.phone})`
+    const patch = {
+      status,
+      processed_by: processedBy || null,
+      processed_at: status === 'new' ? null : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // new → processing: customer confirmed on phone → hold the stock
+    if (status === 'processing' && current.status === 'new') {
+      const reservations = await this._reserveStockForCod(items)
+      patch.stock_reservations = reservations
+    }
+
+    // processing → completed: goods shipped + cash collected → final deduction
+    if (status === 'completed' && current.status === 'processing') {
+      await this._deductReservedStockForCod(current.stock_reservations || [], `COD ${customer}`, id)
+      patch.stock_reservations = []
+    } else if (status === 'completed' && current.status !== 'processing') {
+      throw new Error('COD request must be processing before it can be completed')
+    }
+
+    // new/processing → cancelled: give any held stock back
+    if (status === 'cancelled' && current.status !== 'cancelled') {
+      await this._releaseReservedStockForCod(current.stock_reservations || [])
+      patch.stock_reservations = []
+    }
+    if (status === 'cancelled' && current.status === 'completed') {
+      throw new Error('Completed COD orders cannot be cancelled')
+    }
+
     const { data, error } = await supabase
       .from('cod_orders')
-      .update({
-        status,
-        processed_by: processedBy || null,
-        processed_at: status === 'new' ? null : new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(patch)
       .eq('id', id)
       .select()
       .single()
     if (error) throw error
     return data
+  },
+
+  // Reserve stock for COD items. Throws if any product is short, so nothing is
+  // partially reserved on failure.
+  async _reserveStockForCod(items) {
+    const itemsMeta = items.map(it => ({ product_id: it.product_id, quantity: Number(it.quantity) || 0 }))
+    const short = []
+    for (const item of itemsMeta) {
+      const { data: invRecords, error } = await supabase
+        .from('inventory')
+        .select('id, quantity, quantity_reserved')
+        .eq('product_id', item.product_id)
+      if (error) throw error
+      const available = (invRecords || []).reduce(
+        (s, r) => s + (Number(r.quantity) || 0) - (Number(r.quantity_reserved) || 0),
+        0
+      )
+      if (available < item.quantity) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('name, sku')
+          .eq('id', item.product_id)
+          .single()
+        short.push(`${product?.name || product?.sku || item.product_id} (need ${item.quantity}, have ${available} available)`)
+      }
+    }
+    if (short.length > 0) {
+      throw new Error(`Insufficient stock: ${short.join(', ')}`)
+    }
+
+    const reservations = []
+    for (const item of itemsMeta) {
+      if (item.quantity <= 0) continue
+      const { data: invRecords } = await supabase
+        .from('inventory')
+        .select('id, quantity, quantity_reserved')
+        .eq('product_id', item.product_id)
+        .order('created_at', { ascending: true })
+      let remaining = item.quantity
+      for (const rec of invRecords || []) {
+        if (remaining <= 0) break
+        const free = (Number(rec.quantity) || 0) - (Number(rec.quantity_reserved) || 0)
+        const reserve = Math.min(free, remaining)
+        if (reserve > 0) {
+          await supabase
+            .from('inventory')
+            .update({ quantity_reserved: (Number(rec.quantity_reserved) || 0) + reserve })
+            .eq('id', rec.id)
+          reservations.push({ inventory_id: rec.id, product_id: item.product_id, quantity: reserve })
+          remaining -= reserve
+        }
+      }
+    }
+    return reservations
+  },
+
+  // Completed: deduct from quantity + reservation and record the outflow.
+  async _deductReservedStockForCod(reservations, notes, referenceId) {
+    for (const r of reservations || []) {
+      const { data: inv } = await supabase
+        .from('inventory')
+        .select('id, quantity, quantity_reserved')
+        .eq('id', r.inventory_id)
+        .single()
+      if (inv) {
+        await supabase
+          .from('inventory')
+          .update({
+            quantity: Math.max((Number(inv.quantity) || 0) - (Number(r.quantity) || 0), 0),
+            quantity_reserved: Math.max((Number(inv.quantity_reserved) || 0) - (Number(r.quantity) || 0), 0),
+          })
+          .eq('id', r.inventory_id)
+      }
+      await supabase.from('stock_movements').insert({
+        product_id: r.product_id,
+        movement_type: 'out',
+        quantity: r.quantity,
+        reference_type: 'cod',
+        reference_id: referenceId,
+        notes,
+      })
+    }
+  },
+
+  // Cancelled: put held stock back.
+  async _releaseReservedStockForCod(reservations) {
+    for (const r of reservations || []) {
+      if (!r.inventory_id) continue
+      const { data: inv } = await supabase
+        .from('inventory')
+        .select('id, quantity_reserved')
+        .eq('id', r.inventory_id)
+        .single()
+      if (inv) {
+        await supabase
+          .from('inventory')
+          .update({
+            quantity_reserved: Math.max((Number(inv.quantity_reserved) || 0) - (Number(r.quantity) || 0), 0),
+          })
+          .eq('id', r.inventory_id)
+      }
+    }
   },
 
   // ---- Stock movements ----
