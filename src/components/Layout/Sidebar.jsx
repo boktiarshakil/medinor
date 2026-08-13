@@ -127,7 +127,7 @@ export default function Sidebar({ open, onClose }) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-100 z-50 flex flex-col
+        fixed top-0 left-0 h-[100dvh] w-64 bg-white border-r border-gray-100 z-50 flex flex-col
         transform transition-transform duration-200 ease-out
         lg:translate-x-0 lg:static lg:z-auto
         ${open ? 'translate-x-0' : '-translate-x-full'}
