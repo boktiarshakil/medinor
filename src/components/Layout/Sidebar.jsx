@@ -5,7 +5,7 @@ import {
   MdPeople, MdAssessment, MdLocalShipping, MdAssignmentReturn,
   MdCampaign, MdSupportAgent, MdSettings, MdClose, MdStore,
   MdChat, MdMyLocation, MdQrCode, MdAccountTree, MdBadge, MdAccountBalance,
-  MdLocationOn
+  MdLocationOn, MdLogout
 } from 'react-icons/md'
 
 const NAV_ITEMS = {
@@ -127,7 +127,7 @@ export default function Sidebar({ open, onClose }) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-100 z-50
+        fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-100 z-50 flex flex-col
         transform transition-transform duration-200 ease-out
         lg:translate-x-0 lg:static lg:z-auto
         ${open ? 'translate-x-0' : '-translate-x-full'}
@@ -149,7 +149,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         {/* Nav */}
-        <nav className="p-3 space-y-0.5 overflow-y-auto h-[calc(100%-8rem)]">
+        <nav className="p-3 space-y-0.5 overflow-y-auto flex-1 min-h-0">
           {items.map(item => {
             const Icon = item.icon
             return (
@@ -169,12 +169,12 @@ export default function Sidebar({ open, onClose }) {
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100 bg-white">
+        <div className="p-3 border-t border-gray-100 bg-white flex-shrink-0">
           <button
             onClick={signOut}
             className="nav-item w-full text-red-500 hover:bg-red-50 hover:text-red-600"
           >
-            <MdClose size={19} />
+            <MdLogout size={19} />
             Sign Out
           </button>
         </div>
