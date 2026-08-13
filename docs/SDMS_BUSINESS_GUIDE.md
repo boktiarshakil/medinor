@@ -351,13 +351,14 @@ Overpayment is blocked (amount cannot exceed the due).
 
 ## 9. Settlements
 
-When an order is delivered, its collected amount is **split automatically**:
+When an invoice is **fully paid**, the system **automatically records** the
+settlement split (no manual entry):
 
 ```
-Total collected (from dealer) = dealer_price × qty
+Total collected (from dealer) = invoice total (dealer_price × qty for dealer orders)
         │
         ├── Company share  = trade_price × qty
-        └── Dealer margin  = (dealer_price − trade_price) × qty
+        └── Dealer margin  = total collected − company share
 ```
 
 ### Example: 10 units, trade 2000, dealer 2500
@@ -366,9 +367,19 @@ Total collected (from dealer) = dealer_price × qty
 - Company share = 20,000 BDT
 - Dealer margin = 5,000 BDT
 
-The settlement page lets management **record** the split for each delivered /
-completed order. Already-settled orders are excluded from totals and cannot be
-recorded twice.
+### Enforcement & stability
+
+- One settlement per invoice — guaranteed by a unique database index, so an
+  invoice can never be settled twice.
+- The split is based on the **snapshotted `trade_price`** written onto each
+  order line when the order is placed, so later catalog price edits never
+  rewrite historical settlements or profit figures.
+- Settlements are **only created for money actually received**: an unpaid or
+  partially paid invoice is not settled (it simply appears as outstanding due).
+- The settlement page is a **read-only auto ledger** — company share, dealer
+  margins, total collected and outstanding are derived from the
+  invoice/payment books and reconciled automatically on page load (legacy
+  paid invoices are backfilled on first open).
 
 ### Price isolation notes on this screen
 
@@ -597,25 +608,25 @@ Using the example product (purchase 1000 / trade 2000 / dealer 2500 / mrp 2900)
 and a 10-unit order:
 
 ```
-1. DEALER orders 10 units @ trade price 2000  →  order total 20,000
+1. DEALER orders 10 units @ dealer price 2,500  →  order total 25,000
 2. MANAGER approves → WAREHOUSE packs → dispatches
 3. DELIVERY:
-     - invoice created for 20,000 (unpaid)
+     - invoice created for 25,000 (unpaid)
      - stock deducted (10 units out)
-     - dealer ledger debited 20,000 → current_due = 20,000
+     - dealer ledger debited 25,000 → current_due = 25,000
 4. SR collects payment from dealer:
-     - payment of 20,000 recorded
+     - payment of 25,000 recorded → approved
      - invoice → paid
-     - ledger credited 20,000 → current_due = 0
-5. SETTLEMENT split of the 20,000 collected:
-     - Company share  = 2,000 × 10 = 20,000
-     - Dealer margin  = (2,500 − 2,000) × 10 = 5,000
-     (in this example the dealer remits the full 20,000; the 5,000
-      dealer margin is the dealer's profit when they sell on to retail)
+     - ledger credited 25,000 → current_due = 0
+5. SETTLEMENT auto-recorded on full payment, split of the 25,000 collected:
+     - Company share  = 2,000 × 10 = 20,000   (the company's actual revenue)
+     - Dealer margin  = 25,000 − 20,000 = 5,000
+     (the 5,000 is the dealer's retained margin — their profit when they
+      sell the units on to retail at 2,500+)
 6. COMPANY profit check:
-     - Revenue from dealer = 20,000
-     - Cost to company       = 1,000 × 10 = 10,000
-     - Company gross profit  = 10,000
+     - Company revenue share from dealer = 20,000
+     - Cost to company                   = 1,000 × 10 = 10,000
+     - Company gross profit              = 10,000
 ```
 
 ---

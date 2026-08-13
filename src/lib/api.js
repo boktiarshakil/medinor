@@ -1134,6 +1134,14 @@ export const api = {
         orderCompleted = true
       }
     }
+
+    // Once the invoice is fully paid, settle it automatically (company share
+    // vs dealer margin). Idempotent — the paid invoice is settled exactly once.
+    if (invoice.status === 'paid' && invoice.order_id) {
+      await this.autoSettleInvoice(id).catch(err => {
+        console.warn('Auto-settlement failed:', err)
+      })
+    }
     return { invoice, orderCompleted }
   },
 
@@ -1496,10 +1504,116 @@ export const api = {
   async getSettlements() {
     const { data, error } = await supabase
       .from('settlements')
-      .select('*')
+      .select(`
+        *,
+        invoice:invoices(invoice_number, status, paid_amount, due_amount),
+        order:orders(order_number)
+      `)
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
+  },
+
+  // Create the settlement record for a fully-paid invoice. The company share
+  // comes from the order's snapshotted trade price; the remaining collected
+  // amount is the dealer margin. Idempotent: a paid invoice is settled exactly
+  // once (enforced by the unique index on settlements.invoice_id).
+  async autoSettleInvoice(invoiceId) {
+    const { data: invoice, error: invErr } = await supabase
+      .from('invoices')
+      .select('id, order_id, dealer_id, total_amount, status')
+      .eq('id', invoiceId)
+      .maybeSingle()
+    if (invErr) throw invErr
+    if (!invoice || invoice.status !== 'paid' || !invoice.order_id) return null
+
+    // Already settled — never record twice.
+    const { data: existing } = await supabase
+      .from('settlements')
+      .select('id')
+      .eq('invoice_id', invoiceId)
+      .maybeSingle()
+    if (existing) return existing
+
+    const { data: order } = await supabase
+      .from('orders')
+      .select('sr_id')
+      .eq('id', invoice.order_id)
+      .maybeSingle()
+
+    const { data: items, error: itemsErr } = await supabase
+      .from('order_items')
+      .select('product_id, quantity, unit_price, trade_price')
+      .eq('order_id', invoice.order_id)
+    if (itemsErr) throw itemsErr
+
+    let companyTotal = 0
+    const itemBreakdown = (items || []).map((it) => {
+      const qty = Number(it.quantity) || 0
+      const trade = Number(it.trade_price) || 0
+      companyTotal += trade * qty
+      return {
+        product_id: it.product_id,
+        quantity: qty,
+        unit_price: Number(it.unit_price) || 0,
+        trade_price: trade,
+        trade_subtotal: trade * qty,
+      }
+    })
+
+    const totalCollected = Number(invoice.total_amount) || 0
+    const companyAmount = Math.min(companyTotal, totalCollected)
+    const dealerMargin = Math.max(totalCollected - companyTotal, 0)
+
+    const { data, error } = await supabase
+      .from('settlements')
+      .insert({
+        order_id: invoice.order_id,
+        invoice_id: invoice.id,
+        dealer_id: invoice.dealer_id,
+        sr_id: order?.sr_id || null,
+        company_amount: companyAmount,
+        dealer_margin_amount: dealerMargin,
+        total_collected: totalCollected,
+        item_breakdown: itemBreakdown,
+        status: 'auto_settled',
+        settled_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    // A unique-index race (invoice settled by a concurrent approval in between)
+    // is harmless — return the record that is already on file.
+    if (error) {
+      if (error.code === '23505') {
+        const { data: raced } = await supabase
+          .from('settlements')
+          .select('*')
+          .eq('invoice_id', invoiceId)
+          .maybeSingle()
+        return raced
+      }
+      throw error
+    }
+    return data
+  },
+
+  // Self-heal: ensure every fully-paid invoice with a linked order has a
+  // settlement record. Safe to call on page load — it is a no-op for orders
+  // that are already settled.
+  async reconcileSettlements() {
+    const { data: invoices, error } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('status', 'paid')
+      .not('order_id', 'is', null)
+    if (error) throw error
+    let created = 0
+    for (const inv of invoices || []) {
+      const rec = await this.autoSettleInvoice(inv.id)
+      if (rec?.id) created += 1
+    }
+    return created
   },
 
   // ---- Stock movements ----

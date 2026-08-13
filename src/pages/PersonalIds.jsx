@@ -233,7 +233,7 @@ export default function PersonalIds() {
               <li>• Each SR/dealer gets a <strong>unique code</strong> for order tracking</li>
               <li>• SR uses code to place orders — system auto-applies <strong>their price tier</strong></li>
               <li>• Dealer uses code to access app — sees <strong>only their data</strong></li>
-              <li>• Payment collection via code triggers <strong>auto-settlement</strong></li>
+              <li>• Invoice fully paid triggers <strong>auto-settlement</strong> after delivery</li>
             </ul>
           </div>
         </div>
