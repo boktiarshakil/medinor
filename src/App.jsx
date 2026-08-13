@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/Layout/AppLayout'
 
 // Pages
+import Home from './pages/Home'
 import Login from './pages/Login'
 import Unauthorized from './pages/Unauthorized'
 import Dashboard from './pages/Dashboard'
@@ -49,6 +50,7 @@ export default function App() {
   return (
     <Routes>
       {/* Public */}
+      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Home />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
 
