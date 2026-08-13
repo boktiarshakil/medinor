@@ -1,13 +1,13 @@
 import { useAuth } from '../../context/AuthContext'
 import { formatDate } from '../../lib/utils'
-import { MdMenu, MdNotifications, MdSearch, MdClose } from 'react-icons/md'
+import { MdMenu, MdNotifications, MdSearch, MdClose, MdLogout } from 'react-icons/md'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { supabase } from '../../lib/supabase'
 
 export default function TopBar({ onMenuClick }) {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -345,6 +345,13 @@ export default function TopBar({ onMenuClick }) {
             <p className="text-xs font-semibold text-gray-800 leading-tight">{user?.full_name}</p>
             <p className="text-[10px] text-gray-400 capitalize">{user?.role?.replace(/_/g, ' ')}</p>
           </div>
+          <button
+            onClick={signOut}
+            title="Sign Out"
+            className="ml-1 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+          >
+            <MdLogout size={19} />
+          </button>
         </div>
       </div>
     </header>

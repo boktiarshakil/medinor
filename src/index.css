@@ -133,6 +133,10 @@
   .mobile-bottom-nav {
     @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 pb-safe z-50;
   }
+  .app-sidebar {
+    height: 100vh;
+    height: 100dvh;
+  }
   .skeleton {
     @apply animate-pulse bg-gray-200 rounded;
   }
