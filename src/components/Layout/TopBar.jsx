@@ -219,7 +219,7 @@ export default function TopBar({ onMenuClick }) {
 
         {/* Search results dropdown */}
         {searchOpen && searchResults && (
-          <div className="absolute top-14 right-24 lg:right-28 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2">
+          <div className="fixed inset-x-2 top-16 max-h-[75vh] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2 sm:absolute sm:inset-x-auto sm:top-14 sm:right-24 sm:w-80 sm:max-h-96 lg:right-28">
             {searchLoading ? (
               <p className="text-xs text-gray-400 p-2">Searching...</p>
             ) : searchCount === 0 ? (
@@ -292,7 +292,7 @@ export default function TopBar({ onMenuClick }) {
           </button>
 
           {notifOpen && (
-            <div className="absolute top-11 right-0 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+            <div className="fixed inset-x-2 top-16 max-h-[75vh] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50 sm:absolute sm:inset-x-auto sm:top-11 sm:right-0 sm:w-80 sm:max-h-96">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white">
                 <p className="text-sm font-bold text-gray-900">Notifications</p>
                 <button
