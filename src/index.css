@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'PetitCochon';
+  src: url('/fonts/PetitCochon.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BDSans';
+  src: url('/fonts/BDSans-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BiroScript';
+  src: url('/fonts/BiroScript.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;

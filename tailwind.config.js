@@ -8,16 +8,16 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#e6f4ea',
-          100: '#cce9d5',
-          200: '#99d3ab',
-          300: '#66bd81',
-          400: '#33a757',
-          500: '#188038',
-          600: '#146b2f',
-          700: '#0f5625',
-          800: '#0a401b',
-          900: '#052b11',
+          50: '#fff3ee',
+          100: '#ffe6db',
+          200: '#ffc9ad',
+          300: '#ffa87f',
+          400: '#ff7f52',
+          500: '#ff551f',
+          600: '#e64c1b',
+          700: '#cc4317',
+          800: '#a33712',
+          900: '#7a2a0e',
         },
         surface: {
           50: '#f8fafc',
@@ -34,6 +34,9 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        logo: ['PetitCochon', 'sans-serif'],
+        brandname: ['BDSans', 'sans-serif'],
+        tagline: ['BiroScript', 'sans-serif'],
       },
       boxShadow: {
         'card': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',

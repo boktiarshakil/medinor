@@ -38,15 +38,15 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-emerald-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-500 rounded-2xl mb-4 shadow-lg shadow-brand-500/20">
-            <span className="text-2xl font-bold text-white">M</span>
+          <div className="bg-brand-500 rounded-2xl px-8 py-7 mb-4 shadow-lg shadow-brand-500/20">
+            <div className="font-logo text-6xl leading-none text-white select-none">mms</div>
+            <div className="font-brandname text-xl font-bold text-black uppercase tracking-[0.12em] mt-3">MMS Prime Ltd</div>
+            <div className="font-tagline text-sm text-black uppercase italic mt-1.5">Delivering Value Every Day</div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">MMS Prime Ltd</h1>
-          <p className="text-sm text-gray-500 mt-1">Delivering Value Every Day</p>
         </div>
 
         {/* Form */}
