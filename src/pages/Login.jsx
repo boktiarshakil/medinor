@@ -43,7 +43,7 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="bg-brand-500 rounded-2xl px-8 py-7 mb-4 shadow-lg shadow-brand-500/20">
-            <div className="font-logo text-6xl leading-none text-white select-none tracking-[-0.045em]">mms.</div>
+            <div className="font-logo text-6xl leading-none text-white select-none tracking-[-0.06em]">mms.</div>
             <div className="font-brandname text-xl font-bold text-black uppercase tracking-[0.12em] mt-3">MMS Prime Ltd</div>
             <div className="font-tagline text-[15px] text-black uppercase tracking-[0.1008em] mt-1.5">Delivering Value Every Day</div>
           </div>
