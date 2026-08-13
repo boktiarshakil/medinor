@@ -10,7 +10,7 @@ import {
   MdAttachMoney, MdShoppingCart, MdPeople, MdInventory2,
   MdTrendingUp, MdWarning, MdStore, MdAssessment,
   MdNotificationsActive, MdLocalShipping, MdQrCode, MdMyLocation,
-  MdCampaign, MdChat, MdArrowForward, MdCheckCircle
+  MdCampaign, MdChat, MdArrowForward, MdCheckCircle, MdShoppingBag
 } from 'react-icons/md'
 
 export default function SuperAdminDashboard() {
@@ -22,13 +22,14 @@ export default function SuperAdminDashboard() {
   const [users, setUsers] = useState([])
   const [payments, setPayments] = useState([])
   const [products, setProducts] = useState([])
+  const [codOrders, setCodOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, dealersData, invData, usersData, paymentsData, productsData] = await Promise.all([
+        const [ordersData, invoicesData, dealersData, invData, usersData, paymentsData, productsData, codData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getDealers().catch(() => []),
@@ -36,6 +37,7 @@ export default function SuperAdminDashboard() {
           api.getUsers().catch(() => []),
           api.getPayments().catch(() => []),
           api.getProducts().catch(() => []),
+          api.getCodOrders().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
@@ -44,6 +46,7 @@ export default function SuperAdminDashboard() {
         setUsers(usersData)
         setPayments(paymentsData)
         setProducts(productsData)
+        setCodOrders(codData)
       } catch (err) {
         console.error('Dashboard fetch failed:', err)
       } finally {
@@ -98,6 +101,16 @@ export default function SuperAdminDashboard() {
     { label: 'Active Dealers', value: formatNumber(activeDealers), icon: MdStore, color: 'brand' },
     { label: 'Sales Team', value: formatNumber(salesTeam), icon: MdPeople, color: 'blue' },
   ]
+
+  // COD (cash-on-delivery) is retail revenue collected directly by the company —
+  // no dealer margin. Kept separate from the dealer pipeline but reported here so
+  // the books reflect every unit that physically leaves the warehouse.
+  const completedCod = codOrders.filter(r => r.status === 'completed')
+  const codTotalRevenue = completedCod.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
+  const codMonthRevenue = completedCod
+    .filter(r => r.created_at >= monthStartISO && r.created_at <= monthEndISO)
+    .reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
+  const codPending = codOrders.filter(r => r.status === 'new' || r.status === 'processing').length
 
   // Compute low stock alerts from real inventory
   const lowStockItems = inventory.filter(item => {
@@ -308,6 +321,37 @@ export default function SuperAdminDashboard() {
         </div>
 
         <RecentOrdersTable />
+      </div>
+
+      {/* COD Revenue — separate retail money line */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <MdShoppingBag className="text-brand-500" size={18} />
+            Cash on Delivery
+          </h3>
+          <a href="/cod-requests" className="text-xs font-semibold text-brand-600 flex items-center gap-0.5">
+            Manage Requests <MdArrowForward size={13} />
+          </a>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div>
+            <p className="text-lg font-bold text-gray-900">{formatCurrency(codTotalRevenue)}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">COD Revenue (completed)</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-gray-900">{formatCurrency(codMonthRevenue)}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">COD this month</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-gray-900">{formatNumber(codPending)}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">Pending requests</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-gray-900">{formatNumber(completedCod.length)}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">Completed orders</p>
+          </div>
+        </div>
       </div>
 
       {/* Org Chart Toggle */}

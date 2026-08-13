@@ -14,12 +14,13 @@ const REPORT_CARDS = [
   { title: 'Product Performance', description: 'Best and worst performing products', icon: '📈', color: 'bg-indigo-50 text-indigo-600' },
   { title: 'Visit Report', description: 'Field visit tracking and coverage analysis', icon: '📍', color: 'bg-pink-50 text-pink-600' },
   { title: 'Profit Report', description: 'Revenue, cost, and profit margins', icon: '💹', color: 'bg-teal-50 text-teal-600' },
+  { title: 'COD Requests', description: 'Cash-on-delivery orders from public customers, with processing status', icon: '🛒', color: 'bg-brand-50 text-brand-600' },
 ]
 
 export default function Reports() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dataCache, setDataCache] = useState({ orders: [], invoices: [], dealers: [], inventory: [], products: [], users: [], visits: [] })
+  const [dataCache, setDataCache] = useState({ orders: [], invoices: [], dealers: [], inventory: [], products: [], users: [], visits: [], codOrders: [] })
   const [viewReport, setViewReport] = useState(null)
 
   const downloadCSV = (filename, header, rows) => {
@@ -136,6 +137,19 @@ export default function Reports() {
           ]),
         }
       }
+      case 'COD Requests':
+        return {
+          headers: ['Customer', 'Phone', 'Address', 'Items', 'Total', 'Status', 'Date'],
+          rows: (dataCache.codOrders || []).map(r => [
+            r.customer_name,
+            r.phone,
+            r.address || '—',
+            (r.items || []).map(it => `${it.name || 'Product'} ×${it.quantity}`).join('; '),
+            r.total_amount || 0,
+            r.status,
+            r.created_at,
+          ]),
+        }
       default:
         return {
           headers: ['Order #', 'Dealer', 'Amount', 'Status', 'Date'],
@@ -153,7 +167,7 @@ export default function Reports() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [orders, invoices, dealers, inventory, products, users, visits, payments] = await Promise.all([
+        const [orders, invoices, dealers, inventory, products, users, visits, payments, codOrders] = await Promise.all([
           api.getOrders(),
           api.getInvoices(),
           api.getDealers(),
@@ -162,8 +176,9 @@ export default function Reports() {
           api.getUsers().catch(() => []),
           api.getCRMVisits().catch(() => []),
           api.getPayments().catch(() => []),
+          api.getCodOrders().catch(() => []),
         ])
-        setDataCache({ orders, invoices, dealers, inventory, products, users, visits })
+        setDataCache({ orders, invoices, dealers, inventory, products, users, visits, codOrders })
 
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -185,6 +200,11 @@ export default function Reports() {
           .reduce((s, i) => s + (i.due_amount || i.total_amount || 0), 0)
         const activeDealers = dealers.filter(d => d.status === 'active').length
         const avgOrder = mtdOrders.length > 0 ? totalRevenue / mtdOrders.length : 0
+        // COD revenue is retail money collected directly by the company — reported
+        // separately from the dealer pipeline so every shipped unit is accounted for.
+        const codRevenue = (codOrders || [])
+          .filter(r => r.status === 'completed')
+          .reduce((s, r) => s + (Number(r.total_amount) || 0), 0)
 
         setStats({
           totalRevenue,
@@ -193,6 +213,7 @@ export default function Reports() {
           activeDealers,
           mtdOrders: mtdOrders.length,
           avgOrder,
+          codRevenue,
         })
       } catch (err) {
         console.error('Reports stats fetch failed:', err)
@@ -210,6 +231,7 @@ export default function Reports() {
     { label: 'Active Dealers', value: formatNumber(stats.activeDealers) },
     { label: 'Orders (MTD)', value: formatNumber(stats.mtdOrders) },
     { label: 'Avg Order Value', value: formatCurrency(stats.avgOrder) },
+    { label: 'COD Revenue', value: formatCurrency(stats.codRevenue) },
   ] : []
 
   const renderReportModal = () => {
