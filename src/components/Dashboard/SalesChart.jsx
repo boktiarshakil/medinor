@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Chart from 'react-apexcharts'
 import { api } from '../../lib/api'
 import { startOfMonth, format, subMonths } from 'date-fns'
+import { buildProductsMap, orderCompanyShare } from '../../lib/utils'
 
 export default function SalesChart() {
   const [seriesData, setSeriesData] = useState(null)
@@ -10,8 +11,13 @@ export default function SalesChart() {
   useEffect(() => {
     const fetchSales = async () => {
       try {
-        const orders = await api.getOrders()
-        // Group by month for last 12 months
+        const [orders, products] = await Promise.all([
+          api.getOrders(),
+          api.getProducts().catch(() => []),
+        ])
+        const productsMap = buildProductsMap(products)
+        // Group by month for last 12 months. Revenue = the company's share
+        // (Σ trade_price × qty); order totals include the dealer's margin.
         const monthlyTotals = {}
         for (let i = 11; i >= 0; i--) {
           const m = startOfMonth(subMonths(new Date(), i))
@@ -21,13 +27,13 @@ export default function SalesChart() {
           if (o.created_at && o.status !== 'cancelled') {
             const m = format(startOfMonth(new Date(o.created_at)), 'MMM')
             if (m in monthlyTotals) {
-              monthlyTotals[m] += (o.total_amount || o.amount || 0)
+              monthlyTotals[m] += orderCompanyShare(o, productsMap)
             }
           }
         })
         const categories = Object.keys(monthlyTotals)
         const data = Object.values(monthlyTotals)
-        setSeriesData([{ name: 'Sales', data }])
+        setSeriesData([{ name: 'Revenue', data }])
         setCategories(categories)
       } catch (err) {
         console.error('SalesChart fetch failed:', err)
@@ -66,7 +72,7 @@ export default function SalesChart() {
     },
     series: seriesData,
     xaxis: { categories },
-    colors: ['#188038'],
+    colors: ['#ff551f'],
     fill: {
       type: 'gradient',
       gradient: {

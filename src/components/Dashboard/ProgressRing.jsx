@@ -1,4 +1,4 @@
-export default function ProgressRing({ percent, size = 80, stroke = 8, color = '#188038', label }) {
+export default function ProgressRing({ percent, size = 80, stroke = 8, color = '#ff551f', label }) {
   const radius = (size - stroke) / 2
   const circumference = radius * 2 * Math.PI
   const offset = circumference - (Math.min(percent, 100) / 100) * circumference

@@ -3,7 +3,7 @@ import StatCard from '../../components/Dashboard/StatCard'
 import SalesChart from '../../components/Dashboard/SalesChart'
 import RecentOrdersTable from '../../components/Dashboard/RecentOrdersTable'
 import OrgHierarchy from '../../components/OrgChart/OrgHierarchy'
-import { formatCurrency, formatNumber, calcPercent, todayRange, thisMonthRange } from '../../lib/utils'
+import { formatCurrency, formatNumber, calcPercent, todayRange, thisMonthRange, buildProductsMap, orderCompanyShare } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -21,19 +21,21 @@ export default function SuperAdminDashboard() {
   const [inventory, setInventory] = useState([])
   const [users, setUsers] = useState([])
   const [payments, setPayments] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true)
       try {
-        const [ordersData, invoicesData, dealersData, invData, usersData, paymentsData] = await Promise.all([
+        const [ordersData, invoicesData, dealersData, invData, usersData, paymentsData, productsData] = await Promise.all([
           api.getOrders().catch(() => []),
           api.getInvoices().catch(() => []),
           api.getDealers().catch(() => []),
           api.getInventory().catch(() => []),
           api.getUsers().catch(() => []),
           api.getPayments().catch(() => []),
+          api.getProducts().catch(() => []),
         ])
         setOrders(ordersData)
         setInvoices(invoicesData)
@@ -41,6 +43,7 @@ export default function SuperAdminDashboard() {
         setInventory(invData)
         setUsers(usersData)
         setPayments(paymentsData)
+        setProducts(productsData)
       } catch (err) {
         console.error('Dashboard fetch failed:', err)
       } finally {
@@ -61,11 +64,16 @@ export default function SuperAdminDashboard() {
   const todayOrders = orders.filter(o => o.created_at >= todayStartISO && o.created_at <= todayEndISO && o.status !== 'cancelled' && o.status !== 'draft' && o.status !== 'submitted')
   const monthOrders = orders.filter(o => o.created_at >= monthStartISO && o.created_at <= monthEndISO && o.status !== 'cancelled' && o.status !== 'draft' && o.status !== 'submitted')
 
-  const todaySales = todayOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
-  const monthlySales = monthOrders.reduce((sum, o) => sum + (o.total_amount || o.amount || 0), 0)
+  // Sales/Revenue = the company's actual revenue share (Σ trade_price × qty).
+  // Order totals are billed at dealer price and include the dealer's margin, so
+  // they are not company revenue.
+  const productsMap = buildProductsMap(products)
+  const todaySales = todayOrders.reduce((sum, o) => sum + orderCompanyShare(o, productsMap), 0)
+  const monthlySales = monthOrders.reduce((sum, o) => sum + orderCompanyShare(o, productsMap), 0)
+  // Inventory is valued at cost (purchase price), not retail MRP.
   const stockValue = inventory.reduce((sum, item) => {
     const qty = item.quantity || item.stock || 0
-    const price = item.product?.mrp || item.mrp || item.purchase_price || 0
+    const price = productsMap[item.product_id]?.purchase_price || 0
     return sum + (qty * price)
   }, 0)
   const totalOutstanding = invoices

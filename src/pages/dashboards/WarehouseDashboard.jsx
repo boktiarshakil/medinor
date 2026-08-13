@@ -34,7 +34,7 @@ export default function WarehouseDashboard() {
   const totalSKUs = inventory.length
   const stockValue = inventory.reduce((sum, item) => {
     const qty = item.quantity || item.stock || 0
-    const price = item.product?.mrp || item.mrp || item.purchase_price || 0
+    const price = item.product?.mrp || item.mrp || 0
     return sum + (qty * price)
   }, 0)
   const lowStockItems = inventory.filter(item => {

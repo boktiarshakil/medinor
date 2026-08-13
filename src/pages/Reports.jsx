@@ -107,24 +107,33 @@ export default function Reports() {
         }
       case 'Profit Report': {
         // Company profit = (trade_price − purchase_price) × units. The dealer's
-        // margin (dealer_price − trade_price) is not company profit — treating
-        // full invoiced revenue as profit overstated it on every dealer order.
-        const prodCost = {}
-        products.forEach(p => { prodCost[p.id] = p.purchase_price || 0 })
+        // margin (dealer_price − trade_price) is not company profit — the full
+        // invoiced revenue (dealer price × qty) includes the dealer's margin, so
+        // profit must be computed on the trade-price share the company keeps.
         const itemMap = {}
         activeOrders.forEach(o => (o.items || []).forEach(it => {
           const pid = it.product_id
-          itemMap[pid] = itemMap[pid] || { units: 0, revenue: 0 }
-          itemMap[pid].units += it.quantity || 0
-          itemMap[pid].revenue += it.total_price || it.quantity * it.unit_price || 0
+          const p = products.find(pr => pr.id === pid)
+          if (!p) return
+          const qty = it.quantity || 0
+          const trade = p.trade_price || 0
+          const purchase = p.purchase_price || 0
+          if (!itemMap[pid]) itemMap[pid] = { name: p.name || pid, units: 0, revenue: 0, tradeValue: 0, cost: 0 }
+          itemMap[pid].units += qty
+          itemMap[pid].revenue += it.total_price || it.unit_price * qty || 0
+          itemMap[pid].tradeValue += trade * qty
+          itemMap[pid].cost += purchase * qty
         }))
         return {
-          headers: ['Product', 'Units', 'Revenue', 'Cost', 'Profit'],
-          rows: Object.entries(itemMap).map(([pid, v]) => {
-            const p = products.find(pr => pr.id === pid)
-            const cost = (prodCost[pid] || 0) * v.units
-            return [p?.name || pid, v.units, v.revenue, cost, v.revenue - cost]
-          }),
+          headers: ['Product', 'Units', 'Revenue', 'Dealer Margin', 'Cost', 'Company Profit'],
+          rows: Object.values(itemMap).map(v => [
+            v.name,
+            v.units,
+            v.revenue,
+            Math.max(v.revenue - v.tradeValue, 0),
+            v.cost,
+            v.tradeValue - v.cost,
+          ]),
         }
       }
       default:

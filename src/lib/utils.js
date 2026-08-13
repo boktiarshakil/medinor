@@ -299,3 +299,22 @@ export const formatSettlementSummary = (settlement) => {
     label: `Company ${formatCurrency(settlement.company_total)} + Dealer margin ${formatCurrency(settlement.dealer_margin_total)}`
   }
 }
+
+// Build a lookup map of products by id for price-based calculations.
+export const buildProductsMap = (products) => {
+  const map = {}
+  ;(products || []).forEach(p => { map[p.id] = p })
+  return map
+}
+
+// The company's revenue share of an order = Σ trade_price × qty. Order totals
+// are billed at dealer price (what the customer pays) and therefore include the
+// dealer's margin, so they overstate company revenue. Falls back to the
+// invoiced line total for products missing from the current catalogue.
+export const orderCompanyShare = (order, productsMap = {}) => {
+  return (order.items || []).reduce((sum, it) => {
+    const p = productsMap[it.product_id]
+    if (p) return sum + (Number(p.trade_price) || 0) * (Number(it.quantity) || 0)
+    return sum + (Number(it.total_price) || 0)
+  }, 0)
+}
