@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { formatCurrency } from '../lib/utils'
-import { MdSearch, MdShield, MdVerified, MdLocalShipping, MdPhone, MdEmail, MdArrowForward } from 'react-icons/md'
+import toast from 'react-hot-toast'
+import {
+  MdSearch, MdShield, MdVerified, MdLocalShipping, MdPhone, MdEmail, MdArrowForward,
+  MdAdd, MdRemove, MdCheckCircle, MdShoppingCart, MdCall
+} from 'react-icons/md'
 
 const BRAND = '#ff551f'
 
@@ -21,6 +25,11 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [cart, setCart] = useState({})
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [orderPlaced, setOrderPlaced] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [checkout, setCheckout] = useState({ name: '', phone: '', address: '', notes: '' })
 
   useEffect(() => {
     api.getProducts()
@@ -28,6 +37,72 @@ export default function Home() {
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
   }, [])
+
+  const addToCart = (id) => {
+    const product = products.find(p => p.id === id)
+    if (!product) return
+    const currentQty = cart[id] || 0
+    if (currentQty >= 99) return
+    setCart(prev => ({ ...prev, [id]: currentQty + 1 }))
+  }
+
+  const removeFromCart = (id) => {
+    setCart(prev => {
+      const next = { ...prev }
+      if (next[id] > 1) next[id] -= 1
+      else delete next[id]
+      return next
+    })
+  }
+
+  const cartEntries = Object.entries(cart)
+    .map(([id, qty]) => {
+      const product = products.find(p => p.id === id)
+      if (!product) return null
+      return {
+        id, qty, product,
+        unit_price: Number(product.mrp) || 0,
+        total: (Number(product.mrp) || 0) * qty,
+      }
+    })
+    .filter(Boolean)
+  const cartTotal = cartEntries.reduce((sum, item) => sum + item.total, 0)
+  const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
+
+  const handleSubmitCod = async () => {
+    if (!checkout.name.trim()) {
+      toast.error('Enter your full name')
+      return
+    }
+    const phoneClean = checkout.phone.replace(/\s+/g, '')
+    if (!/^(?:\+?\d{10,15})$/.test(phoneClean)) {
+      toast.error('Enter a valid phone number')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await api.createCodOrder({
+        customer_name: checkout.name.trim(),
+        phone: phoneClean,
+        address: checkout.address.trim() || null,
+        notes: checkout.notes.trim() || null,
+        items: cartEntries.map(it => ({
+          product_id: it.id,
+          name: it.product.name,
+          quantity: it.qty,
+          unit_price: it.unit_price,
+        })),
+        total_amount: cartTotal,
+      })
+      setOrderPlaced(true)
+      setCart({})
+    } catch (err) {
+      console.error('COD order failed:', err)
+      toast.error(err.message || 'Failed to place order')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const categories = ['all', ...new Set(products.map(p => p.category))]
   const filtered = products.filter(p => {
@@ -164,7 +239,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {filtered.map(product => (
                   <div key={product.id} className="card card-hover overflow-hidden">
                     {product.image_url ? (
@@ -184,12 +259,32 @@ export default function Home() {
                           <span className="text-[10px] text-gray-400">MRP</span>
                           <p className="font-semibold text-brand-600">{formatCurrency(product.mrp)}</p>
                         </div>
-                        <button
-                          className="text-xs font-semibold text-brand-500 hover:text-brand-600 flex items-center gap-0.5"
-                          onClick={() => navigate('/login')}
-                        >
-                          Order <MdArrowForward size={13} />
-                        </button>
+                        {cart[product.id] > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-100"
+                              onClick={() => removeFromCart(product.id)}
+                              aria-label="Remove one"
+                            >
+                              <MdRemove size={14} />
+                            </button>
+                            <span className="text-sm font-bold text-gray-900 w-4 text-center">{cart[product.id]}</span>
+                            <button
+                              className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-100"
+                              onClick={() => addToCart(product.id)}
+                              aria-label="Add one"
+                            >
+                              <MdAdd size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="text-xs font-semibold text-brand-500 hover:text-brand-600 flex items-center gap-0.5"
+                            onClick={() => addToCart(product.id)}
+                          >
+                            <MdAdd size={13} /> Add to Cart
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -297,6 +392,126 @@ export default function Home() {
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} MMS Prime Ltd. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Public cart bar */}
+      {cartCount > 0 && (
+        <div className="fixed bottom-4 left-4 right-4 z-50 max-w-xl mx-auto card p-3 sm:p-4 shadow-xl border border-gray-100">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <MdShoppingCart size={18} className="text-brand-600 flex-shrink-0" />
+              <span className="text-xs text-gray-600 truncate">{cartCount} item{cartCount > 1 ? 's' : ''} · {formatCurrency(cartTotal)}</span>
+            </div>
+            <button
+              className="btn-primary text-xs px-4 py-2.5"
+              onClick={() => {
+                setOrderPlaced(false)
+                setShowCheckout(true)
+              }}
+            >
+              Checkout (COD)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Spacer so the footer is not hidden behind the fixed cart bar */}
+      {cartCount > 0 && <div className="h-20" />}
+
+      {/* COD Checkout Modal */}
+      {showCheckout && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full max-w-md max-h-[92vh] overflow-y-auto">
+            {orderPlaced ? (
+              <div className="p-8 text-center">
+                <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <MdCheckCircle size={28} className="text-emerald-500" />
+                </div>
+                <p className="text-base font-bold text-gray-900">Request Received!</p>
+                <p className="text-xs text-gray-500 mt-1.5">
+                  We will call you at <strong>{checkout.phone}</strong> to confirm delivery. Pay in cash when your order arrives.
+                </p>
+                <button
+                  className="btn-primary w-full mt-6"
+                  onClick={() => {
+                    setShowCheckout(false)
+                    setCheckout({ name: '', phone: '', address: '', notes: '' })
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl sm:rounded-xl">
+                  <h3 className="text-sm font-bold text-gray-900">Cash on Delivery Checkout</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Pay in cash when your order arrives</p>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="space-y-2.5">
+                    {cartEntries.map(item => (
+                      <div key={item.id} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700 flex-1 truncate mr-2">{item.product.name}</span>
+                        <span className="text-gray-400 mx-1">×{item.qty}</span>
+                        <span className="font-semibold">{formatCurrency(item.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-xs font-bold text-gray-900">Total (Payable on delivery)</span>
+                    <span className="text-base font-bold text-brand-600">{formatCurrency(cartTotal)}</span>
+                  </div>
+                  <div>
+                    <label className="label">Full Name *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Your name"
+                      value={checkout.name}
+                      onChange={(e) => setCheckout({ ...checkout, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Phone Number *</label>
+                    <input
+                      type="tel"
+                      className="input"
+                      placeholder="01XXXXXXXXX"
+                      value={checkout.phone}
+                      onChange={(e) => setCheckout({ ...checkout, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Delivery Address</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Area, city, district"
+                      value={checkout.address}
+                      onChange={(e) => setCheckout({ ...checkout, address: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Notes (optional)</label>
+                    <textarea
+                      className="input"
+                      rows={2}
+                      placeholder="Anything we should know"
+                      value={checkout.notes}
+                      onChange={(e) => setCheckout({ ...checkout, notes: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button className="btn-secondary flex-1" onClick={() => setShowCheckout(false)}>Back</button>
+                    <button className="btn-primary flex-1" onClick={handleSubmitCod} disabled={submitting}>
+                      {submitting ? 'Placing...' : 'Place COD Request'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

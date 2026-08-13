@@ -1616,6 +1616,83 @@ export const api = {
     return created
   },
 
+  // ---- COD Orders (public cash-on-delivery requests) ----
+
+  // Record a public COD request. Stored separately from the dealer order
+  // pipeline so the main books are never polluted by retail requests.
+  async createCodOrder(order) {
+    const items = (order.items || []).map(it => ({
+      product_id: it.product_id,
+      name: it.name || it.product_name || null,
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+      total_price: it.total_price ?? it.unit_price * it.quantity,
+    }))
+    const total = order.total_amount ?? items.reduce((s, i) => s + (Number(i.total_price) || 0), 0)
+
+    const { data, error } = await supabase
+      .from('cod_orders')
+      .insert({
+        customer_name: order.customer_name,
+        phone: order.phone,
+        address: order.address || null,
+        notes: order.notes || null,
+        items,
+        total_amount: total,
+        status: 'new',
+      })
+      .select()
+      .single()
+    if (error) throw error
+
+    // Notify management so a new COD request never sits unnoticed.
+    try {
+      const { data: admins } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .in('role', ['super_admin', 'admin'])
+        .eq('is_active', true)
+      const adminIds = (admins || []).map(a => a.id)
+      if (adminIds.length > 0) {
+        await this.notifyUsers(adminIds, {
+          title: 'New COD Request',
+          message: `${order.customer_name} (${order.phone}) placed a COD order — ${items.length} item(s), BDT ${total}`,
+          type: 'info',
+          referenceType: 'cod_order',
+          url: '/cod-requests',
+        })
+      }
+    } catch (notifyErr) {
+      console.warn('COD notification failed:', notifyErr)
+    }
+    return data
+  },
+
+  async getCodOrders() {
+    const { data, error } = await supabase
+      .from('cod_orders')
+      .select('*, processedBy:user_profiles!cod_orders_processed_by_fkey(full_name)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  async updateCodOrderStatus(id, status, processedBy = null) {
+    const { data, error } = await supabase
+      .from('cod_orders')
+      .update({
+        status,
+        processed_by: processedBy || null,
+        processed_at: status === 'new' ? null : new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   // ---- Stock movements ----
 
   async getStockMovements(productId) {

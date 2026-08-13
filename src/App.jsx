@@ -31,6 +31,7 @@ import Warranty from './pages/warranty/Warranty'
 import OrgChartPage from './components/OrgChart/OrgHierarchy'
 import Settlements from './pages/Settlements'
 import PersonalIds from './pages/PersonalIds'
+import CODRequests from './pages/CODRequests'
 import UserManagement from './pages/UserManagement'
 
 export default function App() {
@@ -91,6 +92,7 @@ export default function App() {
 
         {/* Price isolation & settlement — admin only */}
         <Route path="/settlements" element={<ProtectedRoute roles={['super_admin','admin','sales_manager']}><Settlements /></ProtectedRoute>} />
+        <Route path="/cod-requests" element={<ProtectedRoute roles={['super_admin','admin','sales_manager']}><CODRequests /></ProtectedRoute>} />
         <Route path="/personal-ids" element={<ProtectedRoute roles={['super_admin','admin']}><PersonalIds /></ProtectedRoute>} />
 
         {/* User management — super_admin only */}
