@@ -35,7 +35,7 @@ export default function Reports() {
     URL.revokeObjectURL(url)
   }
 
-  const activeOrders = orders.filter(o => o.status !== 'cancelled' && o.status !== 'draft')
+  const activeOrders = dataCache.orders.filter(o => o.status !== 'cancelled' && o.status !== 'draft')
 
   const getReportRows = (report) => {
     const { orders, invoices, dealers, inventory, products, users, visits } = dataCache
