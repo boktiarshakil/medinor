@@ -104,7 +104,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © 2025 MMS Prime Ltd. All rights reserved.
+          © {new Date().getFullYear()} MMS Prime Ltd. All rights reserved.
         </p>
       </div>
     </div>
