@@ -223,6 +223,36 @@ export const api = {
       .insert(orderItems)
     if (itemsError) throw itemsError
 
+    // A dealer's self-submitted order (dealer_id set, no sr logged in) triggers a
+    // notification so management never misses a new order. Orders created by staff
+    // on behalf of a dealer are excluded — they already know they made them.
+    if (payload.status === 'submitted' && payload.dealer_id && !payload.sr_id) {
+      try {
+        const { data: dealer } = await supabase
+          .from('dealers')
+          .select('name')
+          .eq('id', payload.dealer_id)
+          .single()
+        const { data: admins } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .in('role', ['super_admin', 'admin', 'sales_manager'])
+          .eq('is_active', true)
+        const adminIds = (admins || []).map(a => a.id)
+        if (adminIds.length > 0) {
+          await this.notifyUsers(adminIds, {
+            title: 'New Order Received',
+            message: `${orderData.order_number} — ${dealer?.name || 'Dealer'} submitted a new order (BDT ${payload.net_amount ?? payload.total_amount ?? 0})`,
+            type: 'info',
+            referenceType: 'order',
+            url: '/orders',
+          })
+        }
+      } catch (notifyErr) {
+        console.warn('New-order notification failed:', notifyErr)
+      }
+    }
+
     return orderData
   },
 
