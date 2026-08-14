@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatCurrency, statusColor } from '../lib/utils'
-import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore, MdClose } from 'react-icons/md'
+import { MdAdd, MdSearch, MdLocationOn, MdPhone, MdMoreVert, MdStore, MdClose, MdPerson } from 'react-icons/md'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
@@ -15,6 +15,7 @@ export default function Dealers() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [areas, setAreas] = useState([])
+  const [srUsers, setSrUsers] = useState([])
   const [menuOpen, setMenuOpen] = useState(null)
   const [editingDealer, setEditingDealer] = useState(null)
   const [newDealer, setNewDealer] = useState({
@@ -26,12 +27,16 @@ export default function Dealers() {
     address: '',
     district: '',
     area_id: '',
+    assigned_sr_id: '',
     credit_limit: 50000,
   })
 
   useEffect(() => {
     fetchDealers()
     api.getAreas().then(setAreas).catch(() => {})
+    api.getUsers()
+      .then(users => setSrUsers((users || []).filter(u => u.role === 'sales_executive' && u.is_active !== false)))
+      .catch(() => {})
   }, [])
 
   const fetchDealers = async () => {
@@ -77,6 +82,7 @@ export default function Dealers() {
         address: editingDealer.address || null,
         district: editingDealer.district || null,
         area_id: editingDealer.area_id || null,
+        assigned_sr_id: editingDealer.assigned_sr_id || null,
         credit_limit: Number(editingDealer.credit_limit) || 0,
       })
       toast.success(`Dealer "${editingDealer.name}" updated`)
@@ -109,10 +115,11 @@ export default function Dealers() {
         address: newDealer.address || null,
         district: newDealer.district || null,
         area_id: newDealer.area_id || null,
+        assigned_sr_id: newDealer.assigned_sr_id || null,
         credit_limit: Number(newDealer.credit_limit) || 0,
       })
       toast.success(`Dealer "${newDealer.name}" created`)
-      setNewDealer({ name: '', owner_name: '', email: '', mobile: '', phone: '', address: '', district: '', area_id: '', credit_limit: 50000 })
+      setNewDealer({ name: '', owner_name: '', email: '', mobile: '', phone: '', address: '', district: '', area_id: '', assigned_sr_id: '', credit_limit: 50000 })
       setShowCreate(false)
       fetchDealers()
     } catch (err) {
@@ -199,6 +206,9 @@ export default function Dealers() {
               </div>
               <div className="flex items-center gap-2 text-gray-600">
                 <MdLocationOn size={13} className="text-gray-400" /> {dealer.area}{dealer.district ? `, ${dealer.district}` : ''}
+              </div>
+              <div className="flex items-center gap-2 text-gray-600">
+                <MdPerson size={13} className="text-gray-400" /> SR: {srUsers.find(sr => sr.id === dealer.assigned_sr_id)?.full_name || 'Unassigned'}
               </div>
             </div>
 
@@ -373,6 +383,20 @@ export default function Dealers() {
                   />
                 </div>
               </div>
+              <div>
+                <label className="label">Assigned SR</label>
+                <select
+                  className="input"
+                  value={newDealer.assigned_sr_id}
+                  onChange={(e) => setNewDealer({ ...newDealer, assigned_sr_id: e.target.value })}
+                >
+                  <option value="">Unassigned</option>
+                  {srUsers.map(sr => (
+                    <option key={sr.id} value={sr.id}>{sr.full_name || sr.email}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">Assign a Sales Executive; the dealer appears under them in the org chart.</p>
+              </div>
 
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">
@@ -453,6 +477,17 @@ export default function Dealers() {
                   <label className="label">Credit Limit</label>
                   <input type="number" className="input" value={editingDealer.credit_limit} onChange={(e) => setEditingDealer({ ...editingDealer, credit_limit: e.target.value })} />
                 </div>
+              </div>
+              <div>
+                <label className="label">Assigned SR</label>
+                <select className="input" value={editingDealer.assigned_sr_id || ''}
+                  onChange={(e) => setEditingDealer({ ...editingDealer, assigned_sr_id: e.target.value })}>
+                  <option value="">Unassigned</option>
+                  {srUsers.map(sr => (
+                    <option key={sr.id} value={sr.id}>{sr.full_name || sr.email}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">Dealer appears under this SR in the org chart.</p>
               </div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setEditingDealer(null)} className="btn-secondary flex-1">Cancel</button>
