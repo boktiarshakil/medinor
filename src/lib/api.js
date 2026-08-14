@@ -223,10 +223,10 @@ export const api = {
       .insert(orderItems)
     if (itemsError) throw itemsError
 
-    // A dealer's self-submitted order (dealer_id set, no sr logged in) triggers a
-    // notification so management never misses a new order. Orders created by staff
-    // on behalf of a dealer are excluded — they already know they made them.
-    if (payload.status === 'submitted' && payload.dealer_id && !payload.sr_id) {
+    // Every new order triggers a management alert so no order slips by — whether a
+    // dealer self-submits or staff creates one on a dealer's behalf. The creator is
+    // excluded (they already know they made it), but the rest of management is told.
+    if (payload.status === 'submitted' && payload.dealer_id) {
       try {
         const { data: dealer } = await supabase
           .from('dealers')
@@ -238,7 +238,9 @@ export const api = {
           .select('id')
           .in('role', ['super_admin', 'admin', 'sales_manager'])
           .eq('is_active', true)
-        const adminIds = (admins || []).map(a => a.id)
+        const adminIds = (admins || [])
+          .map(a => a.id)
+          .filter(id => !payload.sr_id || id !== payload.sr_id)
         if (adminIds.length > 0) {
           await this.notifyUsers(adminIds, {
             title: 'New Order Received',
