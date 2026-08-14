@@ -214,7 +214,7 @@ export default function Dealers() {
             </div>
 
               <div className="flex gap-2">
-                <a href="/place-order" className="btn-primary flex-1 text-xs text-center">Place Order</a>
+                <a href={`/place-order?dealer=${dealer.id}`} className="btn-primary flex-1 text-xs text-center">Place Order</a>
                 <div className="relative">
                   <button
                     onClick={() => setMenuOpen(menuOpen === dealer.id ? null : dealer.id)}

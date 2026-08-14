@@ -38,15 +38,25 @@ export default function PlaceOrder() {
       const data = await api.getProductsWithStock()
       setProducts(data)
       const allDealers = await api.getDealers().catch(() => [])
+      let list
       if (role === 'dealer') {
-        setDealers(allDealers)
+        list = allDealers
       } else if (role === 'sales_executive') {
         // Only dealers assigned to this SR — matching the Collections scope.
         // Orders placed for unassigned dealers would otherwise create invoices
         // the SR can never see in their Collections page.
         const mine = allDealers.filter(d => d.assigned_sr_id === user.id)
-        setDealers(mine.length > 0 ? mine : allDealers)
+        list = mine.length > 0 ? mine : allDealers
+      } else {
+        // Management (super_admin / admin / sales_manager / area_manager) can
+        // place an order for any dealer — they already create orders via /orders.
+        list = allDealers
       }
+      setDealers(list)
+      // A dealer card on /dealers links here with ?dealer=<id> — pre-select it so
+      // staff don't have to re-pick the dealer after tapping "Place Order".
+      const pre = new URLSearchParams(window.location.search).get('dealer')
+      if (pre && list.some(d => d.id === pre)) setSelectedDealerId(pre)
     } catch (err) {
       console.error('Products fetch failed:', err)
       setError(err.message || 'Failed to load products')
@@ -60,9 +70,9 @@ export default function PlaceOrder() {
 
   const getPrice = (product) => {
     if (!role) return product.mrp
-    // When an SR orders FOR a specific dealer, invoice at the dealer price
+    // When staff orders FOR a specific dealer, invoice at the dealer price
     // (the price the dealer actually pays). Otherwise use the caller's tier.
-    if (role === 'sales_executive' && selectedDealerId) {
+    if (role !== 'dealer' && selectedDealerId) {
       return product.dealer_price || getPriceForRole(product, role) || product.mrp
     }
     return getPriceForRole(product, role) || product.mrp
@@ -198,8 +208,8 @@ export default function PlaceOrder() {
         )}
       </div>
 
-      {/* SR: select dealer to order for */}
-      {role === 'sales_executive' && (
+      {/* SR / Management: select dealer to order for */}
+      {role !== 'dealer' && (
         <div className="card p-4">
           <label className="label">Ordering for Dealer *</label>
           <select
