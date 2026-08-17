@@ -269,9 +269,10 @@
   .ptable td { padding: 13px 14px; border-top: 1px solid var(--line); vertical-align: top; font-size: 13px; }
   .ptable tbody tr:hover td { background: #fcfcfd; }
   .cat-row td { background: var(--brand-soft); color: var(--brand-dark); font-weight: 800; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; padding: 8px 14px; border-top: 1.5px solid #ffd9c9; }
-  .prod-cell { display: flex; gap: 14px; align-items: center; min-width: 300px; }
+  .prod-cell { display: flex; flex-direction: column; gap: 10px; min-width: 300px; height: 100%; }
+  .prod-cell > :last-child { order: -1; }
   .prod-thumb {
-    width: 84px; height: 84px; flex-shrink: 0;
+    flex: 1 1 auto; width: 100%; min-height: 84px;
     border: 1px solid var(--line); border-radius: 12px; background: #fff;
     display: flex; align-items: center; justify-content: center; padding: 7px; overflow: hidden;
     box-shadow: 0 2px 8px rgba(22,24,29,.05);
