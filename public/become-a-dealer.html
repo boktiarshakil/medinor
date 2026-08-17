@@ -76,28 +76,63 @@
   .topbar b { color: #fff; font-weight: 700; }
   header.site {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(255,255,255,.92);
-    backdrop-filter: blur(8px);
+    background: rgba(255,255,255,.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
+    transition: box-shadow .2s ease;
   }
-  .nav-wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; }
-  .brand-lockup { display: flex; align-items: center; gap: 12px; }
+  header.site.scrolled { box-shadow: 0 8px 24px rgba(22,24,29,.07); }
+  .nav-wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 0; }
+  .brand-lockup { display: flex; align-items: center; gap: 14px; }
   .brand-logo {
-    width: 42px; height: 42px; border-radius: 10px;
-    background: var(--brand); color: #fff;
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+    color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-family: 'PetitCochon', sans-serif;
-    font-size: 22px; font-weight: 400; letter-spacing: -.09em;
+    font-size: 23px; font-weight: 400; letter-spacing: -.09em;
+    box-shadow: 0 4px 12px rgba(255,85,31,.25);
     flex-shrink: 0;
   }
-  .brand-lockup .name { font-family: 'BDSans', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); }
-  .brand-lockup .tag { font-family: 'BiroScript', sans-serif; font-size: 11px; color: var(--ink-3); }
-  .brand-lockup .divider { width: 1px; height: 30px; background: var(--line); }
-  .brand-lockup .medi { font-size: 13px; font-weight: 800; color: var(--ink); letter-spacing: .06em; }
-  nav ul { display: flex; list-style: none; gap: 22px; }
-  nav a { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
-  nav a:hover { color: var(--brand); }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+  .brand-lockup .name { font-family: 'BDSans', sans-serif; font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: .01em; }
+  .brand-lockup .tag { font-family: 'BiroScript', sans-serif; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+  .brand-lockup .medi {
+    font-size: 12.5px; font-weight: 800; letter-spacing: .14em;
+    color: var(--brand-dark);
+    background: var(--brand-soft);
+    border: 1px solid #ffd9c9;
+    padding: 6px 12px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+  }
+  .brand-lockup .medi::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+  nav.site-nav { display: flex; }
+  nav ul { display: flex; list-style: none; gap: 4px; }
+  nav a {
+    display: inline-block; padding: 8px 12px;
+    font-size: 13.5px; font-weight: 600; color: var(--ink-2);
+    border-radius: 8px; position: relative;
+    transition: color .15s ease, background .15s ease;
+  }
+  nav a:hover { color: var(--brand); background: var(--brand-soft); }
+  nav a.active { color: var(--brand-dark); background: var(--brand-soft); }
+  nav a.active::after {
+    content: ""; position: absolute; left: 12px; right: 12px; bottom: 5px;
+    height: 2px; border-radius: 2px; background: var(--brand);
+  }
+  .skip-link {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--ink); color: #fff;
+    padding: 10px 16px; border-radius: 0 0 10px 0;
+    font-size: 13px; font-weight: 700; z-index: 100;
+  }
+  .skip-link:focus { left: 0; }
   .nav-actions { display: flex; align-items: center; gap: 10px; }
+  .nav-actions .btn { border-radius: 999px; }
+  .nav-actions .btn-outline { background: #fff; border: 1.5px solid var(--line); }
+  .nav-actions .btn-outline:hover { border-color: var(--brand); color: var(--brand); background: #fff; }
   .menu-btn {
     display: none; align-items: center; justify-content: center;
     width: 44px; height: 44px; flex-shrink: 0;
@@ -303,8 +338,8 @@
     .trust-grid { grid-template-columns: repeat(2, 1fr); }
     .footer-grid { grid-template-columns: 1fr 1fr; }
     .hero .container { padding: 52px 20px 58px; }
-    .brand-lockup .divider { display: none; }
-    .brand-lockup .medi { font-size: 12px; }
+    .brand-lockup { gap: 10px; }
+    .brand-lockup .medi { font-size: 11px; padding: 5px 10px; }
     .nav-actions .btn-outline { display: none; }
   }
   @media (max-width: 640px) {
@@ -389,35 +424,41 @@
 
 <!-- Header -->
 <header class="site">
+  <a class="skip-link" href="#main">Skip to content</a>
   <div class="container nav-wrap">
     <div class="brand-lockup">
-      <div class="brand-logo font-logo">mms.</div>
-      <div>
+      <div class="brand-logo font-logo" aria-hidden="true">mms.</div>
+      <div class="brand-text">
         <div class="name font-brandname">MMS Prime Ltd</div>
         <div class="tag font-tagline">Delivering Value Every Day</div>
       </div>
-      <div class="divider"></div>
       <div class="medi">MEDIRON</div>
     </div>
-    <nav class="site-nav">
+    <nav class="site-nav" aria-label="Primary">
       <ul>
-        <li><a href="#why">Why Mediron</a></li>
-        <li><a href="#packages">Dealer Packages</a></li>
-        <li><a href="#incentives">Incentives</a></li>
-        <li><a href="#products">Prices &amp; Specs</a></li>
-        <li><a href="#certifications">Certifications</a></li>
-        <li><a href="#contact">Contact</a></li>
+        <li><a href="#why" class="nav-link">Why Mediron</a></li>
+        <li><a href="#packages" class="nav-link">Dealer Packages</a></li>
+        <li><a href="#incentives" class="nav-link">Incentives</a></li>
+        <li><a href="#products" class="nav-link">Prices &amp; Specs</a></li>
+        <li><a href="#certifications" class="nav-link">Certifications</a></li>
+        <li><a href="#contact" class="nav-link">Contact</a></li>
       </ul>
     </nav>
     <div class="nav-actions no-print">
-      <button class="btn btn-outline" onclick="window.print()">🖨 Print / PDF</button>
-      <a class="btn btn-primary" href="#contact">Become a Dealer</a>
+      <button class="btn btn-outline" onclick="window.print()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        Print / PDF
+      </button>
+      <a class="btn btn-primary" href="#contact">
+        Become a Dealer
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
       <button class="menu-btn" aria-label="Menu" aria-expanded="false" onclick="toggleMenu()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
     </div>
   </div>
-  <nav class="mobile-nav" id="mobileNav">
+  <nav class="mobile-nav" id="mobileNav" aria-label="Mobile">
     <ul>
       <li><a href="#why">Why Mediron</a></li>
       <li><a href="#packages">Dealer Packages</a></li>
@@ -431,7 +472,7 @@
 </header>
 
 <!-- Hero -->
-<section class="hero">
+<main id="main"><section class="hero">
   <div class="container">
     <span class="hero-badge">Authorized Dealer Opportunity</span>
     <h1>Grow a Profitable <em>Medical Equipment Business</em> in Your Area with MEDIRON</h1>
@@ -906,6 +947,7 @@
     <div class="trust"><div class="ic">🤝</div><h4>Build a Strong Network</h4><p>Together we grow, together we succeed.</p></div>
   </div>
 </section>
+</main>
 
 <!-- Footer -->
 <footer class="site">
@@ -914,7 +956,7 @@
       <div>
         <div class="brand-lockup" style="margin-bottom:12px;">
           <div class="brand-logo font-logo">mms.</div>
-          <div>
+          <div class="brand-text">
             <div class="name font-brandname" style="color:#fff;">MMS Prime Ltd</div>
             <div class="tag font-tagline" style="color:rgba(255,255,255,.55);">Delivering Value Every Day</div>
           </div>
@@ -956,6 +998,22 @@
 
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
+  const header = document.querySelector('header.site');
+  const onScroll = function () {
+    header.classList.toggle('scrolled', window.scrollY > 8);
+    const links = document.querySelectorAll('.nav-link');
+    const sections = ['why', 'packages', 'incentives', 'products', 'certifications', 'contact'];
+    let current = '';
+    sections.forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el && el.getBoundingClientRect().top <= 90) current = id;
+    });
+    links.forEach(function (a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
   function toggleMenu() {
     const nav = document.getElementById('mobileNav');
     const btn = document.querySelector('.menu-btn');
