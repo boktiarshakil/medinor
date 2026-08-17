@@ -98,16 +98,6 @@
   .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
   .brand-lockup .name { font-family: 'BDSans', sans-serif; font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: .01em; }
   .brand-lockup .tag { font-family: 'BiroScript', sans-serif; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
-  .brand-lockup .medi {
-    font-size: 12.5px; font-weight: 800; letter-spacing: .14em;
-    color: var(--brand-dark);
-    background: var(--brand-soft);
-    border: 1px solid #ffd9c9;
-    padding: 6px 12px; border-radius: 999px;
-    display: inline-flex; align-items: center; gap: 6px;
-    white-space: nowrap;
-  }
-  .brand-lockup .medi::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
   nav.site-nav { display: flex; }
   nav ul { display: flex; list-style: none; gap: 4px; }
   nav a {
@@ -339,7 +329,6 @@
     .footer-grid { grid-template-columns: 1fr 1fr; }
     .hero .container { padding: 52px 20px 58px; }
     .brand-lockup { gap: 10px; }
-    .brand-lockup .medi { font-size: 11px; padding: 5px 10px; }
     .nav-actions .btn-outline { display: none; }
   }
   @media (max-width: 640px) {
@@ -432,7 +421,6 @@
         <div class="name font-brandname">MMS Prime Ltd</div>
         <div class="tag font-tagline">Delivering Value Every Day</div>
       </div>
-      <div class="medi">MEDIRON</div>
     </div>
     <nav class="site-nav" aria-label="Primary">
       <ul>
