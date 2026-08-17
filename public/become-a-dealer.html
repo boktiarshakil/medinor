@@ -121,27 +121,45 @@
   .skip-link:focus { left: 0; }
   .nav-actions { display: flex; align-items: center; gap: 10px; }
   .nav-actions .btn { border-radius: 999px; }
-  .menu-btn {
-    display: none; align-items: center; justify-content: center;
-    width: 44px; height: 44px; flex-shrink: 0;
-    background: #fff; border: 1.5px solid var(--line); border-radius: 10px;
-    color: var(--ink); cursor: pointer; padding: 0;
-  }
+  .menu-btn { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; background: #fff; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink); cursor: pointer; padding: 0; }
+  .menu-btn .menu-close { display: none; }
+  .menu-btn[aria-expanded="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .menu-btn[aria-expanded="true"] .menu-ic { display: none; }
+  .menu-btn[aria-expanded="true"] .menu-close { display: block; }
   .menu-btn svg { pointer-events: none; }
   .menu-btn:active { background: var(--bg-soft); }
-  .mobile-nav { display: none; }
-  .mobile-nav.open { display: block; }
+  .mobile-nav {
+    display: none;
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 60;
+    background: rgba(255,255,255,.98);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 20px 40px rgba(22,24,29,.12);
+  }
+  .mobile-nav.open { display: block; animation: navSlide .22s ease; }
+  @keyframes navSlide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
   .mobile-nav ul {
-    list-style: none; border-top: 1px solid var(--line);
-    background: #fff; padding: 8px 0 12px;
+    list-style: none; padding: 10px 16px 16px;
   }
   .mobile-nav a {
-    display: flex; align-items: center; min-height: 46px;
-    padding: 0 20px; font-size: 14.5px; font-weight: 600; color: var(--ink-2);
-    border-radius: 8px; margin: 0 8px;
+    display: flex; align-items: center; gap: 12px; min-height: 48px;
+    padding: 0 14px; font-size: 14.5px; font-weight: 600; color: var(--ink-2);
+    border-radius: 10px; position: relative;
+  }
+  .mobile-nav a::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--line); flex-shrink: 0; transition: background .15s ease;
   }
   .mobile-nav a:hover { background: var(--bg-soft); color: var(--brand); }
-  .mobile-nav .btn { margin: 10px 16px 4px; width: calc(100% - 32px); justify-content: center; min-height: 46px; }
+  .mobile-nav a:hover::before { background: var(--brand); }
+  .mobile-nav a.active { color: var(--brand-dark); background: var(--brand-soft); }
+  .mobile-nav a.active::before { background: var(--brand); }
+  .mobile-nav .btn {
+    margin: 12px 0 4px; width: 100%; justify-content: center; min-height: 48px;
+    border-radius: 12px; font-size: 14.5px;
+  }
+  .mobile-nav .btn::before { display: none; }
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
     border: none; cursor: pointer;
@@ -434,7 +452,8 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
       </a>
       <button class="menu-btn" aria-label="Menu" aria-expanded="false" onclick="toggleMenu()">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        <svg class="menu-ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        <svg class="menu-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
   </div>
@@ -983,36 +1002,34 @@
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
   const header = document.querySelector('header.site');
+  const allNavLinks = document.querySelectorAll('.nav-link, .mobile-nav a[href^="#"]');
   const onScroll = function () {
     header.classList.toggle('scrolled', window.scrollY > 8);
-    const links = document.querySelectorAll('.nav-link');
     const sections = ['why', 'packages', 'incentives', 'products', 'certifications', 'contact'];
     let current = '';
     sections.forEach(function (id) {
       const el = document.getElementById(id);
       if (el && el.getBoundingClientRect().top <= 90) current = id;
     });
-    links.forEach(function (a) {
+    allNavLinks.forEach(function (a) {
       a.classList.toggle('active', a.getAttribute('href') === '#' + current);
     });
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
-  function toggleMenu() {
+  function setMenu(open) {
     const nav = document.getElementById('mobileNav');
     const btn = document.querySelector('.menu-btn');
-    const open = nav.classList.toggle('open');
-    btn.setAttribute('aria-expanded', open);
+    nav.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     document.body.style.overflow = open ? 'hidden' : '';
+  }
+  function toggleMenu() {
+    setMenu(!document.getElementById('mobileNav').classList.contains('open'));
   }
   document.querySelectorAll('.mobile-nav a').forEach(function (a) {
     a.addEventListener('click', function () {
-      const nav = document.getElementById('mobileNav');
-      if (nav.classList.contains('open')) {
-        nav.classList.remove('open');
-        document.querySelector('.menu-btn').setAttribute('aria-expanded', 'false');
-        document.body.style.overflow = '';
-      }
+      setMenu(false);
     });
   });
 </script>
