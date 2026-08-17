@@ -121,8 +121,6 @@
   .skip-link:focus { left: 0; }
   .nav-actions { display: flex; align-items: center; gap: 10px; }
   .nav-actions .btn { border-radius: 999px; }
-  .nav-actions .btn-outline { background: #fff; border: 1.5px solid var(--line); }
-  .nav-actions .btn-outline:hover { border-color: var(--brand); color: var(--brand); background: #fff; }
   .menu-btn {
     display: none; align-items: center; justify-content: center;
     width: 44px; height: 44px; flex-shrink: 0;
@@ -154,8 +152,6 @@
   .btn:active { transform: translateY(1px); }
   .btn-primary { background: var(--brand); color: #fff; }
   .btn-primary:hover { background: var(--brand-dark); }
-  .btn-outline { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
-  .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
   .btn-white { background: #fff; color: var(--brand); }
   .btn-white:hover { background: var(--brand-soft); }
   .btn-lg { padding: 14px 24px; font-size: 15px; border-radius: 12px; }
@@ -329,7 +325,6 @@
     .footer-grid { grid-template-columns: 1fr 1fr; }
     .hero .container { padding: 52px 20px 58px; }
     .brand-lockup { gap: 10px; }
-    .nav-actions .btn-outline { display: none; }
   }
   @media (max-width: 640px) {
     .container { padding: 0 16px; }
@@ -433,10 +428,6 @@
       </ul>
     </nav>
     <div class="nav-actions no-print">
-      <button class="btn btn-outline" onclick="window.print()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-        Print / PDF
-      </button>
       <a class="btn btn-primary" href="#contact">
         Become a Dealer
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
