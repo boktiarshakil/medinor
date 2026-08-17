@@ -7,7 +7,31 @@
 <meta name="description" content="Start a profitable medical equipment business in your area with MEDIRON. Dealer packages, product prices & MRP, specifications, incentives and certifications — from MMS Prime Ltd, the authorized distributor.">
 <meta property="og:title" content="Become a Mediron Authorized Dealer | MMS Prime Ltd">
 <meta property="og:description" content="Start a profitable medical equipment business in your area with MEDIRON. Attractive dealer margins, area protection, training & marketing support.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
+  @font-face {
+    font-family: 'PetitCochon';
+    src: url('/fonts/PetitCochon.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'BDSans';
+    src: url('/fonts/BDSans-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'BiroScript';
+    src: url('/fonts/BiroScript.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
   :root {
     --brand: #ff551f;
     --brand-dark: #e64210;
@@ -26,12 +50,16 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Bengali', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Bengali', sans-serif;
     color: var(--ink);
     background: var(--bg);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
+  .font-logo { font-family: 'PetitCochon', sans-serif; font-weight: 400; }
+  .font-brandname { font-family: 'BDSans', sans-serif; font-weight: 700; }
+  .font-tagline { font-family: 'BiroScript', sans-serif; }
+  .bengali { font-family: 'Noto Sans Bengali', 'Nirmala UI', 'Vrinda', sans-serif; }
   img { max-width: 100%; }
   .container { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
   a { color: var(--brand); text-decoration: none; }
@@ -58,11 +86,12 @@
     width: 42px; height: 42px; border-radius: 10px;
     background: var(--brand); color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px; font-weight: 800; letter-spacing: -.09em;
+    font-family: 'PetitCochon', sans-serif;
+    font-size: 22px; font-weight: 400; letter-spacing: -.09em;
     flex-shrink: 0;
   }
-  .brand-lockup .name { font-size: 15px; font-weight: 800; line-height: 1.1; color: var(--ink); }
-  .brand-lockup .tag { font-size: 11px; color: var(--ink-3); }
+  .brand-lockup .name { font-family: 'BDSans', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); }
+  .brand-lockup .tag { font-family: 'BiroScript', sans-serif; font-size: 11px; color: var(--ink-3); }
   .brand-lockup .divider { width: 1px; height: 30px; background: var(--line); }
   .brand-lockup .medi { font-size: 13px; font-weight: 800; color: var(--ink); letter-spacing: .06em; }
   nav ul { display: flex; list-style: none; gap: 22px; }
@@ -311,10 +340,10 @@
 <header class="site">
   <div class="container nav-wrap">
     <div class="brand-lockup">
-      <div class="brand-logo">mms.</div>
+      <div class="brand-logo font-logo">mms.</div>
       <div>
-        <div class="name">MMS Prime Ltd</div>
-        <div class="tag">Delivering Value Every Day</div>
+        <div class="name font-brandname">MMS Prime Ltd</div>
+        <div class="tag font-tagline">Delivering Value Every Day</div>
       </div>
       <div class="divider"></div>
       <div class="medi">MEDIRON</div>
@@ -793,7 +822,7 @@
 <!-- CTA -->
 <section id="contact" class="cta-band">
   <div class="container" style="padding:64px 20px;">
-    <h2>Become Our Dealer — আজই যোগাযোগ করুন</h2>
+    <h2>Become Our Dealer — <span class="bengali">আজই যোগাযোগ করুন</span></h2>
     <p>Share your name, district and mobile number — call us or message our hotline, and our team will guide you through your first order, incentives and dealer grade upgrade.</p>
     <div class="cta-contacts">
       <a class="contact-pill" href="tel:+8801612345678">📞 01612-345678</a>
@@ -819,10 +848,10 @@
     <div class="footer-grid">
       <div>
         <div class="brand-lockup" style="margin-bottom:12px;">
-          <div class="brand-logo">mms.</div>
+          <div class="brand-logo font-logo">mms.</div>
           <div>
-            <div class="name" style="color:#fff;">MMS Prime Ltd</div>
-            <div class="tag" style="color:rgba(255,255,255,.55);">Delivering Value Every Day</div>
+            <div class="name font-brandname" style="color:#fff;">MMS Prime Ltd</div>
+            <div class="tag font-tagline" style="color:rgba(255,255,255,.55);">Delivering Value Every Day</div>
           </div>
         </div>
         <p class="addr">Authorized distributor of MEDIRON medical devices.<br>Dealer recruitment for medical equipment retail,<br>pharmacy, hospital &amp; diagnostic channels.</p>
