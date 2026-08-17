@@ -98,6 +98,27 @@
   nav a { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
   nav a:hover { color: var(--brand); }
   .nav-actions { display: flex; align-items: center; gap: 10px; }
+  .menu-btn {
+    display: none; align-items: center; justify-content: center;
+    width: 44px; height: 44px; flex-shrink: 0;
+    background: #fff; border: 1.5px solid var(--line); border-radius: 10px;
+    color: var(--ink); cursor: pointer; padding: 0;
+  }
+  .menu-btn svg { pointer-events: none; }
+  .menu-btn:active { background: var(--bg-soft); }
+  .mobile-nav { display: none; }
+  .mobile-nav.open { display: block; }
+  .mobile-nav ul {
+    list-style: none; border-top: 1px solid var(--line);
+    background: #fff; padding: 8px 0 12px;
+  }
+  .mobile-nav a {
+    display: flex; align-items: center; min-height: 46px;
+    padding: 0 20px; font-size: 14.5px; font-weight: 600; color: var(--ink-2);
+    border-radius: 8px; margin: 0 8px;
+  }
+  .mobile-nav a:hover { background: var(--bg-soft); color: var(--brand); }
+  .mobile-nav .btn { margin: 10px 16px 4px; width: calc(100% - 32px); justify-content: center; min-height: 46px; }
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
     border: none; cursor: pointer;
@@ -273,18 +294,48 @@
   .print-fab:hover { background: var(--brand-dark); transform: translateY(-2px); }
 
   @media (max-width: 900px) {
+    nav.site-nav { display: none; }
+    .menu-btn { display: inline-flex; }
+    .topbar .container { justify-content: center; gap: 4px 18px; flex-wrap: wrap; }
     .why-grid { grid-template-columns: repeat(2, 1fr); }
     .pkg-grid { grid-template-columns: repeat(2, 1fr); }
     .cert-grid { grid-template-columns: repeat(2, 1fr); }
     .trust-grid { grid-template-columns: repeat(2, 1fr); }
     .footer-grid { grid-template-columns: 1fr 1fr; }
-    nav { display: none; }
+    .hero .container { padding: 52px 20px 58px; }
+    .brand-lockup .divider { display: none; }
+    .brand-lockup .medi { font-size: 12px; }
+    .nav-actions .btn-outline { display: none; }
   }
   @media (max-width: 640px) {
+    .container { padding: 0 16px; }
+    .topbar span { font-size: 11px; }
+    .brand-lockup { gap: 10px; }
+    .brand-logo { width: 38px; height: 38px; font-size: 20px; }
+    .brand-lockup .name { font-size: 13.5px; }
+    .brand-lockup .tag { font-size: 10px; }
     .why-grid, .inc-grid, .pkg-grid { grid-template-columns: 1fr; }
     section { padding: 44px 0; }
+    .section-head { margin-bottom: 28px; }
+    .hero h1 { font-size: clamp(26px, 7.4vw, 34px); }
+    .hero p.sub { font-size: 15px; }
+    .hero-meta { gap: 16px; margin-top: 28px; }
+    .hero-meta .m b { font-size: 20px; }
+    .hero-cta .btn { flex: 1 1 100%; justify-content: center; }
     .ptable { overflow-x: auto; }
-    .ptable table { min-width: 760px; }
+    .ptable table { min-width: 720px; }
+    .cert-grid, .trust-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .cert { padding: 18px 12px; }
+    .cert img { height: 46px; }
+    .cta-band .container { padding: 44px 16px; }
+    .footer-grid { grid-template-columns: 1fr; gap: 22px; }
+    .contact-pill { width: 100%; justify-content: center; }
+    .btn, .mobile-nav a, .contact-pill { min-height: 44px; }
+  }
+  @media (max-width: 400px) {
+    .brand-lockup .name { font-size: 12.5px; }
+    .nav-actions .btn { padding: 9px 12px; font-size: 12.5px; }
+    .pkg { padding: 20px 16px; }
   }
 
   /* ---------- PRINT ---------- */
@@ -348,7 +399,7 @@
       <div class="divider"></div>
       <div class="medi">MEDIRON</div>
     </div>
-    <nav>
+    <nav class="site-nav">
       <ul>
         <li><a href="#why">Why Mediron</a></li>
         <li><a href="#packages">Dealer Packages</a></li>
@@ -361,8 +412,22 @@
     <div class="nav-actions no-print">
       <button class="btn btn-outline" onclick="window.print()">🖨 Print / PDF</button>
       <a class="btn btn-primary" href="#contact">Become a Dealer</a>
+      <button class="menu-btn" aria-label="Menu" aria-expanded="false" onclick="toggleMenu()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
     </div>
   </div>
+  <nav class="mobile-nav" id="mobileNav">
+    <ul>
+      <li><a href="#why">Why Mediron</a></li>
+      <li><a href="#packages">Dealer Packages</a></li>
+      <li><a href="#incentives">Incentives</a></li>
+      <li><a href="#products">Prices &amp; Specs</a></li>
+      <li><a href="#certifications">Certifications</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li><a class="btn btn-primary" href="#contact">Become a Dealer</a></li>
+    </ul>
+  </nav>
 </header>
 
 <!-- Hero -->
@@ -891,6 +956,23 @@
 
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
+  function toggleMenu() {
+    const nav = document.getElementById('mobileNav');
+    const btn = document.querySelector('.menu-btn');
+    const open = nav.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  document.querySelectorAll('.mobile-nav a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      const nav = document.getElementById('mobileNav');
+      if (nav.classList.contains('open')) {
+        nav.classList.remove('open');
+        document.querySelector('.menu-btn').setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+      }
+    });
+  });
 </script>
 </body>
 </html>
