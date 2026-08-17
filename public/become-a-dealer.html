@@ -1022,7 +1022,6 @@
     const btn = document.querySelector('.menu-btn');
     nav.classList.toggle('open', open);
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    document.body.style.overflow = open ? 'hidden' : '';
   }
   function toggleMenu() {
     setMenu(!document.getElementById('mobileNav').classList.contains('open'));
