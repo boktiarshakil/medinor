@@ -6,8 +6,6 @@ import AppLayout from './components/Layout/AppLayout'
 // Pages
 import Home from './pages/Home'
 import Login from './pages/Login'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
 import Unauthorized from './pages/Unauthorized'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
@@ -55,8 +53,6 @@ export default function App() {
       {/* Public */}
       <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Home />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/forgot-password" element={user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
 
       {/* Protected */}
