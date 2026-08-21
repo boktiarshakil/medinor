@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation, Navigate } from 'react-router-dom'
+import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import { MdLock, MdEmail, MdVisibility, MdVisibilityOff } from 'react-icons/md'
@@ -89,6 +89,12 @@ export default function Login() {
                   {showPassword ? <MdVisibilityOff size={18} /> : <MdVisibility size={18} />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex justify-end -mt-1">
+              <Link to="/forgot-password" className="text-sm text-brand-500 hover:text-brand-600">
+                Forgot password?
+              </Link>
             </div>
 
             <button
