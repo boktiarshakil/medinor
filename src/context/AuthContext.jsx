@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase, getCurrentUser } from '../lib/supabase'
 import { registerServiceWorker, initPush } from '../lib/push'
 import { locationSharing } from '../lib/geo'
@@ -9,6 +10,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+  const navigate = useNavigate()
 
   const applyProfile = (profile) => {
     if (profile && profile.is_active === false) {
@@ -45,6 +47,11 @@ export function AuthProvider({ children }) {
     init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // A password recovery link was clicked — force the user to the reset page
+        navigate('/reset-password', { replace: true })
+        return
+      }
       if (event === 'SIGNED_IN') {
         try {
           const profile = await getCurrentUser()
