@@ -1,0 +1,9 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home13/mmsprimebd/public_html/
+    - export VITE_SUPABASE_URL=https://aqlscoocasgzyelotuop.supabase.co
+    - export VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbHNjb29jYXNnenllbG90dW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NTI1NDQsImV4cCI6MjEwMzEyODU0NH0.a8OPJNSsRnE8CYKTa9zB3B0neBjPi_9PxJdt756f5dM
+    - export VITE_VAPID_PUBLIC_KEY=BE7q1ZIZMPtvLrjUKqvxgD_pDjfTvwjx1G3P13sp1ZuZ1pMgOf0IltveuS2Vsqu_hxU0bwtkq9-k6cF6SoT9AZk
+    - npm install
+    - npm run build
+    - /bin/cp -R dist/* $DEPLOYPATH
