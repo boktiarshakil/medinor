@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import StatCard from '../../components/Dashboard/StatCard'
 import SalesChart from '../../components/Dashboard/SalesChart'
 import RecentOrdersTable from '../../components/Dashboard/RecentOrdersTable'
@@ -169,7 +170,7 @@ export default function SalesManagerDashboard() {
       <div className="card">
         <div className="p-5 pb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-900">Team Performance</h3>
-          <a href="/reports" className="text-xs font-semibold text-brand-600 hover:text-brand-700">Full Report →</a>
+          <Link to="/reports" className="text-xs font-semibold text-brand-600 hover:text-brand-700">Full Report →</Link>
         </div>
         {TEAM_PERFORMANCE.length === 0 ? (
           <div className="p-8 text-center">

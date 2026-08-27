@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../../lib/utils'
 import { paymentMethodLabel } from '../../lib/upload'
 import { api } from '../../lib/api'
@@ -138,37 +139,37 @@ export default function DealerDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <a href="/place-order" className="card p-4 flex flex-col items-center gap-2 card-hover">
+        <Link to="/place-order" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center">
             <MdShoppingCart size={20} className="text-brand-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">Place Order</span>
-        </a>
-        <a href="/payments" className="card p-4 flex flex-col items-center gap-2 card-hover">
+        </Link>
+        <Link to="/payments" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
             <MdPayment size={20} className="text-emerald-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">Pay Now</span>
-        </a>
-        <a href="/my-orders" className="card p-4 flex flex-col items-center gap-2 card-hover">
+        </Link>
+        <Link to="/my-orders" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
             <MdReceipt size={20} className="text-blue-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">Order History</span>
-        </a>
-        <a href="/payments" className="card p-4 flex flex-col items-center gap-2 card-hover">
+        </Link>
+        <Link to="/payments" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
             <MdAssessment size={20} className="text-purple-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">Ledger</span>
-        </a>
+        </Link>
       </div>
 
       {/* Recent Orders */}
       <div className="card">
         <div className="p-5 pb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-900">Recent Orders</h3>
-          <a href="/my-orders" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</a>
+          <Link to="/my-orders" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</Link>
         </div>
         {myOrders.length === 0 ? (
           <div className="p-8 text-center">
@@ -205,7 +206,7 @@ export default function DealerDashboard() {
       <div className="card">
         <div className="p-5 pb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-900">Recent Payments</h3>
-          <a href="/payments" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</a>
+          <Link to="/payments" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</Link>
         </div>
         {recentPayments.length === 0 ? (
           <div className="p-8 text-center">

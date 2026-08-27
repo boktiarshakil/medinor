@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { formatCurrency, formatDate, todayRange, thisMonthRange } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
@@ -228,18 +229,18 @@ export default function SalesExecDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <a href="/place-order" className="card p-4 flex flex-col items-center gap-2 card-hover">
+        <Link to="/place-order" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center">
             <MdShoppingCart size={20} className="text-brand-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">New Order</span>
-        </a>
-        <a href="/collections" className="card p-4 flex flex-col items-center gap-2 card-hover">
+        </Link>
+        <Link to="/collections" className="card p-4 flex flex-col items-center gap-2 card-hover">
           <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
             <MdReceipt size={20} className="text-emerald-600" />
           </div>
           <span className="text-xs font-semibold text-gray-700">Collection</span>
-        </a>
+        </Link>
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import OrgHierarchy from '../../components/OrgChart/OrgHierarchy'
 import { formatCurrency, formatNumber, calcPercent, todayRange, thisMonthRange, buildProductsMap, orderCompanyShare } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { Link } from 'react-router-dom'
 import {
   MdAttachMoney, MdShoppingCart, MdPeople, MdInventory2,
   MdTrendingUp, MdWarning, MdStore, MdAssessment,
@@ -208,16 +209,16 @@ export default function SuperAdminDashboard() {
         ].map((action, i) => {
           const Icon = action.icon
           return (
-            <a
+            <Link
               key={i}
-              href={action.path}
+              to={action.path}
               className="card p-3 flex flex-col items-center gap-1.5 card-hover relative"
             >
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${action.color}`}>
                 <Icon size={18} />
               </div>
               <span className="text-[10px] font-semibold text-gray-700 text-center leading-tight">{action.label}</span>
-            </a>
+            </Link>
           )
         })}
       </div>
@@ -330,9 +331,9 @@ export default function SuperAdminDashboard() {
             <MdShoppingBag className="text-brand-500" size={18} />
             Cash on Delivery
           </h3>
-          <a href="/cod-requests" className="text-xs font-semibold text-brand-600 flex items-center gap-0.5">
+          <Link to="/cod-requests" className="text-xs font-semibold text-brand-600 flex items-center gap-0.5">
             Manage Requests <MdArrowForward size={13} />
-          </a>
+          </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
@@ -376,24 +377,24 @@ export default function SuperAdminDashboard() {
       <div className="card p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-3">Quick Actions</h3>
         <div className="flex flex-wrap gap-2">
-          <a href="/orders" className="btn-primary text-xs">
+          <Link to="/orders" className="btn-primary text-xs">
             <MdShoppingCart size={14} /> New Order
-          </a>
-          <a href="/dealers" className="btn-secondary text-xs">
+          </Link>
+          <Link to="/dealers" className="btn-secondary text-xs">
             <MdStore size={14} /> Add Dealer
-          </a>
-          <a href="/inventory" className="btn-secondary text-xs">
+          </Link>
+          <Link to="/inventory" className="btn-secondary text-xs">
             <MdInventory2 size={14} /> Manage Stock
-          </a>
-          <a href="/announcements" className="btn-secondary text-xs">
+          </Link>
+          <Link to="/announcements" className="btn-secondary text-xs">
             <MdCampaign size={14} /> Send Announcement
-          </a>
-          <a href="/warranty" className="btn-secondary text-xs">
+          </Link>
+          <Link to="/warranty" className="btn-secondary text-xs">
             <MdQrCode size={14} /> Warranty Check
-          </a>
-          <a href="/reports" className="btn-secondary text-xs">
+          </Link>
+          <Link to="/reports" className="btn-secondary text-xs">
             <MdAssessment size={14} /> View Reports
-          </a>
+          </Link>
         </div>
       </div>
     </div>

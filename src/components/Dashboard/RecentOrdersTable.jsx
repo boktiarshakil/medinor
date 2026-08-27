@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { formatCurrency, formatDate, statusColor, statusLabel } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { MdShoppingCart } from 'react-icons/md'
@@ -39,7 +40,7 @@ export default function RecentOrdersTable({ orders: propOrders, limit = 5 }) {
     <div className="card">
       <div className="flex items-center justify-between p-5 pb-3">
         <h3 className="text-sm font-bold text-gray-900">Recent Orders</h3>
-        <a href="/orders" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</a>
+        <Link to="/orders" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All →</Link>
       </div>
       {display.length === 0 ? (
         <div className="p-8 text-center">
