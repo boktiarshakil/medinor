@@ -153,7 +153,7 @@ export default function Home() {
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-2xl mb-6 shadow-xl shadow-brand-900/20">
             <span className="font-logo text-5xl leading-none text-brand-500 select-none tracking-[-0.09em]">mms.</span>
           </div>
-          <h1 className="font-brandname text-4xl md:text-5xl font-bold text-white uppercase tracking-wide">MMS Prime Ltd</h1>
+          <h1 className="font-brandname text-4xl md:text-5xl font-bold text-white uppercase tracking-wide">MMS Prime</h1>
           <p className="font-tagline text-xl md:text-2xl text-white italic mt-3 uppercase">Delivering Value Every Day</p>
           <p className="max-w-2xl mx-auto text-white/85 mt-5 text-sm md:text-base leading-relaxed">
             A trusted multi-category distribution company bringing quality products to businesses
@@ -310,7 +310,7 @@ export default function Home() {
             <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">About MMS Prime</h2>
             <p className="text-sm text-gray-500 uppercase font-tagline mt-1 italic">Delivering Value Every Day</p>
             <p className="text-sm text-gray-600 leading-relaxed mt-5">
-              MMS Prime Ltd is a growing distribution company serving retail partners, dealers, and
+              MMS Prime is a growing distribution company serving retail partners, dealers, and
               end customers with a carefully selected catalog. We believe in value beyond the product —
               honest pricing, steady supply, and dependable service on every delivery.
             </p>
@@ -363,10 +363,13 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6 text-white">
             <div className="flex items-center gap-2 text-sm">
-              <MdPhone size={16} /> +880 1XXX-XXXXXX
+              <MdPhone size={16} /> +880 1790-606057
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <MdEmail size={16} /> info@mmsprime.com
+              <MdPhone size={16} /> +880 1818-276424
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <MdEmail size={16} /> mmsprimebd@gmail.com
             </div>
           </div>
           {!user && (
@@ -387,9 +390,9 @@ export default function Home() {
             <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
               <span className="font-logo text-base leading-none text-white select-none tracking-[-0.09em]">mms.</span>
             </div>
-            <span className="font-brandname text-sm font-bold text-white uppercase tracking-wide">MMS Prime Ltd</span>
+            <span className="font-brandname text-sm font-bold text-white uppercase tracking-wide">MMS Prime</span>
           </div>
-          <p className="text-xs text-gray-400">© {new Date().getFullYear()} MMS Prime Ltd. All rights reserved.</p>
+          <p className="text-xs text-gray-400">© {new Date().getFullYear()} MMS Prime. All rights reserved.</p>
         </div>
       </footer>
 

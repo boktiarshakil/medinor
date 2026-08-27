@@ -44,7 +44,7 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="bg-brand-500 rounded-2xl px-8 py-7 mb-4 shadow-lg shadow-brand-500/20">
             <div className="font-logo text-6xl leading-none text-white select-none tracking-[-0.09em]">mms.</div>
-            <div className="font-brandname text-xl font-bold text-black uppercase tracking-[0.12em] mt-3">MMS Prime Ltd</div>
+            <div className="font-brandname text-xl font-bold text-black uppercase tracking-[0.12em] mt-3">MMS Prime</div>
             <div className="font-tagline text-[15px] text-black uppercase tracking-[0.1008em] mt-1.5">Delivering Value Every Day</div>
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © {new Date().getFullYear()} MMS Prime Ltd. All rights reserved.
+          © {new Date().getFullYear()} MMS Prime. All rights reserved.
         </p>
       </div>
     </div>
