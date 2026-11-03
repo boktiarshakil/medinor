@@ -75,13 +75,34 @@ export const api = {
 
   // ---- Products ----
 
+  // Older rows store image_url as a JSON-array string, e.g.
+  // '["https://i.ibb.co/...png","/uploads/products/....png"]'.
+  // Browsers cannot load that whole string as an <img> src, so
+  // normalize to the first entry (the ImgBB photo) for display.
+  // New uploads already store a single URL string.
+  normalizeImageUrl(value) {
+    if (!value) return ''
+    if (Array.isArray(value)) return value[0] || ''
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed)
+          if (Array.isArray(parsed)) return parsed[0] || ''
+        } catch { /* fall through to raw string */ }
+      }
+      return trimmed
+    }
+    return ''
+  },
+
   async getProducts() {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .order('name')
     if (error) throw error
-    return data || []
+    return (data || []).map(p => ({ ...p, image_url: this.normalizeImageUrl(p.image_url) }))
   },
 
   async createProduct(product) {
