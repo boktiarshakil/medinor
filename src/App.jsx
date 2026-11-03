@@ -5,6 +5,7 @@ import AppLayout from './components/Layout/AppLayout'
 
 // Pages
 import Home from './pages/Home'
+import CompanyProfile from './pages/CompanyProfile'
 import Login from './pages/Login'
 import Unauthorized from './pages/Unauthorized'
 import Dashboard from './pages/Dashboard'
@@ -52,6 +53,7 @@ export default function App() {
     <Routes>
       {/* Public */}
       <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Home />} />
+      <Route path="/company-profile" element={<CompanyProfile />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
 

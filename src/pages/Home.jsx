@@ -6,7 +6,8 @@ import { formatCurrency } from '../lib/utils'
 import toast from 'react-hot-toast'
 import {
   MdSearch, MdShield, MdVerified, MdLocalShipping, MdPhone, MdEmail, MdArrowForward,
-  MdAdd, MdRemove, MdCheckCircle, MdShoppingCart, MdCall
+  MdAdd, MdRemove, MdCheckCircle, MdShoppingCart, MdCall, MdVisibility, MdFlag,
+  MdClose, MdChevronLeft, MdChevronRight, MdDownload
 } from 'react-icons/md'
 
 const BRAND = '#ff551f'
@@ -17,6 +18,14 @@ const CATEGORY_LABELS = {
   'bp': 'Blood Pressure',
   'lancet': 'Lancets & Accessories',
 }
+
+const MANAGEMENT = [
+  { name: 'Ahsan Abdullah', role: 'Chairman', initials: 'AA' },
+  { name: 'Monoauar Hossain Moinul', role: 'Managing Director', initials: 'MM' },
+  { name: 'Michael Chowdhury', role: 'Executive Director', initials: 'MC' },
+  { name: 'Md Saidur Rahman', role: 'Operations Director', initials: 'SR' },
+  { name: 'Ikramul Islam Chowdhury', role: 'Director Admin', initials: 'IC' },
+]
 
 export default function Home() {
   const navigate = useNavigate()
@@ -30,6 +39,7 @@ export default function Home() {
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [checkout, setCheckout] = useState({ name: '', phone: '', address: '', notes: '' })
+  const [certIndex, setCertIndex] = useState(null)
 
   useEffect(() => {
     api.getProducts()
@@ -133,6 +143,8 @@ export default function Home() {
             <button onClick={() => scrollTo('home')} className="hover:text-brand-500">Home</button>
             <button onClick={() => scrollTo('products')} className="hover:text-brand-500">Products</button>
             <button onClick={() => scrollTo('about')} className="hover:text-brand-500">About</button>
+            <button onClick={() => scrollTo('management')} className="hover:text-brand-500">Team</button>
+            <button onClick={() => navigate('/company-profile')} className="hover:text-brand-500">Company Profile</button>
             <button onClick={() => scrollTo('contact')} className="hover:text-brand-500">Contact</button>
           </nav>
           {user ? (
@@ -310,8 +322,9 @@ export default function Home() {
             <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">About MMS Prime</h2>
             <p className="text-sm text-gray-500 uppercase font-tagline mt-1 italic">Delivering Value Every Day</p>
             <p className="text-sm text-gray-600 leading-relaxed mt-5">
-              MMS Prime is a growing distribution company serving retail partners, dealers, and
-              end customers with a carefully selected catalog. We believe in value beyond the product —
+              MMS Prime is a professionally managed healthcare, medical equipment, and cosmetic
+              distribution company serving people, healthcare professionals, institutions, and
+              businesses across Bangladesh. We believe in value beyond the product —
               honest pricing, steady supply, and dependable service on every delivery.
             </p>
             <div className="grid grid-cols-3 gap-4 mt-8">
@@ -352,6 +365,157 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Company Profile teaser */}
+      <section className="max-w-6xl mx-auto px-4 py-14">
+        <div className="text-center mb-8">
+          <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">Company Profile</h2>
+          <p className="text-sm text-gray-600 leading-relaxed mt-4 max-w-3xl mx-auto">
+            MMS Prime is a Bangladesh-based importer, distributor, and market-development company
+            specializing in healthcare products, medical equipment, and cosmetic products — and the
+            nationwide distributor and marketer of MEDIRON® medical equipment.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="card p-5 text-center">
+            <p className="text-2xl font-bold text-brand-500">5</p>
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide mt-1">DGDA-registered categories</p>
+          </div>
+          <div className="card p-5 text-center">
+            <p className="text-2xl font-bold text-brand-500">3 Yrs</p>
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide mt-1">Warranty on BP monitors &amp; nebulizer</p>
+          </div>
+          <div className="card p-5 text-center">
+            <p className="text-2xl font-bold text-brand-500">Lifetime</p>
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide mt-1">Warranty on glucose meter</p>
+          </div>
+          <div className="card p-5 text-center">
+            <p className="text-2xl font-bold text-brand-500">Nationwide</p>
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide mt-1">Distribution across Bangladesh</p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
+          <button className="btn-primary" onClick={() => navigate('/company-profile')}>
+            View Full Company Profile
+          </button>
+          <a href="/company-profile.pdf" target="_blank" rel="noopener noreferrer" className="btn-secondary">
+            Download Profile (PDF)
+          </a>
+        </div>
+      </section>
+
+      {/* Vision & Mission */}
+      <section id="vision" className="bg-surface-50 border-y border-gray-100 py-14">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">Purpose That Guides Us</h2>
+            <p className="text-sm text-gray-500 mt-2">Building a trusted healthcare distribution platform for Bangladesh</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="card p-7 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-brand-500" />
+              <div className="w-11 h-11 bg-brand-50 rounded-xl flex items-center justify-center mb-4">
+                <MdVisibility size={22} className="text-brand-500" />
+              </div>
+              <p className="text-[11px] font-bold text-brand-500 uppercase tracking-widest">Our Vision</p>
+              <h3 className="text-lg font-bold text-gray-900 mt-1">A trusted national platform</h3>
+              <p className="text-sm text-gray-600 leading-relaxed mt-3">
+                To build a trusted and professionally managed healthcare, medical equipment, and
+                cosmetic distribution platform in Bangladesh by making quality products more
+                accessible to people, healthcare professionals, institutions, and businesses.
+              </p>
+            </div>
+            <div className="card p-7 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-brand-500" />
+              <div className="w-11 h-11 bg-brand-50 rounded-xl flex items-center justify-center mb-4">
+                <MdFlag size={22} className="text-brand-500" />
+              </div>
+              <p className="text-[11px] font-bold text-brand-500 uppercase tracking-widest">Our Mission</p>
+              <h3 className="text-lg font-bold text-gray-900 mt-1">Import. Distribute. Serve.</h3>
+              <p className="text-sm text-gray-600 leading-relaxed mt-3">
+                To import, distribute, and market reliable healthcare, medical equipment, and
+                cosmetic products through professional service, responsible business practices,
+                integrated sales channels, and a strong nationwide network.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Management */}
+      <section id="management" className="max-w-6xl mx-auto px-4 py-14">
+        <div className="text-center mb-10">
+          <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">Our Management</h2>
+          <p className="text-sm text-gray-500 mt-2">Leadership committed to professional service and responsible growth</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {MANAGEMENT.map(person => (
+            <div key={person.name} className="card card-hover p-6 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-brand-500 text-white flex items-center justify-center font-brandname text-lg font-bold tracking-wide shadow-lg shadow-brand-500/20">
+                {person.initials}
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mt-4 leading-snug">{person.name}</h3>
+              <p className="text-[11px] font-medium text-brand-500 uppercase tracking-wide mt-1">{person.role}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Certifications */}
+      <section id="certifications" className="bg-surface-50 border-y border-gray-100 py-14">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <h2 className="font-brandname text-2xl md:text-3xl font-bold text-gray-900 uppercase tracking-wide">Certifications &amp; Registrations</h2>
+            <p className="text-sm text-gray-500 mt-2">DGDA registered medical devices — quality you can verify</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map(n => (
+              <button key={n} type="button" onClick={() => setCertIndex(n)} className="card card-hover overflow-hidden group text-left">
+                <div className="aspect-[3/4] bg-gray-50 overflow-hidden">
+                  <img src={`/certificates/cert-${n}-thumb.jpg`} alt={`Certificate ${n}`} className="w-full h-full object-cover object-top group-hover:scale-[1.03] transition-transform" loading="lazy" />
+                </div>
+                <div className="p-3 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-gray-700">Certificate {n}</span>
+                  <MdVisibility size={14} className="text-brand-500" />
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <a href="/certificates/mediron-certificates.pdf" target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex text-sm">
+              <MdDownload size={16} /> Download all certificates (PDF)
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Certificate lightbox */}
+      {certIndex !== null && (
+        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4" onClick={() => setCertIndex(null)}>
+          <div className="relative w-full max-w-3xl max-h-[92vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-white">Certificate {certIndex} of 5</p>
+              <div className="flex items-center gap-2">
+                <a href="/certificates/mediron-certificates.pdf" download className="text-xs font-semibold text-white bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 flex items-center gap-1">
+                  <MdDownload size={14} /> PDF
+                </a>
+                <button type="button" aria-label="Close" onClick={() => setCertIndex(null)} className="p-1.5 text-white bg-white/15 hover:bg-white/25 rounded-lg">
+                  <MdClose size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              <img src={`/certificates/cert-${certIndex}.jpg`} alt={`Certificate ${certIndex}`} className="w-full max-h-[82vh] object-contain rounded-lg bg-white" />
+              <button type="button" aria-label="Previous certificate" onClick={() => setCertIndex((certIndex - 1 + 5) % 5 || 5)} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 text-white bg-black/50 hover:bg-black/70 rounded-lg">
+                <MdChevronLeft size={22} />
+              </button>
+              <button type="button" aria-label="Next certificate" onClick={() => setCertIndex((certIndex % 5) + 1)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-white bg-black/50 hover:bg-black/70 rounded-lg">
+                <MdChevronRight size={22} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CTA / Contact */}
       <section id="contact" className="bg-brand-500 py-14">
