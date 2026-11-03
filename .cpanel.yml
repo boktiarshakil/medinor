@@ -2,7 +2,7 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home13/mmsprimebd/public_html/
     - export VITE_SUPABASE_URL=https://jxejieirdqtepcylfpae.supabase.co
-    - export VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4ZWppZWlyZHF0ZXBjeWxmcGFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MTQxNDcsImV4cCI6MjEwMzM5MDE0N30.CXowo-yMv5_LFoBGW7q_WdOnD47DUL3Cl_G
+    - export VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4ZWppZWlyZHF0ZXBjeWxmcGFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MTQxNDcsImV4cCI6MjEwMzM5MDE0N30.CXowo-yMv5_LFoBGW7q_WdOnD47DUL3Cl_GY1utNFkI
     - export VITE_VAPID_PUBLIC_KEY=BE7q1ZIZMPtvLrjUKqvxgD_pDjfTvwjx1G3P13sp1ZuZ1pMgOf0IltveuS2Vsqu_hxU0bwtkq9-k6cF6SoT9AZk
     - npm install
     - npm run build
