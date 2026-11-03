@@ -5,9 +5,74 @@ import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canS
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock, MdClose, MdImage, MdCloudUpload } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { uploadToImgBB } from '../lib/upload'
+import { uploadToWebsite } from '../lib/upload'
 import toast from 'react-hot-toast'
 import BlurredValue from '../components/BlurredValue'
+
+// Multi-photo editor for the product forms: thumbnails with remove
+// and set-as-main, uploads go to the website (not ImgBB).
+function ProductImagesEditor({ images, onImagesChange, uploading, onUploadFiles }) {
+  const inputRef = useRef(null)
+  const moveToFront = (idx) => {
+    if (idx === 0) return
+    const next = [...images]
+    const [item] = next.splice(idx, 1)
+    next.unshift(item)
+    onImagesChange(next)
+  }
+  const removeAt = (idx) => onImagesChange(images.filter((_, i) => i !== idx))
+  return (
+    <div>
+      <label className="label">Product Images</label>
+      <div className="flex flex-wrap gap-3">
+        {images.map((url, idx) => (
+          <div key={url + '-' + idx} className="flex flex-col items-center gap-1">
+            <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+              <img src={url} alt={'Photo ' + (idx + 1)} className="w-full h-full object-cover" />
+              {idx === 0 && (
+                <span className="absolute top-0 left-0 bg-brand-500 text-white text-[9px] px-1 py-0.5 rounded-br-lg">Main</span>
+              )}
+              <button
+                type="button"
+                onClick={() => removeAt(idx)}
+                className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-0.5"
+              >
+                <MdClose size={12} />
+              </button>
+            </div>
+            {idx !== 0 && (
+              <button type="button" onClick={() => moveToFront(idx)} className="text-[10px] text-brand-600 hover:underline">
+                Make main
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand-400 hover:text-brand-500 transition-colors disabled:opacity-50"
+        >
+          {uploading ? (
+            <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+          ) : (
+            <MdCloudUpload size={20} />
+          )}
+        </button>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={(e) => { onUploadFiles(e.target.files); e.target.value = '' }}
+        className="hidden"
+      />
+      <p className="text-xs text-gray-500 mt-1.5">{uploading ? 'Uploading...' : 'Click to upload photos (max 5MB each)'}</p>
+      <p className="text-[10px] text-gray-400 mt-0.5">Saved on mmsprime.bd</p>
+    </div>
+  )
+}
 
 export default function Products() {
   const { user, role } = useAuth()
@@ -20,56 +85,64 @@ export default function Products() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
-  const fileInputRef = useRef(null)
-  const editFileInputRef = useRef(null)
   const [editingProduct, setEditingProduct] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [newProduct, setNewProduct] = useState({
-    name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: ''
+    name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: []
   })
 
   useEffect(() => {
     fetchProducts()
   }, [])
 
-  const handleImageSelect = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB')
-      return
-    }
+  const handleImageSelect = async (files) => {
+    const list = Array.from(files || [])
+    if (!list.length) return
     setUploadingImage(true)
+    let done = 0
     try {
-      const url = await uploadToImgBB(file)
-      setNewProduct(prev => ({ ...prev, image_url: url }))
-      toast.success('Image uploaded')
-    } catch (err) {
-      toast.error('Image upload failed: ' + err.message)
+      for (const file of list) {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`"${file.name}" is over 5MB — skipped`)
+          continue
+        }
+        try {
+          const url = await uploadToWebsite(file)
+          setNewProduct(prev => ({ ...prev, images: [...prev.images, url] }))
+          done += 1
+        } catch (err) {
+          toast.error('Image upload failed: ' + err.message)
+        }
+      }
+      if (done) toast.success(done > 1 ? `${done} photos uploaded` : 'Photo uploaded')
     } finally {
       setUploadingImage(false)
     }
   }
 
-  const handleEditImageSelect = async (e) => {
-    const file = e.target.files?.[0]
-    const input = e.target
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB')
-      return
-    }
+  const handleEditImageSelect = async (files) => {
+    const list = Array.from(files || [])
+    if (!list.length) return
     setUploadingImage(true)
+    let done = 0
     try {
-      const url = await uploadToImgBB(file)
-      setEditingProduct(prev => prev ? ({ ...prev, image_url: url }) : prev)
-      toast.success('Image uploaded')
-    } catch (err) {
-      toast.error('Image upload failed: ' + err.message)
+      for (const file of list) {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`"${file.name}" is over 5MB — skipped`)
+          continue
+        }
+        try {
+          const url = await uploadToWebsite(file)
+          setEditingProduct(prev => prev ? ({ ...prev, images: [...prev.images, url] }) : prev)
+          done += 1
+        } catch (err) {
+          toast.error('Image upload failed: ' + err.message)
+        }
+      }
+      if (done) toast.success(done > 1 ? `${done} photos uploaded` : 'Photo uploaded')
     } finally {
       setUploadingImage(false)
-      input.value = ''
     }
   }
 
@@ -89,7 +162,7 @@ export default function Products() {
       if (newProduct.trade_price) productPayload.trade_price = Number(newProduct.trade_price)
       if (newProduct.dealer_price) productPayload.dealer_price = Number(newProduct.dealer_price)
       if (newProduct.purchase_price) productPayload.purchase_price = Number(newProduct.purchase_price)
-      if (newProduct.image_url) productPayload.image_url = newProduct.image_url
+      if (newProduct.images.length) productPayload.image_url = JSON.stringify(newProduct.images)
       const created = await api.createProduct(productPayload)
       if (newProduct.stock && created) {
         await api.addStockMovement({ product_id: created.id, movement_type: 'in', quantity: Number(newProduct.stock), reference_type: 'opening_stock', notes: 'Initial stock' })
@@ -101,7 +174,7 @@ export default function Products() {
         }
       }
       toast.success(`Product "${newProduct.name}" created`)
-      setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' })
+      setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [] })
       setShowCreate(false)
       fetchProducts()
     } catch (err) {
@@ -123,7 +196,7 @@ export default function Products() {
       purchase_price: product.purchase_price || '',
       stock: product.stock || '',
       status: product.status || 'active',
-      image_url: product.image_url || '',
+      images: product.images?.length ? [...product.images] : (product.image_url ? [product.image_url] : []),
     })
   }
 
@@ -141,7 +214,7 @@ export default function Products() {
       if (editingProduct.trade_price) payload.trade_price = Number(editingProduct.trade_price)
       if (editingProduct.dealer_price) payload.dealer_price = Number(editingProduct.dealer_price)
       if (editingProduct.purchase_price) payload.purchase_price = Number(editingProduct.purchase_price)
-      payload.image_url = editingProduct.image_url || ''
+      payload.image_url = editingProduct.images.length ? JSON.stringify(editingProduct.images) : ''
       payload.status = editingProduct.status || 'active'
       await api.updateProduct(editingProduct.id, payload)
       toast.success(`Product "${editingProduct.name}" updated`)
@@ -244,8 +317,11 @@ export default function Products() {
           <div key={product.id} className="card card-hover overflow-hidden">
             {/* Product image */}
             {product.image_url ? (
-              <div className="aspect-[4/3] overflow-hidden bg-gray-50">
+              <div className="aspect-[4/3] overflow-hidden bg-gray-50 relative">
                 <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                {product.images?.length > 1 && (
+                  <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded">{product.images.length} photos</span>
+                )}
               </div>
             ) : (
               <div className="aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -351,55 +427,12 @@ export default function Products() {
                 <h3 className="text-sm font-bold text-gray-900">Add New Product</h3>
                 <p className="text-xs text-gray-500 mt-0.5">Create product in catalog</p>
               </div>
-              <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' }); }} className="p-1 text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [] }); }} className="p-1 text-gray-400 hover:text-gray-600">
                 <MdClose size={20} />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              {/* Image Upload */}
-              <div>
-                <label className="label">Product Image</label>
-                <div className="flex items-center gap-3">
-                  {newProduct.image_url ? (
-                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={newProduct.image_url} alt="Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setNewProduct(prev => ({ ...prev, image_url: '' }))}
-                        className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-0.5"
-                      >
-                        <MdClose size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingImage}
-                      className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand-400 hover:text-brand-500 transition-colors disabled:opacity-50"
-                    >
-                      {uploadingImage ? (
-                        <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
-                      ) : (
-                        <MdCloudUpload size={20} />
-                      )}
-                    </button>
-                  )}
-                  <div className="flex-1">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
-                    <p className="text-xs text-gray-500">
-                      {uploadingImage ? 'Uploading...' : 'Click to upload (max 5MB)'}
-                    </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">ImgBB hosted</p>
-                  </div>
-                </div>
-              </div>
+              <ProductImagesEditor images={newProduct.images} onImagesChange={(imgs) => setNewProduct(prev => ({ ...prev, images: imgs }))} uploading={uploadingImage} onUploadFiles={handleImageSelect} />
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="label">Product Name *</label>
@@ -443,7 +476,7 @@ export default function Products() {
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', image_url: '' }); }} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [] }); }} className="btn-secondary flex-1">Cancel</button>
                 <button onClick={handleCreate} disabled={!newProduct.name || creating} className="btn-primary flex-1 disabled:opacity-50">
                   {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Create Product</>}
                 </button>
@@ -467,50 +500,7 @@ export default function Products() {
               </button>
             </div>
             <div className="p-5 space-y-4">
-              {/* Image Upload */}
-              <div>
-                <label className="label">Product Image</label>
-                <div className="flex items-center gap-3">
-                  {editingProduct.image_url ? (
-                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={editingProduct.image_url} alt="Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setEditingProduct({ ...editingProduct, image_url: '' })}
-                        className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-0.5"
-                      >
-                        <MdClose size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => editFileInputRef.current?.click()}
-                      disabled={uploadingImage}
-                      className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand-400 hover:text-brand-500 transition-colors disabled:opacity-50"
-                    >
-                      {uploadingImage ? (
-                        <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
-                      ) : (
-                        <MdCloudUpload size={20} />
-                      )}
-                    </button>
-                  )}
-                  <div className="flex-1">
-                    <input
-                      ref={editFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleEditImageSelect}
-                      className="hidden"
-                    />
-                    <p className="text-xs text-gray-500">
-                      {uploadingImage ? 'Uploading...' : 'Click to upload (max 5MB)'}
-                    </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">ImgBB hosted</p>
-                  </div>
-                </div>
-              </div>
+              <ProductImagesEditor images={editingProduct.images} onImagesChange={(imgs) => setEditingProduct(prev => prev ? ({ ...prev, images: imgs }) : prev)} uploading={uploadingImage} onUploadFiles={handleEditImageSelect} />
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="label">Product Name *</label>

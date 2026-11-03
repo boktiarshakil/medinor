@@ -35,6 +35,7 @@ export default function Home() {
   const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
   const [cart, setCart] = useState({})
+  const [selectedImg, setSelectedImg] = useState({})
   const [showCheckout, setShowCheckout] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -254,13 +255,27 @@ export default function Home() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {filtered.map(product => (
                   <div key={product.id} className="card card-hover overflow-hidden">
-                    {product.image_url ? (
+                    {(product.image_url || product.images?.length) ? (
                       <div className="aspect-[4/3] bg-gray-50 overflow-hidden">
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                        <img src={product.images?.length ? (product.images[selectedImg[product.id] || 0] || product.images[0]) : product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
                       </div>
                     ) : (
                       <div className="aspect-[4/3] bg-gradient-to-br from-brand-50 to-brand-100 flex items-center justify-center">
                         <span className="font-logo text-3xl text-brand-500 select-none tracking-[-0.09em]">mms.</span>
+                      </div>
+                    )}
+                    {product.images?.length > 1 && (
+                      <div className="flex gap-1.5 px-3 pt-2">
+                        {product.images.map((u, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setSelectedImg(prev => ({ ...prev, [product.id]: i }))}
+                            className={`w-10 h-10 rounded-md overflow-hidden border-2 ${(selectedImg[product.id] || 0) === i ? 'border-brand-500' : 'border-transparent'}`}
+                          >
+                            <img src={u} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          </button>
+                        ))}
                       </div>
                     )}
                     <div className="p-4">

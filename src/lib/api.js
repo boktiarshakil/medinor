@@ -75,25 +75,30 @@ export const api = {
 
   // ---- Products ----
 
-  // Older rows store image_url as a JSON-array string, e.g.
-  // '["https://i.ibb.co/...png","/uploads/products/....png"]'.
-  // Browsers cannot load that whole string as an <img> src, so
-  // normalize to the first entry (the ImgBB photo) for display.
-  // New uploads already store a single URL string.
-  normalizeImageUrl(value) {
-    if (!value) return ''
-    if (Array.isArray(value)) return value[0] || ''
+  // A product's photos live in image_url: either a JSON-array string
+  // (the gallery format — old rows already used it, e.g.
+  // '["https://i.ibb.co/...png","/uploads/products/....png"]') or a
+  // single URL string. parseImageList returns the full list; the
+  // first entry is the main photo used for display.
+  parseImageList(value) {
+    if (!value) return []
+    if (Array.isArray(value)) return value.filter(Boolean)
     if (typeof value === 'string') {
       const trimmed = value.trim()
       if (trimmed.startsWith('[')) {
         try {
           const parsed = JSON.parse(trimmed)
-          if (Array.isArray(parsed)) return parsed[0] || ''
-        } catch { /* fall through to raw string */ }
+          if (Array.isArray(parsed)) return parsed.filter(Boolean)
+        } catch { /* fall through to single URL */ }
       }
-      return trimmed
+      return trimmed ? [trimmed] : []
     }
-    return ''
+    return []
+  },
+
+  // Main photo for display: the first entry of the photo list.
+  normalizeImageUrl(value) {
+    return this.parseImageList(value)[0] || ''
   },
 
   async getProducts() {
@@ -102,7 +107,11 @@ export const api = {
       .select('*')
       .order('name')
     if (error) throw error
-    return (data || []).map(p => ({ ...p, image_url: this.normalizeImageUrl(p.image_url) }))
+    return (data || []).map(p => ({
+      ...p,
+      images: this.parseImageList(p.image_url),
+      image_url: this.normalizeImageUrl(p.image_url),
+    }))
   },
 
   async createProduct(product) {
