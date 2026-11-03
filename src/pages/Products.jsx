@@ -21,6 +21,7 @@ export default function Products() {
   const [creating, setCreating] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef(null)
+  const editFileInputRef = useRef(null)
   const [editingProduct, setEditingProduct] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
@@ -48,6 +49,27 @@ export default function Products() {
       toast.error('Image upload failed: ' + err.message)
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  const handleEditImageSelect = async (e) => {
+    const file = e.target.files?.[0]
+    const input = e.target
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB')
+      return
+    }
+    setUploadingImage(true)
+    try {
+      const url = await uploadToImgBB(file)
+      setEditingProduct(prev => prev ? ({ ...prev, image_url: url }) : prev)
+      toast.success('Image uploaded')
+    } catch (err) {
+      toast.error('Image upload failed: ' + err.message)
+    } finally {
+      setUploadingImage(false)
+      input.value = ''
     }
   }
 
@@ -119,7 +141,7 @@ export default function Products() {
       if (editingProduct.trade_price) payload.trade_price = Number(editingProduct.trade_price)
       if (editingProduct.dealer_price) payload.dealer_price = Number(editingProduct.dealer_price)
       if (editingProduct.purchase_price) payload.purchase_price = Number(editingProduct.purchase_price)
-      if (editingProduct.image_url) payload.image_url = editingProduct.image_url
+      payload.image_url = editingProduct.image_url || ''
       payload.status = editingProduct.status || 'active'
       await api.updateProduct(editingProduct.id, payload)
       toast.success(`Product "${editingProduct.name}" updated`)
@@ -445,6 +467,50 @@ export default function Products() {
               </button>
             </div>
             <div className="p-5 space-y-4">
+              {/* Image Upload */}
+              <div>
+                <label className="label">Product Image</label>
+                <div className="flex items-center gap-3">
+                  {editingProduct.image_url ? (
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                      <img src={editingProduct.image_url} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct({ ...editingProduct, image_url: '' })}
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-0.5"
+                      >
+                        <MdClose size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand-400 hover:text-brand-500 transition-colors disabled:opacity-50"
+                    >
+                      {uploadingImage ? (
+                        <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin" />
+                      ) : (
+                        <MdCloudUpload size={20} />
+                      )}
+                    </button>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      ref={editFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEditImageSelect}
+                      className="hidden"
+                    />
+                    <p className="text-xs text-gray-500">
+                      {uploadingImage ? 'Uploading...' : 'Click to upload (max 5MB)'}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">ImgBB hosted</p>
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="label">Product Name *</label>
