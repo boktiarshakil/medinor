@@ -21,10 +21,10 @@ const CATEGORY_LABELS = {
 
 const MANAGEMENT = [
   { name: 'Ahsan Abdullah', role: 'Chairman', initials: 'AA' },
-  { name: 'Monoauar Hossain Moinul', role: 'Managing Director', initials: 'MM' },
-  { name: 'Michael Chowdhury', role: 'Executive Director', initials: 'MC' },
+  { name: 'Monoauar Hossain Moinul', role: 'Managing Director', initials: 'MM', photo: '/managers/monoauar-hossain-moinul.jpg' },
+  { name: 'Michael Chowdhury', role: 'Executive Director', initials: 'MC', photo: '/managers/michael-chowdhury.jpg' },
   { name: 'Md Saidur Rahman', role: 'Operations Director', initials: 'SR' },
-  { name: 'Ikramul Islam Chowdhury', role: 'Director Admin', initials: 'IC' },
+  { name: 'Ikramul Islam Chowdhury', role: 'Director Admin', initials: 'IC', photo: '/managers/ikramul-islam-chowdhury.jpg' },
 ]
 
 export default function Home() {
@@ -480,9 +480,13 @@ export default function Home() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {MANAGEMENT.map(person => (
             <div key={person.name} className="card card-hover p-6 text-center">
-              <div className="w-16 h-16 mx-auto rounded-full bg-brand-500 text-white flex items-center justify-center font-brandname text-lg font-bold tracking-wide shadow-lg shadow-brand-500/20">
-                {person.initials}
-              </div>
+              {person.photo ? (
+                <img src={person.photo} alt={person.name} className="w-16 h-16 mx-auto rounded-full object-cover shadow-lg shadow-brand-500/20" loading="lazy" />
+              ) : (
+                <div className="w-16 h-16 mx-auto rounded-full bg-brand-500 text-white flex items-center justify-center font-brandname text-lg font-bold tracking-wide shadow-lg shadow-brand-500/20">
+                  {person.initials}
+                </div>
+              )}
               <h3 className="text-sm font-semibold text-gray-900 mt-4 leading-snug">{person.name}</h3>
               <p className="text-[11px] font-medium text-brand-500 uppercase tracking-wide mt-1">{person.role}</p>
             </div>
