@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canSeePrice } from '../lib/utils'
+import { formatCurrency, statusColor, filterProductByRole, getPriceForRole, canSeePrice, effectivePrice, discountPercent, hasDiscount, round2 } from '../lib/utils'
 import { MdAdd, MdSearch, MdEdit, MdDelete, MdFilterList, MdInventory2, MdLock, MdClose, MdImage, MdCloudUpload } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
@@ -89,8 +89,35 @@ export default function Products() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [newProduct, setNewProduct] = useState({
-    name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: []
+    name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [], cod_price: '', discount_percent: ''
   })
+
+  // Keep cod_price and discount_percent in sync (same two-way rule as the
+  // pre-gallery live site): a % computes the COD price from MRP, a COD price
+  // computes the % from MRP, clearing either clears both. discount_percent is
+  // form-only — the products table stores cod_price, never a percent.
+  const syncPriceFields = (prev, patch) => {
+    const next = { ...prev, ...patch }
+    const mrp = Number(next.mrp) || 0
+    if ('discount_percent' in patch) {
+      const d = String(patch.discount_percent ?? '').trim()
+      if (d === '') { next.discount_percent = ''; next.cod_price = '' }
+      else {
+        const f = Math.min(99, Math.max(0, Number(d) || 0))
+        next.discount_percent = patch.discount_percent
+        next.cod_price = mrp > 0 && f > 0 ? String(round2(mrp * (1 - f / 100))) : ''
+      }
+    } else if ('cod_price' in patch) {
+      const d = String(patch.cod_price ?? '').trim()
+      if (d === '') { next.cod_price = ''; next.discount_percent = '' }
+      else {
+        const f = Number(d) || 0
+        next.cod_price = patch.cod_price
+        next.discount_percent = mrp > 0 && f > 0 && f < mrp ? String(discountPercent(mrp, f)) : ''
+      }
+    }
+    return next
+  }
 
   useEffect(() => {
     fetchProducts()
@@ -162,6 +189,7 @@ export default function Products() {
       if (newProduct.trade_price) productPayload.trade_price = Number(newProduct.trade_price)
       if (newProduct.dealer_price) productPayload.dealer_price = Number(newProduct.dealer_price)
       if (newProduct.purchase_price) productPayload.purchase_price = Number(newProduct.purchase_price)
+      if (newProduct.cod_price) productPayload.cod_price = Number(newProduct.cod_price)
       if (newProduct.images.length) productPayload.image_url = JSON.stringify(newProduct.images)
       const created = await api.createProduct(productPayload)
       if (newProduct.stock && created) {
@@ -174,7 +202,7 @@ export default function Products() {
         }
       }
       toast.success(`Product "${newProduct.name}" created`)
-      setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [] })
+      setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [], cod_price: '', discount_percent: '' })
       setShowCreate(false)
       fetchProducts()
     } catch (err) {
@@ -197,6 +225,8 @@ export default function Products() {
       stock: product.stock || '',
       status: product.status || 'active',
       images: product.images?.length ? [...product.images] : (product.image_url ? [product.image_url] : []),
+      cod_price: product.cod_price || '',
+      discount_percent: hasDiscount(product) ? String(discountPercent(product.mrp, product.cod_price)) : '',
     })
   }
 
@@ -214,6 +244,7 @@ export default function Products() {
       if (editingProduct.trade_price) payload.trade_price = Number(editingProduct.trade_price)
       if (editingProduct.dealer_price) payload.dealer_price = Number(editingProduct.dealer_price)
       if (editingProduct.purchase_price) payload.purchase_price = Number(editingProduct.purchase_price)
+      payload.cod_price = editingProduct.cod_price ? Number(editingProduct.cod_price) : null
       payload.image_url = editingProduct.images.length ? JSON.stringify(editingProduct.images) : ''
       payload.status = editingProduct.status || 'active'
       await api.updateProduct(editingProduct.id, payload)
@@ -342,7 +373,14 @@ export default function Products() {
                 {/* MRP always visible */}
                 <div>
                   <span className="text-gray-400">MRP</span>
-                  <p className="font-semibold text-gray-800">{formatCurrency(product.mrp)}</p>
+                  {hasDiscount(product) ? (
+                    <p>
+                      <span className="text-gray-400 line-through text-[11px]">{formatCurrency(product.mrp)}</span>
+                      <span className="block font-semibold text-brand-600">{formatCurrency(effectivePrice(product))}</span>
+                    </p>
+                  ) : (
+                    <p className="font-semibold text-gray-800">{formatCurrency(product.mrp)}</p>
+                  )}
                 </div>
 
                 {/* Dealer price — only for dealer role and above */}
@@ -376,6 +414,13 @@ export default function Products() {
                   <p className={`font-semibold ${(product.stock ?? 0) < 50 ? 'text-amber-600' : 'text-gray-800'}`}>{(product.stock ?? 0)} pcs</p>
                 </div>
               </div>
+
+              {hasDiscount(product) && (
+                <div className="text-xs mb-3">
+                  <span className="text-gray-400">COD Discount</span>
+                  <p className="font-semibold text-brand-600">{discountPercent(product.mrp, product.cod_price)}% OFF</p>
+                </div>
+              )}
 
               {/* Role-based price access indicator */}
               {role === 'sales_executive' && (
@@ -470,13 +515,29 @@ export default function Products() {
                     value={newProduct.purchase_price} onChange={(e) => setNewProduct({ ...newProduct, purchase_price: e.target.value })} />
                 </div>
                 <div>
+                  <label className="label">COD Price</label>
+                  <input type="number" min="0" className="input" placeholder="Selling price"
+                    value={newProduct.cod_price} onChange={(e) => setNewProduct(prev => syncPriceFields(prev, { cod_price: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="label">Discount %</label>
+                  <div className="relative">
+                    <input type="number" min="0" max="99" step="0.1" className="input pr-8" placeholder="0"
+                      value={newProduct.discount_percent} onChange={(e) => setNewProduct(prev => syncPriceFields(prev, { discount_percent: e.target.value }))} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                  </div>
+                </div>
+                {newProduct.mrp && !hasDiscount(newProduct) && (
+                  <div className="col-span-2 text-[11px] text-gray-500">Homepage shows MRP {formatCurrency(newProduct.mrp)} — add a discount to enable COD price</div>
+                )}
+                <div>
                   <label className="label">Stock Qty</label>
                   <input type="number" className="input" placeholder="0"
                     value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [] }); }} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={() => { setShowCreate(false); setNewProduct({ name: '', sku: '', category: '', mrp: '', trade_price: '', dealer_price: '', purchase_price: '', stock: '', status: 'active', images: [], cod_price: '', discount_percent: '' }); }} className="btn-secondary flex-1">Cancel</button>
                 <button onClick={handleCreate} disabled={!newProduct.name || creating} className="btn-primary flex-1 disabled:opacity-50">
                   {creating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" /> : <><MdAdd size={15} /> Create Product</>}
                 </button>
@@ -537,6 +598,22 @@ export default function Products() {
                   <input type="number" className="input" placeholder="0"
                     value={editingProduct.purchase_price} onChange={(e) => setEditingProduct({ ...editingProduct, purchase_price: e.target.value })} />
                 </div>
+                <div>
+                  <label className="label">COD Price</label>
+                  <input type="number" min="0" className="input" placeholder="Selling price"
+                    value={editingProduct.cod_price} onChange={(e) => setEditingProduct(prev => prev ? syncPriceFields(prev, { cod_price: e.target.value }) : prev)} />
+                </div>
+                <div>
+                  <label className="label">Discount %</label>
+                  <div className="relative">
+                    <input type="number" min="0" max="99" step="0.1" className="input pr-8" placeholder="0"
+                      value={editingProduct.discount_percent} onChange={(e) => setEditingProduct(prev => prev ? syncPriceFields(prev, { discount_percent: e.target.value }) : prev)} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                  </div>
+                </div>
+                {editingProduct.mrp && !hasDiscount(editingProduct) && (
+                  <div className="col-span-2 text-[11px] text-gray-500">Homepage shows MRP {formatCurrency(editingProduct.mrp)} — add a discount to enable COD price</div>
+                )}
                 <div>
                   <label className="label">Status</label>
                   <select className="input" value={editingProduct.status}

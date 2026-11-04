@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { formatCurrency } from '../lib/utils'
+import { formatCurrency, effectivePrice, discountPercent, hasDiscount } from '../lib/utils'
 import toast from 'react-hot-toast'
 import {
   MdSearch, MdShield, MdVerified, MdLocalShipping, MdPhone, MdEmail, MdArrowForward,
@@ -72,8 +72,8 @@ export default function Home() {
       if (!product) return null
       return {
         id, qty, product,
-        unit_price: Number(product.mrp) || 0,
-        total: (Number(product.mrp) || 0) * qty,
+        unit_price: effectivePrice(product),
+        total: effectivePrice(product) * qty,
       }
     })
     .filter(Boolean)
@@ -254,7 +254,12 @@ export default function Home() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {filtered.map(product => (
-                  <div key={product.id} className="card card-hover overflow-hidden">
+                  <div key={product.id} className="card card-hover overflow-hidden relative">
+                    {hasDiscount(product) && (
+                      <span className="absolute top-2 right-2 z-10 bg-brand-500 text-white text-[10px] font-bold leading-tight rounded-md px-1.5 py-1 shadow-md text-center">
+                        {discountPercent(product.mrp, product.cod_price)}%<br />OFF
+                      </span>
+                    )}
                     {(product.image_url || product.images?.length) ? (
                       <div className="aspect-[4/3] bg-gray-50 overflow-hidden">
                         <img src={product.images?.length ? (product.images[selectedImg[product.id] || 0] || product.images[0]) : product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
@@ -283,8 +288,17 @@ export default function Home() {
                       <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
                         <div>
-                          <span className="text-[10px] text-gray-400">MRP</span>
-                          <p className="font-semibold text-brand-600">{formatCurrency(product.mrp)}</p>
+                          {hasDiscount(product) ? (
+                            <>
+                              <span className="text-[11px] text-gray-400 line-through leading-none">{formatCurrency(product.mrp)}</span>
+                              <p className="font-semibold text-brand-600 mt-0.5">{formatCurrency(effectivePrice(product))}</p>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[10px] text-gray-400">MRP</span>
+                              <p className="font-semibold text-brand-600">{formatCurrency(product.mrp)}</p>
+                            </>
+                          )}
                         </div>
                         {cart[product.id] > 0 ? (
                           <div className="flex items-center gap-1.5">

@@ -116,6 +116,7 @@ export const api = {
 
   async createProduct(product) {
     const payload = { ...product }
+    delete payload.discount_percent // form-only field; products table stores cod_price
     if (!payload.sku) payload.sku = `MDN-${Date.now().toString(36).toUpperCase()}`
     if (!payload.category) payload.category = 'General'
     delete payload.stock
@@ -129,9 +130,11 @@ export const api = {
   },
 
   async updateProduct(id, updates) {
+    const payload = { ...updates }
+    delete payload.discount_percent // form-only field; products table stores cod_price
     const { data, error } = await supabase
       .from('products')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...payload, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()

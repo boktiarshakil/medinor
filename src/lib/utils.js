@@ -16,6 +16,31 @@ export const formatNumber = (num) => {
   return Number(num).toLocaleString('en-BD')
 }
 
+// Discount pricing (COD price vs MRP) — restored from the pre-gallery live site.
+// A product is discounted when it has a cod_price below its MRP; the homepage
+// then shows a "% OFF" badge, the MRP struck through, and the COD price, and
+// the cart charges the COD price. discount_percent exists only as a form
+// helper (the products table stores cod_price, not a percent).
+export const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100
+
+export const effectivePrice = (p) => {
+  const mrp = Number(p?.mrp) || 0
+  const cod = Number(p?.cod_price)
+  return cod > 0 && mrp > 0 && cod < mrp ? cod : mrp
+}
+
+export const discountPercent = (mrp, cod) => {
+  const m = Number(mrp) || 0
+  const c = Number(cod) || 0
+  return m <= 0 || c <= 0 || c >= m ? 0 : Math.round((1 - c / m) * 100)
+}
+
+export const hasDiscount = (p) => {
+  const mrp = Number(p?.mrp) || 0
+  const cod = Number(p?.cod_price) || 0
+  return mrp > 0 && cod > 0 && cod < mrp
+}
+
 // Date formatting
 export const formatDate = (date, formatStr = 'dd MMM yyyy') => {
   if (!date) return '-'
