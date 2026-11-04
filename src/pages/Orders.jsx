@@ -43,6 +43,8 @@ export default function Orders() {
   const [dealers, setDealers] = useState([])
   const [products, setProducts] = useState([])
   const [orderDraft, setOrderDraft] = useState({
+    buyer_type: 'dealer',
+    customer_name: '',
     dealer_id: '',
     sr_id: '',
     area_id: '',
@@ -78,7 +80,7 @@ export default function Orders() {
       const mapped = (scoped || []).map(order => ({
         id: order.id,
         number: order.order_number || order.order_no || order.id,
-        dealer: order.dealer?.name || order.dealer_name || 'Unknown',
+        dealer: order.dealer?.name || order.dealer_name || order.customer_name || 'Unknown',
         sr: userMap[order.sr_id] || 'Unassigned',
         amount: order.net_amount || order.total_amount || order.amount || 0,
         items: (order.items || []).length,
@@ -142,8 +144,13 @@ export default function Orders() {
     }))
   }
 
-  const handleCreateOrder = async () => {    if (!orderDraft.dealer_id) {
+  const handleCreateOrder = async () => {    const isCustom = orderDraft.buyer_type === 'custom'
+    if (!isCustom && !orderDraft.dealer_id) {
       toast.error('Select a dealer')
+      return
+    }
+    if (isCustom && !(orderDraft.customer_name || '').trim()) {
+      toast.error('Enter the customer name')
       return
     }
     const validItems = orderDraft.items.filter(i => i.product_id && i.quantity > 0)
@@ -157,7 +164,9 @@ export default function Orders() {
       const totalAmount = validItems.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0)
       await api.createOrder(
         {
-          dealer_id: orderDraft.dealer_id,
+          dealer_id: isCustom ? null : orderDraft.dealer_id,
+          customer_type: isCustom ? 'customer' : null,
+          customer_name: isCustom ? orderDraft.customer_name.trim() : null,
           sr_id: user?.id || orderDraft.sr_id || null,
           area_id: selectedDealer?.area_id || orderDraft.area_id || null,
           status: 'submitted',
@@ -174,7 +183,7 @@ export default function Orders() {
       )
       toast.success('Order created')
       setShowCreate(false)
-      setOrderDraft({ dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '' })
+      setOrderDraft({ buyer_type: 'dealer', customer_name: '', dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '' })
       fetchOrders()
     } catch (err) {
       toast.error('Failed: ' + err.message)
@@ -414,11 +423,19 @@ export default function Orders() {
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Dealer *</label>
-                  <select className="input" value={orderDraft.dealer_id} onChange={(e) => setOrderDraft({ ...orderDraft, dealer_id: e.target.value })}>
-                    <option value="">Select dealer...</option>
-                    {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  <label className="label">Buyer *</label>
+                  <div className="flex gap-2 mb-2">
+                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'dealer' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
+                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'custom' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
+                  </div>
+                  {orderDraft.buyer_type === 'custom' ? (
+                    <input type="text" className="input" placeholder="Customer name (walk-in buyer)" value={orderDraft.customer_name} onChange={(e) => setOrderDraft({ ...orderDraft, customer_name: e.target.value })} />
+                  ) : (
+                    <select className="input" value={orderDraft.dealer_id} onChange={(e) => setOrderDraft({ ...orderDraft, dealer_id: e.target.value })}>
+                      <option value="">Select dealer...</option>
+                      {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="label">Notes</label>

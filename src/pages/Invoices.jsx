@@ -38,6 +38,8 @@ export default function Invoices() {
   const [payments, setPayments] = useState([])
   const [showPendingPayments, setShowPendingPayments] = useState(false)
   const [newInvoice, setNewInvoice] = useState({
+    buyerType: 'dealer',
+    customerName: '',
     dealerId: '',
     orderId: '',
     items: [],
@@ -89,7 +91,7 @@ export default function Invoices() {
   const normalizedInvoice = (inv) => ({
     id: inv.id,
     number: inv.invoice_number || inv.number || inv.id,
-    dealer: typeof inv.dealer === 'object' ? inv.dealer?.name : (inv.dealer_name || inv.dealer || '-'),
+    dealer: typeof inv.dealer === 'object' ? (inv.dealer?.name || inv.customer_name || '-') : (inv.dealer_name || inv.dealer || inv.customer_name || '-'),
     amount: inv.total_amount || inv.amount || 0,
     paid: inv.paid_amount || inv.paid || 0,
     due: inv.due_amount || inv.due || (inv.total_amount - (inv.paid_amount || 0)),
@@ -159,12 +161,17 @@ export default function Invoices() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (!selectedDealer || newInvoice.items.length === 0) return
+    const isCustom = newInvoice.buyerType === 'custom'
+    if (newInvoice.items.length === 0) return
+    if (!isCustom && !selectedDealer) { toast.error('Select a dealer'); return }
+    if (isCustom && !(newInvoice.customerName || '').trim()) { toast.error('Enter the customer name'); return }
     setCreating(true)
     try {
       const invoice = {
         invoice_number: generateInvoiceNo(),
-        dealer_id: selectedDealer.id,
+        dealer_id: isCustom ? null : selectedDealer.id,
+        customer_type: isCustom ? 'customer' : null,
+        customer_name: isCustom ? newInvoice.customerName.trim() : null,
         order_id: newInvoice.orderId || null,
         created_by: user?.id || null,
         amount: total,
@@ -178,8 +185,8 @@ export default function Invoices() {
         notes: newInvoice.notes || null,
       }
       const created = await api.createInvoice(invoice)
-      // Record dealer ledger debit for the manual invoice
-      try {
+      // Record dealer ledger debit for the manual invoice (dealers only — the ledger is per-dealer)
+      if (!isCustom) try {
         await api.recordDealerLedger({
           dealer_id: selectedDealer.id,
           transaction_type: 'invoice',
@@ -209,7 +216,7 @@ export default function Invoices() {
       }
       toast.success('Invoice created')
       setShowCreate(false)
-      setNewInvoice({ dealerId: '', orderId: '', items: [], discount: 0, notes: '', dueDate: '' })
+      setNewInvoice({ buyerType: 'dealer', customerName: '', dealerId: '', orderId: '', items: [], discount: 0, notes: '', dueDate: '' })
       fetchAll()
     } catch (err) {
       console.error('Invoice create failed:', err)
@@ -266,7 +273,7 @@ export default function Invoices() {
       const isManagement = ['super_admin', 'admin', 'sales_manager'].includes(user?.role)
       await api.createPayment({
         invoice_id: selectedInvoice.id,
-        dealer_id: selectedInvoice.dealer_id,
+        ...(selectedInvoice.dealer_id ? { dealer_id: selectedInvoice.dealer_id } : {}),
         collected_by: user?.id || null,
         amount,
         payment_method: paymentMethod,
@@ -280,7 +287,8 @@ export default function Invoices() {
         confirmed_at: isManagement ? new Date().toISOString() : null,
       })
       // Only management confirmations update the invoice as paid/partial
-      if (isManagement) {
+      // (dealer ledger entries only exist for dealer invoices)
+      if (isManagement && selectedInvoice.dealer_id) {
         try {
           await api.recordDealerLedger({
             dealer_id: selectedInvoice.dealer_id,
@@ -791,20 +799,34 @@ export default function Invoices() {
             </div>
 
               <form onSubmit={handleCreate} className="p-5 space-y-5">
-                {/* Dealer Selection */}
+                {/* Buyer Selection */}
                 <div>
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5 block">Select Dealer *</label>
-                  <select
-                    className="input"
-                    value={newInvoice.dealerId}
-                    onChange={(e) => setNewInvoice({ ...newInvoice, dealerId: e.target.value })}
-                    required
-                  >
-                    <option value="">Choose dealer...</option>
-                    {dealers.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} — {d.area || d.area_name || ''}</option>
-                    ))}
-                  </select>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5 block">Buyer *</label>
+                  <div className="flex gap-2 mb-2">
+                    <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'dealer' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
+                    <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'custom' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
+                  </div>
+                  {newInvoice.buyerType === 'custom' ? (
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Customer name (walk-in buyer)"
+                      value={newInvoice.customerName}
+                      onChange={(e) => setNewInvoice({ ...newInvoice, customerName: e.target.value })}
+                    />
+                  ) : (
+                    <select
+                      className="input"
+                      value={newInvoice.dealerId}
+                      onChange={(e) => setNewInvoice({ ...newInvoice, dealerId: e.target.value })}
+                      required
+                    >
+                      <option value="">Choose dealer...</option>
+                      {dealers.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} — {d.area || d.area_name || ''}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {/* Link to Order (optional) */}
@@ -817,10 +839,10 @@ export default function Invoices() {
                   >
                     <option value="">No order link</option>
                     {allOrders
-                      .filter(o => !newInvoice.dealerId || String(o.dealer_id) === String(newInvoice.dealerId))
+                      .filter(o => newInvoice.buyerType === 'custom' ? !o.dealer_id : (!newInvoice.dealerId || String(o.dealer_id) === String(newInvoice.dealerId)))
                       .map(o => (
                         <option key={o.id} value={o.id}>
-                          {o.order_number || o.order_no || o.id} — {o.dealer?.name || o.dealer_name || ''} ({o.status})
+                          {o.order_number || o.order_no || o.id} — {o.dealer?.name || o.dealer_name || o.customer_name || ''} ({o.status})
                         </option>
                       ))}
                   </select>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { formatCurrency, getPriceForRole, canSeePrice } from '../lib/utils'
+import { formatCurrency, getPriceForRole, canSeePrice, effectivePrice } from '../lib/utils'
 import {
   MdAdd, MdRemove, MdShoppingCart, MdCheckCircle, MdWarning,
   MdErrorOutline, MdInfo, MdSend, MdLocalShipping, MdAccessTime
@@ -25,6 +25,8 @@ export default function PlaceOrder() {
   const [cart, setCart] = useState({})
   const [dealers, setDealers] = useState([])
   const [selectedDealerId, setSelectedDealerId] = useState('')
+  const [buyerType, setBuyerType] = useState('dealer')
+  const [customerName, setCustomerName] = useState('')
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
@@ -71,7 +73,11 @@ export default function PlaceOrder() {
   const getPrice = (product) => {
     if (!role) return product.mrp
     // When staff orders FOR a specific dealer, invoice at the dealer price
-    // (the price the dealer actually pays). Otherwise use the caller's tier.
+    // (the price the dealer actually pays). For a custom (walk-in) buyer,
+    // charge the retail price — the discounted COD price when one is set.
+    if (role !== 'dealer' && buyerType === 'custom') {
+      return effectivePrice(product)
+    }
     if (role !== 'dealer' && selectedDealerId) {
       return product.dealer_price || getPriceForRole(product, role) || product.mrp
     }
@@ -134,19 +140,25 @@ export default function PlaceOrder() {
         ? dealers.find(
             d => d.email && d.email.toLowerCase() === String(user.email || '').toLowerCase()
           )
-        : dealers.find(d => d.id === selectedDealerId)
+        : (buyerType === 'custom' ? null : dealers.find(d => d.id === selectedDealerId))
 
       if (role === 'dealer' && !dealerRecord) {
         toast.error('Your login is not linked to a dealer record. Contact admin.')
         return
       }
-      if (role !== 'dealer' && !selectedDealerId) {
+      if (role !== 'dealer' && buyerType !== 'custom' && !selectedDealerId) {
         toast.error('Select a dealer to order for')
+        return
+      }
+      if (role !== 'dealer' && buyerType === 'custom' && !customerName.trim()) {
+        toast.error('Enter the customer name')
         return
       }
 
       const orderData = {
         dealer_id: dealerRecord ? dealerRecord.id : null,
+        customer_type: role !== 'dealer' && buyerType === 'custom' ? 'customer' : null,
+        customer_name: role !== 'dealer' && buyerType === 'custom' ? customerName.trim() : null,
         sr_id: role === 'dealer' ? null : user.id,
         area_id: dealerRecord?.area_id || user.area_id || null,
         status: 'submitted',
@@ -208,21 +220,35 @@ export default function PlaceOrder() {
         )}
       </div>
 
-      {/* SR / Management: select dealer to order for */}
+      {/* SR / Management: select dealer to order for, or a custom customer */}
       {role !== 'dealer' && (
         <div className="card p-4">
-          <label className="label">Ordering for Dealer *</label>
-          <select
-            className="input"
-            value={selectedDealerId}
-            onChange={(e) => setSelectedDealerId(e.target.value)}
-          >
-            <option value="">Select dealer...</option>
-            {dealers.map(d => (
-              <option key={d.id} value={d.id}>{d.name} — {d.area?.name || d.area_name || d.area || 'Unassigned'}</option>
-            ))}
-          </select>
-          <p className="text-[10px] text-gray-400 mt-1">Order will be attributed to this dealer and recorded against you.</p>
+          <label className="label">Ordering for *</label>
+          <div className="flex gap-2 mb-2">
+            <button type="button" onClick={() => setBuyerType('dealer')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
+            <button type="button" onClick={() => setBuyerType('custom')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
+          </div>
+          {buyerType === 'custom' ? (
+            <input
+              type="text"
+              className="input"
+              placeholder="Customer name (walk-in buyer)"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+            />
+          ) : (
+            <select
+              className="input"
+              value={selectedDealerId}
+              onChange={(e) => setSelectedDealerId(e.target.value)}
+            >
+              <option value="">Select dealer...</option>
+              {dealers.map(d => (
+                <option key={d.id} value={d.id}>{d.name} — {d.area?.name || d.area_name || d.area || 'Unassigned'}</option>
+              ))}
+            </select>
+          )}
+          <p className="text-[10px] text-gray-400 mt-1">{buyerType === 'custom' ? 'Walk-in sale — charged at the retail price, no dealer ledger entry.' : 'Order will be attributed to this dealer and recorded against you.'}</p>
         </div>
       )}
 

@@ -259,13 +259,13 @@ export const api = {
     // Every new order triggers a management alert so no order slips by — whether a
     // dealer self-submits or staff creates one on a dealer's behalf. The creator is
     // excluded (they already know they made it), but the rest of management is told.
-    if (payload.status === 'submitted' && payload.dealer_id) {
+    if (payload.status === 'submitted' && (payload.dealer_id || payload.customer_name)) {
       try {
-        const { data: dealer } = await supabase
+        const { data: dealer } = payload.dealer_id ? await supabase
           .from('dealers')
           .select('name')
           .eq('id', payload.dealer_id)
-          .single()
+          .single() : { data: null }
         const { data: admins } = await supabase
           .from('user_profiles')
           .select('id')
@@ -277,7 +277,7 @@ export const api = {
         if (adminIds.length > 0) {
           await this.notifyUsers(adminIds, {
             title: 'New Order Received',
-            message: `${orderData.order_number} — ${dealer?.name || 'Dealer'} submitted a new order (BDT ${payload.net_amount ?? payload.total_amount ?? 0})`,
+            message: `${orderData.order_number} — ${dealer?.name || payload.customer_name || 'Customer'} submitted a new order (BDT ${payload.net_amount ?? payload.total_amount ?? 0})`,
             type: 'info',
             referenceType: 'order',
             url: '/orders',
@@ -408,6 +408,8 @@ export const api = {
       invoice_number: generateInvoiceNo(),
       order_id: order.id,
       dealer_id: order.dealer_id,
+      customer_type: order.customer_type || null,
+      customer_name: order.customer_name || null,
       created_by: createdBy || null,
       amount: subtotal,
       vat_amount: vat,
