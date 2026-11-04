@@ -5,6 +5,7 @@ import { MdAdd, MdSearch, MdFilterList, MdVisibility, MdShoppingCart, MdRefresh,
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
+import BookParcelModal from '../components/BookParcelModal'
 
 const NEXT_ACTIONS = {
   submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'], note: 'Stock reserved, invoice generated' },
@@ -40,6 +41,8 @@ export default function Orders() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [bookOrder, setBookOrder] = useState(null)
+  const [refreshingCourier, setRefreshingCourier] = useState(false)
   const [dealers, setDealers] = useState([])
   const [products, setProducts] = useState([])
   const [orderDraft, setOrderDraft] = useState({
@@ -212,6 +215,58 @@ export default function Orders() {
     }
   }
 
+  // ---- Packzy courier ----
+  const handleCourierBooked = async (result) => {
+    if (!bookOrder) return
+    try {
+      await api.updateOrderCourier(bookOrder._raw.id, {
+        courier_name: 'packzy',
+        courier_consignment_id: result.consignment_id,
+        courier_tracking_code: result.tracking_code,
+        courier_status: result.status,
+        courier_booked_at: new Date().toISOString(),
+      })
+      toast.success('Courier booking saved')
+      setSelectedOrder(prev => prev ? {
+        ...prev,
+        _raw: {
+          ...prev._raw,
+          courier_name: 'packzy',
+          courier_consignment_id: result.consignment_id,
+          courier_tracking_code: result.tracking_code,
+          courier_status: result.status,
+          courier_booked_at: new Date().toISOString(),
+        },
+      } : prev)
+      fetchOrders()
+    } catch (err) {
+      toast.error('Booked with courier, but could not save locally: ' + err.message)
+    }
+  }
+
+  const handleRefreshCourier = async (order) => {
+    if (!order?.number) return
+    setRefreshingCourier(true)
+    try {
+      // Orders refresh by the invoice number sent at booking (the order #)
+      const res = await api.packzy('status_by_invoice', { invoice: order.number })
+      const d = res?.data || res || {}
+      const status = d.delivery_status || d.status || d.data?.delivery_status || d.data?.status || null
+      if (status) {
+        await api.updateOrderCourier(order._raw.id, { courier_status: status })
+        setSelectedOrder(prev => prev ? { ...prev, _raw: { ...prev._raw, courier_status: status } } : prev)
+        toast.success('Status: ' + status)
+        fetchOrders()
+      } else {
+        toast.error('Courier returned no status')
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to refresh status')
+    } finally {
+      setRefreshingCourier(false)
+    }
+  }
+
   const filtered = orders.filter(o => {
     const matchSearch = o.number.toLowerCase().includes(search.toLowerCase()) || o.dealer.toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === 'all' || o.status === statusFilter
@@ -374,6 +429,20 @@ export default function Orders() {
                   </div>
                 )}
               </div>
+              {/* Courier */}
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2 flex items-center gap-1"><MdLocalShipping size={12} /> Courier</p>
+                {selectedOrder._raw?.courier_consignment_id ? (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-blue-700">CN {selectedOrder._raw.courier_consignment_id}</span>
+                    {selectedOrder._raw.courier_tracking_code && <span className="text-blue-600">· {selectedOrder._raw.courier_tracking_code}</span>}
+                    {selectedOrder._raw.courier_status && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{selectedOrder._raw.courier_status}</span>}
+                    <button onClick={() => handleRefreshCourier(selectedOrder)} disabled={refreshingCourier} className="ml-auto text-blue-600 hover:text-blue-800 disabled:opacity-50">Refresh</button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">Not booked with a courier yet.</p>
+                )}
+              </div>
               <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-2">
                 {(() => {
                   const action = NEXT_ACTIONS[selectedOrder.status]
@@ -400,11 +469,37 @@ export default function Orders() {
                     Cancel Order
                   </button>
                 )}
+                {!selectedOrder._raw?.courier_consignment_id && ['super_admin','admin','sales_manager'].includes(user?.role) && (
+                  <button
+                    onClick={() => setBookOrder(selectedOrder)}
+                    className="btn-secondary inline-flex items-center gap-2 text-xs"
+                  >
+                    <MdLocalShipping size={15} />
+                    Book Parcel
+                  </button>
+                )}
                 <button onClick={() => setSelectedOrder(null)} className="btn-secondary text-xs">Close</button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Book Parcel Modal */}
+      {bookOrder && (
+        <BookParcelModal
+          open={!!bookOrder}
+          onClose={() => setBookOrder(null)}
+          defaults={{
+            invoice: bookOrder.number,
+            recipient_name: bookOrder.dealer !== 'Unknown' ? bookOrder.dealer : '',
+            recipient_phone: '',
+            recipient_address: '',
+            cod_amount: bookOrder.amount || 0,
+            note: '',
+          }}
+          onBooked={handleCourierBooked}
+        />
       )}
 
       {/* Create Order Modal */}

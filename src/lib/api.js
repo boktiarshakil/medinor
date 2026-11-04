@@ -291,6 +291,48 @@ export const api = {
     return orderData
   },
 
+  // ---- Packzy courier (restored from the pre-gallery live build) ----
+  // The courier API key lives in the Supabase "packzy" edge function;
+  // the frontend only sends the action + payload, never credentials.
+
+  async packzy(action, params = {}) {
+    const { data, error } = await supabase.functions.invoke('packzy', {
+      body: { action, ...params },
+    })
+    if (error) {
+      let message = error.message || 'Courier request failed'
+      try {
+        const ctx = await error.context?.json?.()
+        if (ctx?.error) message = ctx.error
+      } catch {}
+      throw new Error(message)
+    }
+    if (data != null && data.error) throw new Error(data.error)
+    return data
+  },
+
+  async updateOrderCourier(id, updates) {
+    const { data, error } = await supabase
+      .from('orders')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async updateCodOrderCourier(id, updates) {
+    const { data, error } = await supabase
+      .from('cod_orders')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   async updateOrderStatus(id, status, createdBy = null) {
     // Only allow legitimate forward (or cancel) transitions so we never
     // double-reserve stock on re-approval or jump draft→delivered.

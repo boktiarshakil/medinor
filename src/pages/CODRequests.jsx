@@ -12,10 +12,12 @@ import {
   MdReceipt,
   MdNotes,
   MdPerson,
+  MdLocalShipping,
 } from 'react-icons/md'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
+import BookParcelModal from '../components/BookParcelModal'
 
 const STATUS_META = {
   new: { label: 'New', color: 'bg-blue-50 text-blue-600 ring-blue-100', icon: MdHourglassEmpty },
@@ -31,6 +33,8 @@ export default function CODRequests() {
   const [filter, setFilter] = useState('all')
   const [expandedId, setExpandedId] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  const [bookReq, setBookReq] = useState(null)
+  const [refreshingId, setRefreshingId] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -67,6 +71,46 @@ export default function CODRequests() {
       } finally {
         setBusyId(null)
       }
+    }
+  }
+
+  // ---- Packzy courier ----
+  const handleCodCourierBooked = async (result) => {
+    if (!bookReq) return
+    try {
+      await api.updateCodOrderCourier(bookReq.id, {
+        courier_name: 'packzy',
+        courier_consignment_id: result.consignment_id,
+        courier_tracking_code: result.tracking_code,
+        courier_status: result.status,
+        courier_booked_at: new Date().toISOString(),
+      })
+      toast.success('Courier booking saved')
+      fetchData()
+    } catch (err) {
+      toast.error('Booked with courier, but could not save locally: ' + err.message)
+    }
+  }
+
+  const handleCodRefreshCourier = async (req) => {
+    if (!req?.courier_consignment_id) return
+    setRefreshingId(req.id)
+    try {
+      // COD requests refresh by consignment id
+      const res = await api.packzy('status_by_cid', { consignment_id: req.courier_consignment_id })
+      const d = res?.data || res || {}
+      const status = d.delivery_status || d.status || d.data?.delivery_status || d.data?.status || null
+      if (status) {
+        await api.updateCodOrderCourier(req.id, { courier_status: status })
+        toast.success('Status: ' + status)
+        fetchData()
+      } else {
+        toast.error('Courier returned no status')
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to refresh status')
+    } finally {
+      setRefreshingId(null)
     }
   }
 
@@ -214,6 +258,24 @@ export default function CODRequests() {
                       </p>
                     )}
 
+                    {/* Courier */}
+                    {req.courier_consignment_id ? (
+                      <div className="flex flex-wrap items-center gap-2 p-3 bg-blue-50 rounded-lg text-xs">
+                        <MdLocalShipping size={14} className="text-blue-500 flex-shrink-0" />
+                        <span className="font-semibold text-blue-700">Courier booked:</span>
+                        <span className="text-blue-700">CN {req.courier_consignment_id}</span>
+                        {req.courier_tracking_code && <span className="text-blue-600">· {req.courier_tracking_code}</span>}
+                        {req.courier_status && <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{req.courier_status}</span>}
+                        <button onClick={() => handleCodRefreshCourier(req)} disabled={refreshingId === req.id} className="ml-auto text-blue-600 hover:text-blue-800 disabled:opacity-50">Refresh</button>
+                      </div>
+                    ) : (
+                      <div>
+                        <button className="btn-secondary text-xs px-4 py-2" onClick={() => setBookReq(req)}>
+                          <MdLocalShipping size={14} /> Book Parcel
+                        </button>
+                      </div>
+                    )}
+
                     {availableActions(req.status).length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {canCancel && (
@@ -254,6 +316,23 @@ export default function CODRequests() {
             )
           })}
         </div>
+      )}
+
+      {/* Book Parcel Modal */}
+      {bookReq && (
+        <BookParcelModal
+          open={!!bookReq}
+          onClose={() => setBookReq(null)}
+          defaults={{
+            invoice: `COD-${String(bookReq.id).slice(0, 8).toUpperCase()}`,
+            recipient_name: bookReq.customer_name || '',
+            recipient_phone: bookReq.phone || '',
+            recipient_address: bookReq.address || '',
+            cod_amount: bookReq.total_amount || 0,
+            note: '',
+          }}
+          onBooked={handleCodCourierBooked}
+        />
       )}
     </div>
   )
