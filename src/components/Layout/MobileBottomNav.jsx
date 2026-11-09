@@ -57,7 +57,7 @@ export default function MobileBottomNav() {
   const items = MOBILE_NAV[user?.role] || MOBILE_NAV.sales_executive
 
   return (
-    <nav className="mobile-bottom-nav flex items-center justify-around lg:hidden">
+    <nav className="no-print mobile-bottom-nav flex items-center justify-around lg:hidden">
       {items.map(item => {
         const Icon = item.icon
         return (

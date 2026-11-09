@@ -51,7 +51,7 @@ export default function NewsMarquee({ direction = 'right' }) {
   }
 
   return (
-    <div className="news-marquee">
+    <div className="no-print news-marquee">
       <span className="news-marquee-label">
         <MdOutlineNotificationsActive size={13} />
         <span>Announcements</span>

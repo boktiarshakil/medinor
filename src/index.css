@@ -288,7 +288,38 @@
   font-size: 9px;
   line-height: 1.35;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
 }
+/* Single invoice: fills a whole A4 portrait page (297mm − 2×10mm margins). */
+.invoice-print-page.single .invoice-sheet { min-height: 277mm; }
+/* The product table grows so the sheet always fills its page; rows stretch. */
+.inv-table-wrap { flex: 1; display: flex; min-height: 0; }
+.inv-table-wrap .inv-table { height: 100%; }
+/* Bulk: two invoices side by side on one A4 landscape page
+   (297mm − 2×10mm margins = 277mm wide; 135mm + 7mm gap + 135mm). */
+.bulk-page { display: flex; gap: 7mm; justify-content: center; margin-bottom: 8mm; }
+.bulk-page .invoice-sheet { margin: 0; }
+.invoice-sheet.bulk {
+  width: 135mm;
+  min-height: 194mm; /* landscape A4 210mm − 2×8mm margins */
+  font-size: 8px;
+}
+.invoice-sheet.bulk .inv-logo { width: 26mm; }
+.invoice-sheet.bulk .inv-company-name { font-size: 11px; }
+.invoice-sheet.bulk .inv-company-sub { font-size: 7.5px; }
+.invoice-sheet.bulk .inv-company-addr { font-size: 7px; }
+.invoice-sheet.bulk .inv-title-main { font-size: 10px; }
+.invoice-sheet.bulk .inv-meta { gap: 4mm; }
+.invoice-sheet.bulk .inv-meta-right { width: 48mm; }
+.invoice-sheet.bulk .inv-billto-name { font-size: 9px; }
+.invoice-sheet.bulk .inv-table th, .invoice-sheet.bulk .inv-table td { font-size: 7.5px; }
+.invoice-sheet.bulk .inv-table .c-qty { width: 10mm; }
+.invoice-sheet.bulk .inv-table .c-price { width: 20mm; }
+.invoice-sheet.bulk .inv-table .c-amt { width: 22mm; }
+.invoice-sheet.bulk .inv-bottom { gap: 4mm; }
+.invoice-sheet.bulk .inv-totals { width: 58mm; }
+.invoice-sheet.bulk .inv-sign { gap: 5mm; }
 .inv-header { display: flex; align-items: center; gap: 5mm; padding-bottom: 1.5mm; border-bottom: 1.5px solid #111; }
 .inv-logo { width: 34mm; height: auto; flex-shrink: 0; display: block; }
 .inv-company { flex: 1; min-width: 0; }
@@ -329,9 +360,20 @@
 .inv-sign { display: flex; gap: 8mm; margin-top: 4mm; }
 .inv-sign > div { flex: 1; border-top: 0.6px solid #555; padding-top: 1mm; text-align: center; font-size: 7.5px; color: #444; }
 .inv-footer { margin-top: 2mm; text-align: center; font-size: 7.5px; color: #555; border-top: 1px solid #ddd; padding-top: 1mm; }
+@page { size: A4 portrait; margin: 10mm; }
+@page bulk { size: A4 landscape; margin: 8mm 10mm; }
+.invoice-print-page.bulk { page: bulk; }
+
 @media print {
   .no-print { display: none !important; }
   body { background: #fff !important; }
+  /* Un-do the app shell so nothing clips or pads the printed page. */
+  .app-shell { display: block !important; height: auto !important; overflow: visible !important; }
+  .app-shell > div { overflow: visible !important; }
+  .app-main { padding: 0 !important; overflow: visible !important; }
   .invoice-print-page { background: #fff; }
   .invoice-sheet { margin: 0 auto; }
+  .bulk-page { margin-bottom: 0; break-after: page; }
+  .bulk-page:last-child { break-after: auto; }
+  .bulk-page .invoice-sheet { margin: 0; }
 }

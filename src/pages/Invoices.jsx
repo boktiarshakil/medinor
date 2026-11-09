@@ -30,6 +30,12 @@ export default function Invoices() {
   const [showCreate, setShowCreate] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [printInvoice, setPrintInvoice] = useState(null)
+  // Bulk print: tick invoices in the list, print 2 per A4 landscape page.
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkInvoices, setBulkInvoices] = useState(null)
+  const toggleSelect = (id) => setSelectedIds(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  )
   const [showPayment, setShowPayment] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
@@ -448,7 +454,18 @@ export default function Invoices() {
   const filteredInvoices = invoices.filter(filtered)
   const totalDue = invoices.reduce((s, i) => s + (normalizedInvoice(i).due || 0), 0)
 
-  // Print view replaces the page (half-A4 invoice); closing returns to the list.
+  // Print view replaces the page (full-A4 single invoice, or 2-up bulk);
+  // closing returns to the list.
+  if (bulkInvoices) {
+    return (
+      <InvoicePrint
+        invoices={bulkInvoices}
+        products={products}
+        payments={payments}
+        onClose={() => { setBulkInvoices(null); setSelectedIds([]) }}
+      />
+    )
+  }
   if (printInvoice) {
     return (
       <InvoicePrint
@@ -471,6 +488,16 @@ export default function Invoices() {
           </p>
         </div>
         <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <button
+              className="btn-secondary"
+              onClick={() => setBulkInvoices(
+                filteredInvoices.filter(inv => selectedIds.includes(inv.id)).map(normalizedInvoice)
+              )}
+            >
+              <MdFileDownload size={16} /> Print selected ({selectedIds.length})
+            </button>
+          )}
           <button className="btn-secondary" onClick={handleExport}>
             <MdFileDownload size={16} /> Export
           </button>
@@ -620,6 +647,14 @@ export default function Invoices() {
           <table className="data-table">
             <thead>
               <tr>
+                <th className="w-8">
+                  <input
+                    type="checkbox"
+                    checked={filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedIds.includes(inv.id))}
+                    onChange={(e) => setSelectedIds(e.target.checked ? filteredInvoices.map(inv => inv.id) : [])}
+                    aria-label="Select all invoices on this page"
+                  />
+                </th>
                 <th>Invoice #</th>
                 <th>Dealer</th>
                 <th>Amount</th>
@@ -638,6 +673,14 @@ export default function Invoices() {
                 const n = normalizedInvoice(inv)
                 return (
                   <tr key={n.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(inv.id)}
+                        onChange={() => toggleSelect(inv.id)}
+                        aria-label={`Select invoice ${n.number}`}
+                      />
+                    </td>
                     <td className="font-mono text-xs font-semibold text-brand-600">{n.number}</td>
                     <td className="font-medium">{n.dealer}</td>
                     <td className="font-semibold">{formatCurrency(n.amount)}</td>
@@ -788,7 +831,7 @@ export default function Invoices() {
                   onClick={() => { setSelectedInvoice(null); setPrintInvoice(n) }}
                   className="btn-secondary w-full"
                 >
-                  <MdFileDownload size={15} /> Print Invoice (half A4)
+                  <MdFileDownload size={15} /> Print Invoice (A4)
                 </button>
               </div>
             </div>

@@ -9,7 +9,7 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-surface-50">
+    <div className="app-shell flex h-[100dvh] overflow-hidden bg-surface-50">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -17,7 +17,7 @@ export default function AppLayout() {
 
         <NewsMarquee />
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
+        <main className="app-main flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
           <Outlet />
         </main>
       </div>
