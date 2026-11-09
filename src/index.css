@@ -274,3 +274,64 @@
   70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
   100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
+
+/* ============================================================
+   Printable sales invoice — half A4 (A4 portrait, invoice block
+   ~190mm wide, content kept compact to fit the top half).
+   ============================================================ */
+@page { size: A4; margin: 8mm 10mm; }
+.invoice-print-page { background: #fff; }
+.invoice-sheet {
+  width: 190mm;
+  margin: 0 auto;
+  color: #111;
+  font-size: 9px;
+  line-height: 1.35;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.inv-header { display: flex; align-items: center; gap: 5mm; padding-bottom: 1.5mm; border-bottom: 1.5px solid #111; }
+.inv-logo { width: 34mm; height: auto; flex-shrink: 0; display: block; }
+.inv-company { flex: 1; min-width: 0; }
+.inv-company-name { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; line-height: 1.1; }
+.inv-company-sub { font-size: 8px; font-weight: 600; color: #333; }
+.inv-company-addr { font-size: 7.5px; color: #444; }
+.inv-title { text-align: right; flex-shrink: 0; }
+.inv-title-main { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.inv-title-sub { font-size: 8px; color: #555; }
+.inv-meta { display: flex; gap: 6mm; padding: 1.5mm 0; border-bottom: 1px solid #bbb; }
+.inv-billto { flex: 1; min-width: 0; }
+.inv-sec-label { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #666; margin-bottom: 0.5mm; }
+.inv-billto-name { font-size: 10px; font-weight: 700; }
+.inv-line { font-size: 8px; color: #333; }
+.inv-meta-right { width: 62mm; flex-shrink: 0; }
+.inv-meta-row { display: flex; justify-content: space-between; gap: 3mm; font-size: 8px; padding: 0.3mm 0; }
+.inv-meta-row span { color: #555; }
+.inv-table { width: 100%; border-collapse: collapse; margin-top: 1.5mm; }
+.inv-table th, .inv-table td { border: 0.5px solid #999; padding: 0.5mm 1.5mm; font-size: 8px; line-height: 1.25; }
+.inv-table th { background: #f0f0f0; font-weight: 700; text-align: left; }
+.inv-table .c-num { width: 8mm; text-align: center; }
+.inv-table .c-qty { width: 12mm; text-align: center; }
+.inv-table .c-price { width: 24mm; text-align: right; }
+.inv-table .c-amt { width: 26mm; text-align: right; }
+.inv-table td.c-num, .inv-table td.c-qty { text-align: center; }
+.inv-table td.c-price, .inv-table td.c-amt { text-align: right; }
+.inv-bottom { display: flex; gap: 6mm; margin-top: 1.5mm; }
+.inv-pay { flex: 1; min-width: 0; }
+.inv-pay-methods { display: flex; gap: 4mm; font-size: 8px; margin: 1mm 0; flex-wrap: wrap; }
+.inv-pay-method { display: inline-flex; align-items: center; gap: 1mm; }
+.inv-box { display: inline-flex; align-items: center; justify-content: center; width: 3.2mm; height: 3.2mm; border: 0.6px solid #555; font-size: 7px; line-height: 1; }
+.inv-totals { width: 74mm; flex-shrink: 0; }
+.inv-trow { display: flex; justify-content: space-between; gap: 3mm; font-size: 8px; padding: 0.4mm 0; }
+.inv-trow.inv-grand { border-top: 1px solid #111; font-weight: 700; font-size: 8.5px; padding-top: 0.8mm; }
+.inv-trow.inv-net { font-weight: 800; font-size: 9px; background: #f0f0f0; padding: 0.8mm 1.5mm; margin: 0.4mm -1.5mm; }
+.inv-trow.inv-due { font-weight: 700; border-top: 0.5px solid #999; }
+.inv-words { margin-top: 1.5mm; padding-top: 1mm; border-top: 1px solid #bbb; font-size: 8px; }
+.inv-sign { display: flex; gap: 8mm; margin-top: 4mm; }
+.inv-sign > div { flex: 1; border-top: 0.6px solid #555; padding-top: 1mm; text-align: center; font-size: 7.5px; color: #444; }
+.inv-footer { margin-top: 2mm; text-align: center; font-size: 7.5px; color: #555; border-top: 1px solid #ddd; padding-top: 1mm; }
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .invoice-print-page { background: #fff; }
+  .invoice-sheet { margin: 0 auto; }
+}

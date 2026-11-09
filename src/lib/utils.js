@@ -343,3 +343,37 @@ export const orderCompanyShare = (order, productsMap = {}) => {
     return sum + (Number(it.total_price) || 0)
   }, 0)
 }
+
+// Amount in words (Bangladeshi numbering: lakh / crore), for printed invoices.
+// e.g. 69728 -> "Sixty-Nine Thousand Seven Hundred Twenty-Eight Taka Only"
+const _ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen',
+  'Eighteen', 'Nineteen']
+const _TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+const _under1000 = (n) => {
+  const parts = []
+  if (n >= 100) {
+    parts.push(_ONES[Math.floor(n / 100)] + ' Hundred')
+    n %= 100
+  }
+  if (n >= 20) {
+    parts.push(_TENS[Math.floor(n / 10)] + (n % 10 ? '-' + _ONES[n % 10] : ''))
+  } else if (n > 0) {
+    parts.push(_ONES[n])
+  }
+  return parts.join(' ')
+}
+export const amountInWords = (amount) => {
+  const num = Math.round(Number(amount) || 0)
+  if (num === 0) return 'Zero Taka Only'
+  const groups = []
+  let rest = num
+  const crore = Math.floor(rest / 10000000)
+  if (crore > 0) { groups.push(_under1000(crore) + ' Crore'); rest %= 10000000 }
+  const lakh = Math.floor(rest / 100000)
+  if (lakh > 0) { groups.push(_under1000(lakh) + ' Lakh'); rest %= 100000 }
+  const thousand = Math.floor(rest / 1000)
+  if (thousand > 0) { groups.push(_under1000(thousand) + ' Thousand'); rest %= 1000 }
+  if (rest > 0) groups.push(_under1000(rest))
+  return groups.join(' ') + ' Taka Only'
+}

@@ -6,6 +6,7 @@ import {
   formatCurrency, formatDate, statusColor, statusLabel, generateInvoiceNo
 } from '../lib/utils'
 import { PAYMENT_METHODS, paymentMethodLabel, uploadToImgBB } from '../lib/upload'
+import InvoicePrint from '../components/InvoicePrint'
 import {
   MdSearch, MdFileDownload, MdReceipt, MdAdd, MdSend, MdVisibility,
   MdPerson, MdLocationOn, MdPhone, MdClose, MdCheckCircle, MdDelete,
@@ -26,6 +27,7 @@ export default function Invoices() {
   const [search, setSearch] = useState(initialQuery)
   const [showCreate, setShowCreate] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [printInvoice, setPrintInvoice] = useState(null)
   const [showPayment, setShowPayment] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
@@ -44,6 +46,9 @@ export default function Invoices() {
     orderId: '',
     items: [],
     discount: 0,
+    vatPercent: 15,
+    tdsPercent: 5,
+    deliveryCharge: 0,
     notes: '',
     dueDate: ''
   })
@@ -88,20 +93,47 @@ export default function Invoices() {
     fetchAll()
   }, [])
 
-  const normalizedInvoice = (inv) => ({
-    id: inv.id,
-    number: inv.invoice_number || inv.number || inv.id,
-    dealer: typeof inv.dealer === 'object' ? (inv.dealer?.name || inv.customer_name || '-') : (inv.dealer_name || inv.dealer || inv.customer_name || '-'),
-    amount: inv.total_amount || inv.amount || 0,
-    paid: inv.paid_amount || inv.paid || 0,
-    due: inv.due_amount || inv.due || (inv.total_amount - (inv.paid_amount || 0)),
-    status: inv.status || 'unpaid',
-    date: inv.invoice_date || inv.date || inv.created_at,
-    dueDate: inv.due_date || inv.dueDate,
-    createdBy: inv.creator?.full_name || inv.created_by_name || inv.createdBy || '-',
-    processedBy: inv.processedBy?.full_name || inv.processed_by_name || inv.processedBy || '-',
-    area: inv.dealer?.area?.name || inv.area_name || inv.area || '-',
-  })
+  const normalizedInvoice = (inv) => {
+    const grandTotal = inv.total_amount || inv.amount || 0
+    const netPayable = inv.net_payable ?? grandTotal
+    return {
+      id: inv.id,
+      number: inv.invoice_number || inv.number || inv.id,
+      dealer: typeof inv.dealer === 'object' ? (inv.dealer?.name || inv.customer_name || '-') : (inv.dealer_name || inv.dealer || inv.customer_name || '-'),
+      amount: grandTotal,
+      netPayable,
+      paid: inv.paid_amount || inv.paid || 0,
+      due: inv.due_amount ?? inv.due ?? (netPayable - (inv.paid_amount || 0)),
+      status: inv.status || 'unpaid',
+      date: inv.invoice_date || inv.date || inv.created_at,
+      dueDate: inv.due_date || inv.dueDate,
+      createdBy: inv.creator?.full_name || inv.created_by_name || inv.createdBy || '-',
+      processedBy: inv.processedBy?.full_name || inv.processed_by_name || inv.processedBy || '-',
+      area: inv.dealer?.area?.name || inv.area_name || inv.area || '-',
+      // Tax breakdown (stored on the invoice; old rows fall back to 0 / grand total).
+      subtotal: inv.subtotal ?? grandTotal,
+      discountAmount: inv.discount_amount || 0,
+      discountPercent: inv.discount_amount && inv.subtotal ? Math.round((inv.discount_amount / inv.subtotal) * 100) : 0,
+      taxPercent: inv.tax_percent ?? 0,
+      vatAmount: inv.vat_amount || 0,
+      deliveryCharge: inv.delivery_charge || 0,
+      tdsPercent: inv.tds_percent ?? 0,
+      tdsAmount: inv.tds_amount || 0,
+      items: Array.isArray(inv.items) ? inv.items : [],
+      customerName: inv.customer_name || null,
+      customerType: inv.customer_type || null,
+      orderId: inv.order_id || null,
+      notes: inv.notes || null,
+      dealerPhone: (() => {
+        const d = (dealers || []).find(d => String(d.id) === String(inv.dealer_id))
+        return d ? (d.phone || d.contact_number || '') : (inv.dealer_phone || '')
+      })(),
+      dealerAddress: (() => {
+        const d = (dealers || []).find(d => String(d.id) === String(inv.dealer_id))
+        return d ? (d.address || '') : (inv.dealer_address || '')
+      })(),
+    }
+  }
 
   const filtered = (inv) => {
     const n = normalizedInvoice(inv)
@@ -153,9 +185,18 @@ export default function Invoices() {
     })
   }
 
+  // Invoice math (matches the live invoice precedent):
+  //   subtotal → discount → VAT on (net + delivery) → grand total
+  //   → less TDS (IT deducted at source) → net payable (what the buyer pays).
   const subtotal = newInvoice.items.reduce((sum, i) => sum + (i.price * i.qty), 0)
   const discountAmount = Math.round(subtotal * (newInvoice.discount / 100))
-  const total = subtotal - discountAmount
+  const netAfterDiscount = subtotal - discountAmount
+  const deliveryCharge = Math.max(Number(newInvoice.deliveryCharge) || 0, 0)
+  const vatAmount = Math.round((netAfterDiscount + deliveryCharge) * (Number(newInvoice.vatPercent) || 0) / 100)
+  const grandTotal = netAfterDiscount + vatAmount + deliveryCharge
+  const tdsAmount = Math.round(grandTotal * (Number(newInvoice.tdsPercent) || 0) / 100)
+  const netPayable = grandTotal - tdsAmount
+  const total = grandTotal
 
   const selectedDealer = dealers.find(d => String(d.id) === String(newInvoice.dealerId))
 
@@ -174,24 +215,40 @@ export default function Invoices() {
         customer_name: isCustom ? newInvoice.customerName.trim() : null,
         order_id: newInvoice.orderId || null,
         created_by: user?.id || null,
-        amount: total,
-        total_amount: total,
-        vat_amount: 0,
+        amount: grandTotal,
+        subtotal,
+        discount_amount: discountAmount,
+        tax_percent: Number(newInvoice.vatPercent) || 0,
+        vat_amount: vatAmount,
+        delivery_charge: deliveryCharge,
+        tds_percent: Number(newInvoice.tdsPercent) || 0,
+        tds_amount: tdsAmount,
+        net_payable: netPayable,
+        items: newInvoice.items.map(i => ({
+          product_id: i.id,
+          name: i.name,
+          qty: i.qty,
+          price: i.price,
+          amount: i.price * i.qty,
+        })),
+        total_amount: grandTotal,
         paid_amount: 0,
-        due_amount: total,
+        due_amount: netPayable,
         status: 'unpaid',
         invoice_date: new Date().toISOString().split('T')[0],
         due_date: newInvoice.dueDate || null,
         notes: newInvoice.notes || null,
       }
       const created = await api.createInvoice(invoice)
-      // Record dealer ledger debit for the manual invoice (dealers only — the ledger is per-dealer)
+      // Record dealer ledger debit for the manual invoice (dealers only — the ledger is per-dealer).
+      // Debit is the net payable: the cash the dealer actually owes (the TDS
+      // portion is claimed from NBR, not from the dealer).
       if (!isCustom) try {
         await api.recordDealerLedger({
           dealer_id: selectedDealer.id,
           transaction_type: 'invoice',
           reference_id: created.id,
-          debit: total,
+          debit: netPayable,
           credit: 0,
           description: `Invoice ${created.invoice_number}`,
           transaction_date: invoice.invoice_date,
@@ -216,7 +273,7 @@ export default function Invoices() {
       }
       toast.success('Invoice created')
       setShowCreate(false)
-      setNewInvoice({ buyerType: 'dealer', customerName: '', dealerId: '', orderId: '', items: [], discount: 0, notes: '', dueDate: '' })
+      setNewInvoice({ buyerType: 'dealer', customerName: '', dealerId: '', orderId: '', items: [], discount: 0, vatPercent: 15, tdsPercent: 5, deliveryCharge: 0, notes: '', dueDate: '' })
       fetchAll()
     } catch (err) {
       console.error('Invoice create failed:', err)
@@ -268,7 +325,7 @@ export default function Invoices() {
     setSavingPayment(true)
     try {
       const newPaid = (inv.paid || 0) + amount
-      const newDue = (inv.total_amount || inv.amount) - newPaid
+      const newDue = (inv.netPayable ?? inv.amount) - newPaid
       // Dealers submit payments for approval; management confirms them directly.
       const isManagement = ['super_admin', 'admin', 'sales_manager'].includes(user?.role)
       await api.createPayment({
@@ -380,6 +437,18 @@ export default function Invoices() {
 
   const filteredInvoices = invoices.filter(filtered)
   const totalDue = invoices.reduce((s, i) => s + (normalizedInvoice(i).due || 0), 0)
+
+  // Print view replaces the page (half-A4 invoice); closing returns to the list.
+  if (printInvoice) {
+    return (
+      <InvoicePrint
+        invoice={printInvoice}
+        products={products}
+        payments={payments}
+        onClose={() => setPrintInvoice(null)}
+      />
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -640,6 +709,20 @@ export default function Invoices() {
                     <p className="text-sm font-semibold text-gray-800">{formatDate(n.dueDate)}</p>
                   </div>
                 </div>
+                {/* Tax breakdown */}
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Breakdown</p>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-semibold">{formatCurrency(n.subtotal)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Discount ({n.discountPercent || 0}%)</span><span className="font-semibold">− {formatCurrency(n.discountAmount)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Delivery Charge</span><span className="font-semibold">+ {formatCurrency(n.deliveryCharge)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">VAT ({n.taxPercent || 0}%)</span><span className="font-semibold">+ {formatCurrency(n.vatAmount)}</span></div>
+                    <div className="flex justify-between border-t border-gray-100 pt-1"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(n.amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Less: IT (TDS) ({n.tdsPercent || 0}%)</span><span className="font-semibold">− {formatCurrency(n.tdsAmount)}</span></div>
+                    <div className="flex justify-between bg-brand-50 rounded px-2 py-1"><span className="font-bold">Net Payable</span><span className="font-bold text-brand-700">{formatCurrency(n.netPayable)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-semibold text-emerald-600">{formatCurrency(n.paid)}</span></div>
+                  </div>
+                </div>
                 {/* Hierarchy chain */}
                 <div className="pt-3 border-t border-gray-100">
                   <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Visible to (Hierarchy Chain)</p>
@@ -691,6 +774,12 @@ export default function Invoices() {
                     <MdPayments size={15} /> Record Payment
                   </button>
                 )}
+                <button
+                  onClick={() => { setSelectedInvoice(null); setPrintInvoice(n) }}
+                  className="btn-secondary w-full"
+                >
+                  <MdFileDownload size={15} /> Print Invoice (half A4)
+                </button>
               </div>
             </div>
           </div>
@@ -803,8 +892,8 @@ export default function Invoices() {
                 <div>
                   <label className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5 block">Buyer *</label>
                   <div className="flex gap-2 mb-2">
-                    <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'dealer' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
-                    <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'custom' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
+                    <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'dealer', tdsPercent: 5 })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
+                    <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'custom', tdsPercent: 0 })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
                   </div>
                   {newInvoice.buyerType === 'custom' ? (
                     <input
@@ -947,23 +1036,67 @@ export default function Invoices() {
                   </div>
                 )}
 
-                {/* Discount + Total */}
+                {/* Discount / VAT / TDS / Delivery + Totals */}
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs font-semibold text-gray-600">Discount %:</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="50"
-                      value={newInvoice.discount}
-                      onChange={(e) => setNewInvoice({ ...newInvoice, discount: Number(e.target.value) })}
-                      className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5"
-                    />
-                    <span className="text-xs text-gray-500">({formatCurrency(discountAmount)})</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Discount %:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={newInvoice.discount}
+                        onChange={(e) => setNewInvoice({ ...newInvoice, discount: Number(e.target.value) })}
+                        className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                      />
+                      <span className="text-xs text-gray-500">({formatCurrency(discountAmount)})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Delivery ৳:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newInvoice.deliveryCharge}
+                        onChange={(e) => setNewInvoice({ ...newInvoice, deliveryCharge: Number(e.target.value) })}
+                        className="w-24 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">VAT %:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={newInvoice.vatPercent}
+                        onChange={(e) => setNewInvoice({ ...newInvoice, vatPercent: Number(e.target.value) })}
+                        className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                      />
+                      <span className="text-xs text-gray-500">({formatCurrency(vatAmount)})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">IT (TDS) %:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="15"
+                        value={newInvoice.tdsPercent}
+                        onChange={(e) => setNewInvoice({ ...newInvoice, tdsPercent: Number(e.target.value) })}
+                        className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                      />
+                      <span className="text-xs text-gray-500">(−{formatCurrency(tdsAmount)})</span>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-100 divide-y divide-gray-50 text-xs">
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Subtotal</span><span className="font-semibold text-gray-800">{formatCurrency(subtotal)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Discount ({newInvoice.discount}%)</span><span className="font-semibold text-gray-800">− {formatCurrency(discountAmount)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Delivery Charge</span><span className="font-semibold text-gray-800">+ {formatCurrency(deliveryCharge)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">VAT ({newInvoice.vatPercent}%)</span><span className="font-semibold text-gray-800">+ {formatCurrency(vatAmount)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5 bg-gray-50"><span className="font-semibold text-gray-900">Grand Total</span><span className="font-bold text-gray-900">{formatCurrency(grandTotal)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Less: IT (TDS) ({newInvoice.tdsPercent}%)</span><span className="font-semibold text-gray-800">− {formatCurrency(tdsAmount)}</span></div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-brand-50 rounded-lg">
-                    <span className="text-sm font-bold text-gray-900">Total</span>
-                    <span className="text-lg font-bold text-brand-700">{formatCurrency(total)}</span>
+                    <span className="text-sm font-bold text-gray-900">Net Payable</span>
+                    <span className="text-lg font-bold text-brand-700">{formatCurrency(netPayable)}</span>
                   </div>
                 </div>
 
@@ -997,7 +1130,7 @@ export default function Invoices() {
                   </button>
                   <button
                     type="submit"
-                    disabled={!selectedDealer || newInvoice.items.length === 0}
+                    disabled={((newInvoice.buyerType !== 'custom' && !selectedDealer) || newInvoice.items.length === 0)}
                     className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <MdSend size={15} /> Create Invoice

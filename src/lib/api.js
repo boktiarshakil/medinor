@@ -445,6 +445,33 @@ export const api = {
         ? Number(order.net_amount)
         : Math.max(subtotal - discount + vat, 0)
     const totalAmount = netAmount
+    // VAT rate carried from the order (0 when the order charged no VAT).
+    // Orders carry no delivery charge, so the VAT base is subtotal − discount.
+    const vatBase = Math.max(subtotal - discount, 0)
+    const taxPercent = vat > 0 && vatBase > 0 ? Math.round((vat / vatBase) * 100) : 0
+    // TDS (income tax deducted at source): dealers deduct 5%, walk-in buyers 0%.
+    // It comes off the grand total — the buyer pays the net payable.
+    const tdsPercent = order.dealer_id ? 5 : 0
+    const tdsAmount = Math.round(totalAmount * (tdsPercent / 100))
+    const netPayable = totalAmount - tdsAmount
+    // Product names for the printed invoice lines.
+    let productNames = {}
+    try {
+      const ids = [...new Set((order.items || []).map(i => i.product_id).filter(Boolean))]
+      if (ids.length > 0) {
+        const { data: prods } = await supabase.from('products').select('id, name').in('id', ids)
+        ;(prods || []).forEach(p => { productNames[p.id] = p.name })
+      }
+    } catch (nameErr) {
+      console.warn('Invoice product-name lookup failed:', nameErr)
+    }
+    const invoiceItems = (order.items || []).map(item => ({
+      product_id: item.product_id,
+      name: productNames[item.product_id] || '',
+      qty: Number(item.quantity) || 0,
+      price: Number(item.unit_price) || 0,
+      amount: Number(item.total_price ?? (Number(item.quantity) || 0) * (Number(item.unit_price) || 0)),
+    }))
 
     const invoicePayload = {
       invoice_number: generateInvoiceNo(),
@@ -453,11 +480,19 @@ export const api = {
       customer_type: order.customer_type || null,
       customer_name: order.customer_name || null,
       created_by: createdBy || null,
-      amount: subtotal,
+      amount: totalAmount,
+      subtotal,
+      discount_amount: discount,
+      tax_percent: taxPercent,
       vat_amount: vat,
+      delivery_charge: 0,
+      tds_percent: tdsPercent,
+      tds_amount: tdsAmount,
+      net_payable: netPayable,
+      items: invoiceItems,
       total_amount: totalAmount,
       paid_amount: 0,
-      due_amount: totalAmount,
+      due_amount: netPayable,
       status: 'unpaid',
       invoice_date: new Date().toISOString().split('T')[0],
       notes: `Auto-generated from order ${order.order_number || order.order_no || order.id}`,
@@ -470,13 +505,14 @@ export const api = {
       .single()
     if (invError) throw invError
 
-    // Record dealer ledger debit for the invoice
+    // Record dealer ledger debit for the invoice (the net payable — the cash
+    // the dealer actually owes; the TDS portion is claimed from NBR, not the dealer).
     try {
       await this.recordDealerLedger({
         dealer_id: order.dealer_id,
         transaction_type: 'invoice',
         reference_id: invData.id,
-        debit: totalAmount,
+        debit: netPayable,
         credit: 0,
         description: `Invoice ${invData.invoice_number}`,
         transaction_date: invoicePayload.invoice_date,
@@ -1195,11 +1231,13 @@ export const api = {
 
     const { data: invRow } = await supabase
       .from('invoices')
-      .select('id, total_amount, amount, order_id')
+      .select('id, total_amount, amount, net_payable, order_id')
       .eq('id', id)
       .single()
+    // The buyer owes the net payable (grand total less TDS deducted at source);
+    // old invoices have no net_payable, so they fall back to the grand total.
     const total = invRow
-      ? Number(invRow.total_amount ?? invRow.amount ?? 0)
+      ? Number(invRow.net_payable ?? invRow.total_amount ?? invRow.amount ?? 0)
       : 0
     const due = Math.max(total - paid, 0)
     const status = due <= 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid'
