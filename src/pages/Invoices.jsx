@@ -7,6 +7,8 @@ import {
 } from '../lib/utils'
 import { PAYMENT_METHODS, paymentMethodLabel, uploadToImgBB } from '../lib/upload'
 import InvoicePrint from '../components/InvoicePrint'
+import CRMCustomerPicker from '../components/CRMCustomerPicker'
+import DealerPicker from '../components/DealerPicker'
 import {
   MdSearch, MdFileDownload, MdReceipt, MdAdd, MdSend, MdVisibility,
   MdPerson, MdLocationOn, MdPhone, MdClose, MdCheckCircle, MdDelete,
@@ -53,6 +55,10 @@ export default function Invoices() {
     dueDate: ''
   })
   const [createSuccess, setCreateSuccess] = useState(false)
+  // CRM buyer for walk-in invoices (same picker as the order flow).
+  const [crmContacts, setCrmContacts] = useState([])
+  const [selectedContact, setSelectedContact] = useState(null)
+  const [manualCustomer, setManualCustomer] = useState(false)
 
   const fetchAll = async () => {
     setLoading(true)
@@ -65,6 +71,7 @@ export default function Invoices() {
         api.getOrders().catch(() => []),
       ])
       api.getPayments().then(setPayments).catch(() => setPayments([]))
+      api.getCRMContacts().then(setCrmContacts).catch(() => setCrmContacts([]))
       let invoices = invData
       if (user?.role === 'dealer') {
         const match = dealerData.find(
@@ -213,6 +220,7 @@ export default function Invoices() {
         dealer_id: isCustom ? null : selectedDealer.id,
         customer_type: isCustom ? 'customer' : null,
         customer_name: isCustom ? newInvoice.customerName.trim() : null,
+        crm_contact_id: isCustom ? (selectedContact?.id || null) : null,
         order_id: newInvoice.orderId || null,
         created_by: user?.id || null,
         amount: grandTotal,
@@ -273,6 +281,8 @@ export default function Invoices() {
       }
       toast.success('Invoice created')
       setShowCreate(false)
+      setSelectedContact(null)
+      setManualCustomer(false)
       setNewInvoice({ buyerType: 'dealer', customerName: '', dealerId: '', orderId: '', items: [], discount: 0, vatPercent: 15, tdsPercent: 5, deliveryCharge: 0, notes: '', dueDate: '' })
       fetchAll()
     } catch (err) {
@@ -896,25 +906,40 @@ export default function Invoices() {
                     <button type="button" onClick={() => setNewInvoice({ ...newInvoice, buyerType: 'custom', tdsPercent: 0 })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${newInvoice.buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
                   </div>
                   {newInvoice.buyerType === 'custom' ? (
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Customer name (walk-in buyer)"
-                      value={newInvoice.customerName}
-                      onChange={(e) => setNewInvoice({ ...newInvoice, customerName: e.target.value })}
-                    />
+                    manualCustomer ? (
+                      <div>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Customer name (walk-in buyer)"
+                          value={newInvoice.customerName}
+                          onChange={(e) => setNewInvoice({ ...newInvoice, customerName: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { setManualCustomer(false); setSelectedContact(null); setNewInvoice({ ...newInvoice, customerName: '' }) }}
+                          className="text-[11px] font-medium text-brand-600 hover:text-brand-700 mt-1"
+                        >
+                          Search CRM instead
+                        </button>
+                      </div>
+                    ) : (
+                      <CRMCustomerPicker
+                        contacts={crmContacts}
+                        selected={selectedContact}
+                        onSelect={(c) => {
+                          setSelectedContact(c)
+                          setNewInvoice({ ...newInvoice, customerName: c ? c.name : '' })
+                        }}
+                        onManual={() => setManualCustomer(true)}
+                      />
+                    )
                   ) : (
-                    <select
-                      className="input"
-                      value={newInvoice.dealerId}
-                      onChange={(e) => setNewInvoice({ ...newInvoice, dealerId: e.target.value })}
-                      required
-                    >
-                      <option value="">Choose dealer...</option>
-                      {dealers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} — {d.area || d.area_name || ''}</option>
-                      ))}
-                    </select>
+                    <DealerPicker
+                      dealers={dealers}
+                      selected={selectedDealer}
+                      onSelect={(d) => setNewInvoice({ ...newInvoice, dealerId: d ? d.id : '' })}
+                    />
                   )}
                 </div>
 

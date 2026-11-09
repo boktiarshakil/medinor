@@ -440,20 +440,33 @@ export const api = {
     // for legacy rows that predate the trigger.
     const discount = Number(order.discount_amount) || 0
     const vat = Number(order.vat_amount) || 0
+    // The order carries the full sale terms (migration 019). The auto-invoice
+    // inherits them exactly — delivery, TDS and net payable included — so the
+    // order and its invoice can never disagree. Old orders predate those
+    // columns, so they fall back to delivery 0 and the buyer-type TDS default.
+    const delivery = Number(order.delivery_charge) || 0
     const netAmount =
       order.net_amount != null && Number(order.net_amount) > 0
         ? Number(order.net_amount)
         : Math.max(subtotal - discount + vat, 0)
-    const totalAmount = netAmount
+    const totalAmount = netAmount + delivery
     // VAT rate carried from the order (0 when the order charged no VAT).
     // Orders carry no delivery charge, so the VAT base is subtotal − discount.
     const vatBase = Math.max(subtotal - discount, 0)
-    const taxPercent = vat > 0 && vatBase > 0 ? Math.round((vat / vatBase) * 100) : 0
+    const taxPercent = order.tax_percent != null
+      ? Number(order.tax_percent)
+      : (vat > 0 && vatBase > 0 ? Math.round((vat / vatBase) * 100) : 0)
     // TDS (income tax deducted at source): dealers deduct 5%, walk-in buyers 0%.
     // It comes off the grand total — the buyer pays the net payable.
-    const tdsPercent = order.dealer_id ? 5 : 0
-    const tdsAmount = Math.round(totalAmount * (tdsPercent / 100))
-    const netPayable = totalAmount - tdsAmount
+    const tdsPercent = order.tds_percent != null
+      ? Number(order.tds_percent)
+      : (order.dealer_id ? 5 : 0)
+    const tdsAmount = order.tds_amount != null
+      ? Number(order.tds_amount)
+      : Math.round(totalAmount * (tdsPercent / 100))
+    const netPayable = order.net_payable != null
+      ? Number(order.net_payable)
+      : totalAmount - tdsAmount
     // Product names for the printed invoice lines.
     let productNames = {}
     try {
@@ -485,7 +498,7 @@ export const api = {
       discount_amount: discount,
       tax_percent: taxPercent,
       vat_amount: vat,
-      delivery_charge: 0,
+      delivery_charge: delivery,
       tds_percent: tdsPercent,
       tds_amount: tdsAmount,
       net_payable: netPayable,

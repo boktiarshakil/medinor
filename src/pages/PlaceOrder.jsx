@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import CRMCustomerPicker from '../components/CRMCustomerPicker'
+import DealerPicker from '../components/DealerPicker'
 import toast from 'react-hot-toast'
 
 // Stock status helper — null/undefined means no inventory record (assume available)
@@ -27,6 +28,11 @@ export default function PlaceOrder() {
   const [dealers, setDealers] = useState([])
   const [selectedDealerId, setSelectedDealerId] = useState('')
   const [buyerType, setBuyerType] = useState('dealer')
+  // Order tax terms (same chain as the invoice; the auto-invoice inherits them).
+  const [discountPct, setDiscountPct] = useState(0)
+  const [deliveryCharge, setDeliveryCharge] = useState(0)
+  const [vatPercent, setVatPercent] = useState(15)
+  const [tdsPercent, setTdsPercent] = useState(5)
   const [customerName, setCustomerName] = useState('')
   // CRM buyer: pick a contact and name / phone / address auto-fill from it.
   const [crmContacts, setCrmContacts] = useState([])
@@ -139,6 +145,16 @@ export default function PlaceOrder() {
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.total, 0)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
+  // Order tax chain (matches the invoice): subtotal → discount → VAT on
+  // (net + delivery) → grand total → less TDS → net payable.
+  const orderSubtotal = cartTotal
+  const orderDiscount = Math.round(orderSubtotal * (discountPct / 100))
+  const orderNet = orderSubtotal - orderDiscount
+  const orderDelivery = Math.max(Number(deliveryCharge) || 0, 0)
+  const orderVat = Math.round((orderNet + orderDelivery) * (Number(vatPercent) || 0) / 100)
+  const orderGrand = orderNet + orderVat + orderDelivery
+  const orderTds = Math.round(orderGrand * (Number(tdsPercent) || 0) / 100)
+  const orderNetPayable = orderGrand - orderTds
 
   useEffect(() => {
     if (!cartRef.current) return
@@ -195,8 +211,20 @@ export default function PlaceOrder() {
         sr_id: role === 'dealer' ? null : user.id,
         area_id: dealerRecord?.area_id || user.area_id || null,
         status: 'submitted',
-        total_amount: cartTotal,
-        net_amount: cartTotal,
+        // Tax breakdown — the auto-invoice inherits these exact numbers.
+        // total_amount / net_amount follow the order-items trigger's formulas
+        // (total = subtotal, net = subtotal - discount + vat); the full amount
+        // the buyer pays is net_payable.
+        subtotal: orderSubtotal,
+        discount_amount: orderDiscount,
+        tax_percent: Number(vatPercent) || 0,
+        vat_amount: orderVat,
+        delivery_charge: orderDelivery,
+        tds_percent: Number(tdsPercent) || 0,
+        tds_amount: orderTds,
+        net_payable: orderNetPayable,
+        total_amount: orderSubtotal,
+        net_amount: orderNet + orderVat,
       }
       const items = cartItems.map(item => ({
         product_id: item.id,
@@ -263,8 +291,8 @@ export default function PlaceOrder() {
         <div className="card p-4">
           <label className="label">Ordering for *</label>
           <div className="flex gap-2 mb-2">
-            <button type="button" onClick={() => setBuyerType('dealer')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
-            <button type="button" onClick={() => setBuyerType('custom')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>CRM Customer</button>
+            <button type="button" onClick={() => { setBuyerType('dealer'); setTdsPercent(5) }} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
+            <button type="button" onClick={() => { setBuyerType('custom'); setTdsPercent(0) }} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>CRM Customer</button>
           </div>
           {buyerType === 'custom' ? (
             <div className="space-y-2">
@@ -305,16 +333,11 @@ export default function PlaceOrder() {
               )}
             </div>
           ) : (
-            <select
-              className="input"
-              value={selectedDealerId}
-              onChange={(e) => setSelectedDealerId(e.target.value)}
-            >
-              <option value="">Select dealer...</option>
-              {dealers.map(d => (
-                <option key={d.id} value={d.id}>{d.name} — {d.area?.name || d.area_name || d.area || 'Unassigned'}</option>
-              ))}
-            </select>
+            <DealerPicker
+              dealers={dealers}
+              selected={dealers.find(d => d.id === selectedDealerId) || null}
+              onSelect={(d) => setSelectedDealerId(d ? d.id : '')}
+            />
           )}
           <p className="text-[10px] text-gray-400 mt-1">{buyerType === 'custom' ? 'CRM customer — name, phone and address auto-fill from the CRM record. Charged at the retail price, no dealer ledger entry.' : 'Order will be attributed to this dealer and recorded against you.'}</p>
         </div>
@@ -514,9 +537,41 @@ export default function PlaceOrder() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-bold text-gray-900">Total Amount</span>
-                    <span className="text-lg font-bold text-brand-700">{formatCurrency(cartTotal)}</span>
+                  {/* Order tax terms + breakdown (inherited by the auto-invoice) */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Discount %:</label>
+                        <input type="number" min="0" max="50" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value))} className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                        <span className="text-xs text-gray-500">({formatCurrency(orderDiscount)})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Delivery ৳:</label>
+                        <input type="number" min="0" value={deliveryCharge} onChange={(e) => setDeliveryCharge(Number(e.target.value))} className="w-24 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">VAT %:</label>
+                        <input type="number" min="0" max="30" value={vatPercent} onChange={(e) => setVatPercent(Number(e.target.value))} className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                        <span className="text-xs text-gray-500">({formatCurrency(orderVat)})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">IT (TDS) %:</label>
+                        <input type="number" min="0" max="15" value={tdsPercent} onChange={(e) => setTdsPercent(Number(e.target.value))} className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                        <span className="text-xs text-gray-500">(−{formatCurrency(orderTds)})</span>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-gray-100 divide-y divide-gray-50 text-xs">
+                      <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Subtotal</span><span className="font-semibold text-gray-800">{formatCurrency(orderSubtotal)}</span></div>
+                      <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Discount ({discountPct}%)</span><span className="font-semibold text-gray-800">− {formatCurrency(orderDiscount)}</span></div>
+                      <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Delivery Charge</span><span className="font-semibold text-gray-800">+ {formatCurrency(orderDelivery)}</span></div>
+                      <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">VAT ({vatPercent}%)</span><span className="font-semibold text-gray-800">+ {formatCurrency(orderVat)}</span></div>
+                      <div className="flex justify-between px-3 py-1.5 bg-gray-50"><span className="font-semibold text-gray-900">Grand Total</span><span className="font-bold text-gray-900">{formatCurrency(orderGrand)}</span></div>
+                      <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Less: IT (TDS) ({tdsPercent}%)</span><span className="font-semibold text-gray-800">− {formatCurrency(orderTds)}</span></div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-brand-50 rounded-lg">
+                      <span className="text-sm font-bold text-gray-900">Net Payable</span>
+                      <span className="text-lg font-bold text-brand-700">{formatCurrency(orderNetPayable)}</span>
+                    </div>
                   </div>
 
                   {stockIssues.length > 0 && (

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import BookParcelModal from '../components/BookParcelModal'
 import CRMCustomerPicker from '../components/CRMCustomerPicker'
+import DealerPicker from '../components/DealerPicker'
 
 const NEXT_ACTIONS = {
   submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'], note: 'Stock reserved, invoice generated' },
@@ -61,6 +62,11 @@ export default function Orders() {
     area_id: '',
     items: [{ product_id: '', quantity: 1, unit_price: 0 }],
     notes: '',
+    // Order tax terms (same chain as the invoice; the auto-invoice inherits them).
+    discount: 0,
+    deliveryCharge: 0,
+    vatPercent: 15,
+    tdsPercent: 5,
   })
 
   const statuses = ['all', 'draft', 'submitted', 'approved', 'packed', 'dispatched', 'delivered', 'completed', 'cancelled']
@@ -201,7 +207,15 @@ export default function Orders() {
     setCreating(true)
     try {
       const selectedDealer = dealers.find(d => d.id === orderDraft.dealer_id)
-      const totalAmount = validItems.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0)
+      const subtotal = validItems.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0)
+      // Order tax chain (matches the invoice); the auto-invoice inherits it.
+      const discountAmount = Math.round(subtotal * (Number(orderDraft.discount) || 0) / 100)
+      const netAfterDiscount = subtotal - discountAmount
+      const deliveryCharge = Math.max(Number(orderDraft.deliveryCharge) || 0, 0)
+      const vatAmount = Math.round((netAfterDiscount + deliveryCharge) * (Number(orderDraft.vatPercent) || 0) / 100)
+      const grandTotal = netAfterDiscount + vatAmount + deliveryCharge
+      const tdsAmount = Math.round(grandTotal * (Number(orderDraft.tdsPercent) || 0) / 100)
+      const netPayable = grandTotal - tdsAmount
       await api.createOrder(
         {
           dealer_id: isCustom ? null : orderDraft.dealer_id,
@@ -215,8 +229,19 @@ export default function Orders() {
           sr_id: user?.id || orderDraft.sr_id || null,
           area_id: selectedDealer?.area_id || orderDraft.area_id || null,
           status: 'submitted',
-          total_amount: totalAmount,
-          net_amount: totalAmount,
+          // Tax breakdown — the auto-invoice inherits these exact numbers.
+          // total_amount / net_amount follow the order-items trigger's formulas
+          // (total = subtotal, net = subtotal - discount + vat).
+          subtotal,
+          discount_amount: discountAmount,
+          tax_percent: Number(orderDraft.vatPercent) || 0,
+          vat_amount: vatAmount,
+          delivery_charge: deliveryCharge,
+          tds_percent: Number(orderDraft.tdsPercent) || 0,
+          tds_amount: tdsAmount,
+          net_payable: netPayable,
+          total_amount: subtotal,
+          net_amount: netAfterDiscount + vatAmount,
           notes: orderDraft.notes || null,
         },
         validItems.map(i => ({
@@ -230,7 +255,7 @@ export default function Orders() {
       setShowCreate(false)
       setSelectedContact(null)
       setManualCustomer(false)
-      setOrderDraft({ buyer_type: 'dealer', customer_name: '', crm_contact_id: null, customer_phone: '', customer_address: '', dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '' })
+      setOrderDraft({ buyer_type: 'dealer', customer_name: '', crm_contact_id: null, customer_phone: '', customer_address: '', dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '', discount: 0, deliveryCharge: 0, vatPercent: 15, tdsPercent: 5 })
       fetchOrders()
     } catch (err) {
       toast.error('Failed: ' + err.message)
@@ -316,6 +341,16 @@ export default function Orders() {
     const matchStatus = statusFilter === 'all' || o.status === statusFilter
     return matchSearch && matchStatus
   })
+
+  // Draft order tax chain for the create modal (same as the invoice).
+  const draftSubtotal = orderDraft.items.reduce((sum, i) => sum + ((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)), 0)
+  const draftDiscount = Math.round(draftSubtotal * (Number(orderDraft.discount) || 0) / 100)
+  const draftNet = draftSubtotal - draftDiscount
+  const draftDelivery = Math.max(Number(orderDraft.deliveryCharge) || 0, 0)
+  const draftVat = Math.round((draftNet + draftDelivery) * (Number(orderDraft.vatPercent) || 0) / 100)
+  const draftGrand = draftNet + draftVat + draftDelivery
+  const draftTds = Math.round(draftGrand * (Number(orderDraft.tdsPercent) || 0) / 100)
+  const draftNetPayable = draftGrand - draftTds
 
   return (
     <div className="space-y-5">
@@ -566,8 +601,8 @@ export default function Orders() {
                 <div>
                   <label className="label">Buyer *</label>
                   <div className="flex gap-2 mb-2">
-                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'dealer' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
-                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'custom' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>CRM Customer</button>
+                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'dealer', tdsPercent: 5 })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
+                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'custom', tdsPercent: 0 })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>CRM Customer</button>
                   </div>
                   {orderDraft.buyer_type === 'custom' ? (
                     <div className="space-y-2">
@@ -590,10 +625,11 @@ export default function Orders() {
                       )}
                     </div>
                   ) : (
-                    <select className="input" value={orderDraft.dealer_id} onChange={(e) => setOrderDraft({ ...orderDraft, dealer_id: e.target.value })}>
-                      <option value="">Select dealer...</option>
-                      {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
+                    <DealerPicker
+                      dealers={dealers}
+                      selected={dealers.find(d => d.id === orderDraft.dealer_id) || null}
+                      onSelect={(d) => setOrderDraft({ ...orderDraft, dealer_id: d ? d.id : '' })}
+                    />
                   )}
                 </div>
                 <div>
@@ -633,10 +669,41 @@ export default function Orders() {
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-end mt-2">
-                  <p className="text-sm font-bold text-gray-900">
-                    Total: {formatCurrency(orderDraft.items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0))}
-                  </p>
+                {/* Order tax terms + breakdown (inherited by the auto-invoice) */}
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Discount %:</label>
+                      <input type="number" min="0" max="50" value={orderDraft.discount} onChange={(e) => setOrderDraft({ ...orderDraft, discount: Number(e.target.value) })} className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                      <span className="text-xs text-gray-500">({formatCurrency(draftDiscount)})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Delivery ৳:</label>
+                      <input type="number" min="0" value={orderDraft.deliveryCharge} onChange={(e) => setOrderDraft({ ...orderDraft, deliveryCharge: Number(e.target.value) })} className="w-24 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">VAT %:</label>
+                      <input type="number" min="0" max="30" value={orderDraft.vatPercent} onChange={(e) => setOrderDraft({ ...orderDraft, vatPercent: Number(e.target.value) })} className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                      <span className="text-xs text-gray-500">({formatCurrency(draftVat)})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">IT (TDS) %:</label>
+                      <input type="number" min="0" max="15" value={orderDraft.tdsPercent} onChange={(e) => setOrderDraft({ ...orderDraft, tdsPercent: Number(e.target.value) })} className="w-20 text-xs border border-gray-200 rounded-md px-2 py-1.5" />
+                      <span className="text-xs text-gray-500">(−{formatCurrency(draftTds)})</span>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-100 divide-y divide-gray-50 text-xs">
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Subtotal</span><span className="font-semibold text-gray-800">{formatCurrency(draftSubtotal)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Discount ({orderDraft.discount}%)</span><span className="font-semibold text-gray-800">− {formatCurrency(draftDiscount)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Delivery Charge</span><span className="font-semibold text-gray-800">+ {formatCurrency(draftDelivery)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">VAT ({orderDraft.vatPercent}%)</span><span className="font-semibold text-gray-800">+ {formatCurrency(draftVat)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5 bg-gray-50"><span className="font-semibold text-gray-900">Grand Total</span><span className="font-bold text-gray-900">{formatCurrency(draftGrand)}</span></div>
+                    <div className="flex justify-between px-3 py-1.5"><span className="text-gray-500">Less: IT (TDS) ({orderDraft.tdsPercent}%)</span><span className="font-semibold text-gray-800">− {formatCurrency(draftTds)}</span></div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-brand-50 rounded-lg">
+                    <span className="text-sm font-bold text-gray-900">Net Payable</span>
+                    <span className="text-lg font-bold text-brand-700">{formatCurrency(draftNetPayable)}</span>
+                  </div>
                 </div>
               </div>
 
