@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import BookParcelModal from '../components/BookParcelModal'
+import CRMCustomerPicker from '../components/CRMCustomerPicker'
 
 const NEXT_ACTIONS = {
   submitted: { status: 'approved', label: 'Approve', icon: MdCheck, roles: ['super_admin', 'admin', 'sales_manager'], note: 'Stock reserved, invoice generated' },
@@ -45,9 +46,16 @@ export default function Orders() {
   const [refreshingCourier, setRefreshingCourier] = useState(false)
   const [dealers, setDealers] = useState([])
   const [products, setProducts] = useState([])
+  // CRM buyer: pick a contact and name / phone / address auto-fill from it.
+  const [crmContacts, setCrmContacts] = useState([])
+  const [selectedContact, setSelectedContact] = useState(null)
+  const [manualCustomer, setManualCustomer] = useState(false)
   const [orderDraft, setOrderDraft] = useState({
     buyer_type: 'dealer',
     customer_name: '',
+    crm_contact_id: null,
+    customer_phone: '',
+    customer_address: '',
     dealer_id: '',
     sr_id: '',
     area_id: '',
@@ -113,9 +121,38 @@ export default function Orders() {
       ])
       setDealers(dealerData)
       setProducts(productData)
+      // CRM contacts power the walk-in buyer picker. A failed load only
+      // disables the picker; manual entry stays available.
+      api.getCRMContacts().then(setCrmContacts).catch(() => setCrmContacts([]))
     } catch (err) {
       console.error('Failed to load dealers/products:', err)
     }
+  }
+
+  // Picking a CRM contact auto-fills name / phone / address from the record.
+  // The fields stay editable so staff can correct a detail for this order.
+  const handleSelectContact = (contact) => {
+    setSelectedContact(contact)
+    setManualCustomer(false)
+    setOrderDraft(prev => ({
+      ...prev,
+      crm_contact_id: contact ? contact.id : null,
+      customer_name: contact ? contact.name : '',
+      customer_phone: contact ? (contact.phone || contact.mobile || '') : '',
+      customer_address: contact ? (contact.address || '') : '',
+    }))
+  }
+
+  const handleManualCustomer = () => {
+    setSelectedContact(null)
+    setManualCustomer(true)
+    setOrderDraft(prev => ({
+      ...prev,
+      crm_contact_id: null,
+      customer_name: '',
+      customer_phone: '',
+      customer_address: '',
+    }))
   }
 
   const addItem = () => {
@@ -170,6 +207,11 @@ export default function Orders() {
           dealer_id: isCustom ? null : orderDraft.dealer_id,
           customer_type: isCustom ? 'customer' : null,
           customer_name: isCustom ? orderDraft.customer_name.trim() : null,
+          // CRM link + delivery details snapshotted from the contact (or
+          // typed manually). Needs migration 017 live before this ships.
+          crm_contact_id: isCustom ? (orderDraft.crm_contact_id || null) : null,
+          phone: isCustom ? (orderDraft.customer_phone.trim() || null) : null,
+          address: isCustom ? (orderDraft.customer_address.trim() || null) : null,
           sr_id: user?.id || orderDraft.sr_id || null,
           area_id: selectedDealer?.area_id || orderDraft.area_id || null,
           status: 'submitted',
@@ -186,7 +228,9 @@ export default function Orders() {
       )
       toast.success('Order created')
       setShowCreate(false)
-      setOrderDraft({ buyer_type: 'dealer', customer_name: '', dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '' })
+      setSelectedContact(null)
+      setManualCustomer(false)
+      setOrderDraft({ buyer_type: 'dealer', customer_name: '', crm_contact_id: null, customer_phone: '', customer_address: '', dealer_id: '', sr_id: '', area_id: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }], notes: '' })
       fetchOrders()
     } catch (err) {
       toast.error('Failed: ' + err.message)
@@ -493,8 +537,10 @@ export default function Orders() {
           defaults={{
             invoice: bookOrder.number,
             recipient_name: bookOrder.dealer !== 'Unknown' ? bookOrder.dealer : '',
-            recipient_phone: '',
-            recipient_address: '',
+            // CRM orders carry the delivery phone/address snapshotted at
+            // order time; dealer orders leave these blank as before.
+            recipient_phone: bookOrder._raw?.phone || '',
+            recipient_address: bookOrder._raw?.address || '',
             cod_amount: bookOrder.amount || 0,
             note: '',
           }}
@@ -521,10 +567,28 @@ export default function Orders() {
                   <label className="label">Buyer *</label>
                   <div className="flex gap-2 mb-2">
                     <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'dealer' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
-                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'custom' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
+                    <button type="button" onClick={() => setOrderDraft({ ...orderDraft, buyer_type: 'custom' })} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${orderDraft.buyer_type === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>CRM Customer</button>
                   </div>
                   {orderDraft.buyer_type === 'custom' ? (
-                    <input type="text" className="input" placeholder="Customer name (walk-in buyer)" value={orderDraft.customer_name} onChange={(e) => setOrderDraft({ ...orderDraft, customer_name: e.target.value })} />
+                    <div className="space-y-2">
+                      {manualCustomer ? (
+                        <button type="button" onClick={() => { setManualCustomer(false); handleSelectContact(null) }} className="text-[11px] font-medium text-brand-600 hover:text-brand-700">← Pick from CRM instead</button>
+                      ) : (
+                        <CRMCustomerPicker
+                          contacts={crmContacts}
+                          selected={selectedContact}
+                          onSelect={handleSelectContact}
+                          onManual={handleManualCustomer}
+                        />
+                      )}
+                      {(selectedContact || manualCustomer) && (
+                        <>
+                          <input type="text" className="input" placeholder="Customer name" value={orderDraft.customer_name} onChange={(e) => setOrderDraft({ ...orderDraft, customer_name: e.target.value })} />
+                          <input type="tel" className="input" placeholder="Phone" value={orderDraft.customer_phone} onChange={(e) => setOrderDraft({ ...orderDraft, customer_phone: e.target.value })} />
+                          <input type="text" className="input" placeholder="Delivery address" value={orderDraft.customer_address} onChange={(e) => setOrderDraft({ ...orderDraft, customer_address: e.target.value })} />
+                        </>
+                      )}
+                    </div>
                   ) : (
                     <select className="input" value={orderDraft.dealer_id} onChange={(e) => setOrderDraft({ ...orderDraft, dealer_id: e.target.value })}>
                       <option value="">Select dealer...</option>

@@ -6,6 +6,7 @@ import {
 } from 'react-icons/md'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
+import CRMCustomerPicker from '../components/CRMCustomerPicker'
 import toast from 'react-hot-toast'
 
 // Stock status helper — null/undefined means no inventory record (assume available)
@@ -27,6 +28,12 @@ export default function PlaceOrder() {
   const [selectedDealerId, setSelectedDealerId] = useState('')
   const [buyerType, setBuyerType] = useState('dealer')
   const [customerName, setCustomerName] = useState('')
+  // CRM buyer: pick a contact and name / phone / address auto-fill from it.
+  const [crmContacts, setCrmContacts] = useState([])
+  const [selectedContact, setSelectedContact] = useState(null)
+  const [manualCustomer, setManualCustomer] = useState(false)
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerAddress, setCustomerAddress] = useState('')
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
@@ -40,6 +47,9 @@ export default function PlaceOrder() {
       const data = await api.getProductsWithStock()
       setProducts(data)
       const allDealers = await api.getDealers().catch(() => [])
+      // CRM contacts power the walk-in buyer picker (name / phone / address
+      // auto-fill from the record). A failed load only disables the picker.
+      api.getCRMContacts().then(setCrmContacts).catch(() => setCrmContacts([]))
       let list
       if (role === 'dealer') {
         list = allDealers
@@ -69,6 +79,24 @@ export default function PlaceOrder() {
   }
 
   useEffect(() => { fetchProducts() }, [])
+
+  // Picking a CRM contact auto-fills name / phone / address from the record.
+  // The fields stay editable so staff can correct a detail for this order.
+  const handleSelectContact = (contact) => {
+    setSelectedContact(contact)
+    setManualCustomer(false)
+    setCustomerName(contact ? contact.name : '')
+    setCustomerPhone(contact ? (contact.phone || contact.mobile || '') : '')
+    setCustomerAddress(contact ? (contact.address || '') : '')
+  }
+
+  const handleManualCustomer = () => {
+    setSelectedContact(null)
+    setManualCustomer(true)
+    setCustomerName('')
+    setCustomerPhone('')
+    setCustomerAddress('')
+  }
 
   const getPrice = (product) => {
     if (!role) return product.mrp
@@ -159,6 +187,11 @@ export default function PlaceOrder() {
         dealer_id: dealerRecord ? dealerRecord.id : null,
         customer_type: role !== 'dealer' && buyerType === 'custom' ? 'customer' : null,
         customer_name: role !== 'dealer' && buyerType === 'custom' ? customerName.trim() : null,
+        // CRM link + delivery details snapshotted from the contact (or typed
+        // manually). Needs migration 017 live before this code ships.
+        crm_contact_id: role !== 'dealer' && buyerType === 'custom' ? (selectedContact?.id || null) : null,
+        phone: role !== 'dealer' && buyerType === 'custom' ? (customerPhone.trim() || null) : null,
+        address: role !== 'dealer' && buyerType === 'custom' ? (customerAddress.trim() || null) : null,
         sr_id: role === 'dealer' ? null : user.id,
         area_id: dealerRecord?.area_id || user.area_id || null,
         status: 'submitted',
@@ -177,6 +210,11 @@ export default function PlaceOrder() {
         setOrderPlaced(false)
         setShowConfirm(false)
         setCart({})
+        setSelectedContact(null)
+        setManualCustomer(false)
+        setCustomerName('')
+        setCustomerPhone('')
+        setCustomerAddress('')
       }, 3000)
     } catch (err) {
       console.error('Order placement failed:', err)
@@ -226,16 +264,46 @@ export default function PlaceOrder() {
           <label className="label">Ordering for *</label>
           <div className="flex gap-2 mb-2">
             <button type="button" onClick={() => setBuyerType('dealer')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType !== 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Dealer</button>
-            <button type="button" onClick={() => setBuyerType('custom')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>Custom name</button>
+            <button type="button" onClick={() => setBuyerType('custom')} className={`flex-1 py-2 text-xs font-semibold rounded-lg border ${buyerType === 'custom' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-600'}`}>CRM Customer</button>
           </div>
           {buyerType === 'custom' ? (
-            <input
-              type="text"
-              className="input"
-              placeholder="Customer name (walk-in buyer)"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
+            <div className="space-y-2">
+              {manualCustomer ? (
+                <button type="button" onClick={() => { setManualCustomer(false); setCustomerName(''); setCustomerPhone(''); setCustomerAddress('') }} className="text-[11px] font-medium text-brand-600 hover:text-brand-700">← Pick from CRM instead</button>
+              ) : (
+                <CRMCustomerPicker
+                  contacts={crmContacts}
+                  selected={selectedContact}
+                  onSelect={handleSelectContact}
+                  onManual={handleManualCustomer}
+                />
+              )}
+              {(selectedContact || manualCustomer) && (
+                <>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Customer name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="Phone"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Delivery address"
+                    value={customerAddress}
+                    onChange={(e) => setCustomerAddress(e.target.value)}
+                  />
+                </>
+              )}
+            </div>
           ) : (
             <select
               className="input"
@@ -248,7 +316,7 @@ export default function PlaceOrder() {
               ))}
             </select>
           )}
-          <p className="text-[10px] text-gray-400 mt-1">{buyerType === 'custom' ? 'Walk-in sale — charged at the retail price, no dealer ledger entry.' : 'Order will be attributed to this dealer and recorded against you.'}</p>
+          <p className="text-[10px] text-gray-400 mt-1">{buyerType === 'custom' ? 'CRM customer — name, phone and address auto-fill from the CRM record. Charged at the retail price, no dealer ledger entry.' : 'Order will be attributed to this dealer and recorded against you.'}</p>
         </div>
       )}
 
